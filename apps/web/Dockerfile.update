@@ -1,0 +1,3 @@
+FROM tiggena-web:runtime-base
+RUN rm -rf /app/.next
+COPY .next /app/.next
