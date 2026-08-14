@@ -1,0 +1,308 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+enum Role {
+  CUSTOMER
+  PROVIDER
+  ADMIN
+}
+
+enum Language {
+  AM
+  EN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum DocumentType {
+  NATIONAL_ID
+  WOREDA_RECOMMENDATION
+  COC_CERTIFICATE
+  TRADE_CERTIFICATE
+  POLICE_CLEARANCE
+  PORTFOLIO
+}
+
+enum DocumentReviewState {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  PAID
+  CANCELLED
+}
+
+enum PaymentGatewayType {
+  TELEBIRR
+  CHAPA
+  CBEBIRR
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum LedgerType {
+  JOB_CREDIT
+  COMMISSION
+  PAYOUT
+  ADJUSTMENT
+}
+
+enum PayoutStatus {
+  REQUESTED
+  APPROVED
+  PROCESSED
+  REJECTED
+}
+
+enum ReviewState {
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+model User {
+  id              String           @id @default(cuid())
+  phone           String           @unique
+  name            String?
+  role            Role             @default(CUSTOMER)
+  language        Language         @default(AM)
+  telegramChatId  String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  providerProfile ProviderProfile?
+  bookings        Booking[]        @relation("CustomerBookings")
+  reviews         Review[]
+  messages        Message[]
+}
+
+model OtpCode {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+}
+
+model ServiceCategory {
+  id            String            @id @default(cuid())
+  slug          String            @unique
+  nameEn        String
+  nameAm        String
+  icon          String?
+  priceFloorEtb Decimal?          @db.Decimal(12, 2)
+  isActive      Boolean           @default(true)
+  providers     ProviderProfile[]
+  bookings      Booking[]
+}
+
+model ProviderProfile {
+  id                 String                                @id @default(cuid())
+  userId             String                                @unique
+  user               User                                  @relation(fields: [userId], references: [id])
+  categoryId         String
+  category           ServiceCategory                       @relation(fields: [categoryId], references: [id])
+  bio                String?
+  /// Vetting protocol fields (official onboarding document)
+  subCity            String?
+  woreda             String?
+  faydaIdNumber      String?
+  yearsExperience    Int?
+  guarantorName      String?
+  guarantorPhone     String?
+  serviceRadiusKm    Float                                 @default(5)
+  isAvailable        Boolean                               @default(false)
+  verificationStatus VerificationStatus                    @default(PENDING)
+  verificationNote   String?
+  ratingAvg          Float                                 @default(0)
+  ratingCount        Int                                   @default(0)
+  jobsCompleted      Int                                   @default(0)
+  lat                Float?
+  lng                Float?
+  locationUpdatedAt  DateTime?
+  location           Unsupported("geography(Point, 4326)")?
+  documents          ProviderDocument[]
+  bookings           Booking[]                             @relation("ProviderBookings")
+  offers             BookingOffer[]
+  wallet             Wallet?
+  createdAt          DateTime                              @default(now())
+  updatedAt          DateTime                              @updatedAt
+
+  @@index([categoryId, verificationStatus, isAvailable])
+}
+
+model ProviderDocument {
+  id         String              @id @default(cuid())
+  providerId String
+  provider   ProviderProfile     @relation(fields: [providerId], references: [id])
+  type       DocumentType
+  objectKey  String
+  state      DocumentReviewState @default(PENDING)
+  reviewNote String?
+  createdAt  DateTime            @default(now())
+}
+
+model Booking {
+  id                 String           @id @default(cuid())
+  customerId         String
+  customer           User             @relation("CustomerBookings", fields: [customerId], references: [id])
+  providerId         String?
+  provider           ProviderProfile? @relation("ProviderBookings", fields: [providerId], references: [id])
+  categoryId         String
+  category           ServiceCategory  @relation(fields: [categoryId], references: [id])
+  status             BookingStatus    @default(REQUESTED)
+  description        String?
+  lat                Float
+  lng                Float
+  landmarkNote       String?
+  priceQuoteEtb      Decimal?         @db.Decimal(12, 2)
+  finalPriceEtb      Decimal?         @db.Decimal(12, 2)
+  offerExpiresAt     DateTime?
+  acceptedAt         DateTime?
+  enRouteAt          DateTime?
+  arrivedAt          DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  paidAt             DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  payment            Payment?
+  review             Review?
+  messages           Message[]
+  offers             BookingOffer[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([customerId, createdAt])
+  @@index([providerId, status])
+}
+
+enum OfferOutcome {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  SUPERSEDED
+}
+
+/// One row per technician a job was offered to — the dispatch cascade audit trail.
+model BookingOffer {
+  id         String          @id @default(cuid())
+  bookingId  String
+  booking    Booking         @relation(fields: [bookingId], references: [id])
+  providerId String
+  provider   ProviderProfile @relation(fields: [providerId], references: [id])
+  offeredAt  DateTime        @default(now())
+  expiresAt  DateTime
+  outcome    OfferOutcome    @default(PENDING)
+
+  @@index([bookingId, offeredAt])
+  @@index([providerId, outcome])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+model Payment {
+  id            String             @id @default(cuid())
+  bookingId     String             @unique
+  booking       Booking            @relation(fields: [bookingId], references: [id])
+  gateway       PaymentGatewayType
+  status        PaymentStatus      @default(PENDING)
+  amountEtb     Decimal            @db.Decimal(12, 2)
+  commissionEtb Decimal?           @db.Decimal(12, 2)
+  gatewayRef    String?            @unique
+  initiatedAt   DateTime           @default(now())
+  confirmedAt   DateTime?
+}
+
+model Wallet {
+  id           String              @id @default(cuid())
+  providerId   String              @unique
+  provider     ProviderProfile     @relation(fields: [providerId], references: [id])
+  balanceEtb   Decimal             @default(0) @db.Decimal(12, 2)
+  transactions WalletTransaction[]
+  payouts      Payout[]
+}
+
+model WalletTransaction {
+  id        String     @id @default(cuid())
+  walletId  String
+  wallet    Wallet     @relation(fields: [walletId], references: [id])
+  type      LedgerType
+  amountEtb Decimal    @db.Decimal(12, 2)
+  bookingId String?
+  note      String?
+  createdAt DateTime   @default(now())
+
+  @@index([walletId, createdAt])
+}
+
+model Payout {
+  id          String       @id @default(cuid())
+  walletId    String
+  wallet      Wallet       @relation(fields: [walletId], references: [id])
+  amountEtb   Decimal      @db.Decimal(12, 2)
+  destination String
+  status      PayoutStatus @default(REQUESTED)
+  requestedAt DateTime     @default(now())
+  processedAt DateTime?
+}
+
+model Review {
+  id         String      @id @default(cuid())
+  bookingId  String      @unique
+  booking    Booking     @relation(fields: [bookingId], references: [id])
+  customerId String
+  customer   User        @relation(fields: [customerId], references: [id])
+  stars      Int
+  text       String?
+  state      ReviewState @default(PENDING)
+  createdAt  DateTime    @default(now())
+}
+
+model AppConfig {
+  key   String @id
+  value String
+}

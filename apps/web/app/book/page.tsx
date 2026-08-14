@@ -1,0 +1,418 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { Stars } from '../../components/Stars';
+import {
+  api,
+  Booking,
+  Category,
+  fmtDistance,
+  getToken,
+  NearbyProvider,
+} from '../../lib/api';
+import { SUB_CITIES } from '../../lib/areas';
+import { iconFor } from '../../lib/catalog';
+import { ARRIVAL, DIAGNOSTIC_FEE, GUARANTEE_DAYS } from '../../lib/content';
+
+const MapPicker = dynamic(() => import('../../components/MapPicker'), {
+  ssr: false,
+  loading: () => <div className="skeleton" style={{ height: 380 }} />,
+});
+
+// Meskel Square — a landmark every Addis resident knows
+const ADDIS = { lat: 9.0108, lng: 38.7613 };
+
+const WIZ_STEPS = [
+  { n: 1, t: 'Service', am: 'አገልግሎት' },
+  { n: 2, t: 'Location', am: 'ቦታ' },
+  { n: 3, t: 'Technician', am: 'ባለሙያ' },
+  { n: 4, t: 'Confirm', am: 'ማረጋገጫ' },
+];
+
+function BookWizard() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [step, setStep] = useState(1);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState(params.get('category') ?? '');
+  const [pos, setPos] = useState(ADDIS);
+  const [subCity, setSubCity] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [description, setDescription] = useState('');
+  const [providers, setProviders] = useState<NearbyProvider[] | null>(null);
+  const [providerId, setProviderId] = useState<string | undefined>();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.replace('/login?next=/book');
+      return;
+    }
+    api<Category[]>('/catalog/categories').then(setCategories).catch(() => {});
+  }, [router]);
+
+  const category = categories.find((c) => c.id === categoryId);
+  const chosenProvider = providers?.find((p) => p.id === providerId);
+  const areaLabel = [subCity, neighborhood].filter(Boolean).join(' · ');
+  // the API stores one landmark note — prefix it with the mapped service area
+  const fullLandmark = [areaLabel, landmark].filter(Boolean).join(' — ');
+
+  async function loadNearby() {
+    setBusy(true);
+    setError('');
+    try {
+      const list = await api<NearbyProvider[]>(
+        `/providers/nearby?lat=${pos.lat}&lng=${pos.lng}&categoryId=${categoryId}`,
+      );
+      setProviders(list);
+      setProviderId(list[0]?.id);
+      setStep(3);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm() {
+    setBusy(true);
+    setError('');
+    try {
+      const booking = await api<Booking>('/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          categoryId,
+          providerId,
+          lat: pos.lat,
+          lng: pos.lng,
+          landmarkNote: fullLandmark || undefined,
+          description: description || undefined,
+        }),
+      });
+      router.push(`/bookings/${booking.id}`);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="page">
+      <div className="container" style={{ maxWidth: 1060 }}>
+        <span className="sec-no">Booking · ማስያዝ</span>
+        <h1 className="page-title">አገልግሎት ይዘዙ · Book a service</h1>
+        <p className="page-sub">Verified professionals, live tracking, digital payment.</p>
+
+        <div className="wiz-rail" role="list" aria-label="Booking steps">
+          {WIZ_STEPS.map((s) => (
+            <button
+              key={s.n}
+              role="listitem"
+              className={`wiz-step${step === s.n ? ' on' : ''}${step > s.n ? ' done' : ''}`}
+              onClick={() => step > s.n && setStep(s.n)}
+              disabled={step < s.n}
+              aria-current={step === s.n ? 'step' : undefined}
+            >
+              <span className="n">{step > s.n ? '✓' : s.n}</span>
+              <span className="lbl">
+                {s.t}
+                <small>{s.am}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {error && <div className="error-box">{error}</div>}
+
+        <div className="wizard-grid">
+          <div>
+            {/* step 1 — category */}
+            {step === 1 && (
+              <div className="panel">
+                <h2>Which service? · የትኛው አገልግሎት?</h2>
+                <div className="pick-grid">
+                  {categories.map((c) => (
+                    <button
+                      key={c.id}
+                      className={`pick${categoryId === c.id ? ' selected' : ''}`}
+                      onClick={() => setCategoryId(c.id)}
+                    >
+                      <span className="em" aria-hidden>{iconFor(c.slug)}</span>
+                      <span className="en">{c.nameEn}</span>
+                      <span className="am">{c.nameAm}</span>
+                      {c.priceFloorEtb && (
+                        <span className="from">
+                          ከ ETB {c.priceFloorEtb} ጀምሮ · from ETB {c.priceFloorEtb}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                  {categories.length === 0 && (
+                    <div className="skeleton" style={{ height: 120, gridColumn: '1/-1' }} />
+                  )}
+                </div>
+                <div className="mt" style={{ textAlign: 'right' }}>
+                  <button className="btn btn-primary" disabled={!categoryId} onClick={() => setStep(2)}>
+                    Continue →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* step 2 — location */}
+            {step === 2 && (
+              <div className="panel">
+                <h2>Where? · የት?</h2>
+                <p className="hint mb">
+                  Tap the map or drag the pin to your exact gate. Landmark notes help the technician
+                  on streets without addresses.
+                </p>
+                <MapPicker lat={pos.lat} lng={pos.lng} onChange={(lat, lng) => setPos({ lat, lng })} />
+                <div className="row mt mb">
+                  <button
+                    className="btn btn-line btn-sm"
+                    onClick={() =>
+                      navigator.geolocation?.getCurrentPosition((p) =>
+                        setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                      )
+                    }
+                  >
+                    ⌖ Use my location
+                  </button>
+                  <span className="hint">
+                    {pos.lat.toFixed(5)}, {pos.lng.toFixed(5)}
+                  </span>
+                </div>
+                <div className="row" style={{ alignItems: 'stretch' }}>
+                  <div className="field" style={{ flex: 1, minWidth: 180 }}>
+                    <label>Sub-city · ክፍለ ከተማ</label>
+                    <select
+                      value={subCity}
+                      onChange={(e) => {
+                        setSubCity(e.target.value);
+                        setNeighborhood('');
+                      }}
+                    >
+                      <option value="">Choose…</option>
+                      {SUB_CITIES.map((s) => (
+                        <option key={s.name} value={s.name}>
+                          {s.name} · {s.nameAm}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field" style={{ flex: 1, minWidth: 180 }}>
+                    <label>Neighborhood · ሰፈር</label>
+                    <select
+                      value={neighborhood}
+                      onChange={(e) => setNeighborhood(e.target.value)}
+                      disabled={!subCity}
+                    >
+                      <option value="">{subCity ? 'Choose…' : 'Pick a sub-city first'}</option>
+                      {SUB_CITIES.find((s) => s.name === subCity)?.neighborhoods.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Landmark note · ምልክት</label>
+                  <input
+                    placeholder="e.g. Blue gate behind Edna Mall, 3rd floor"
+                    value={landmark}
+                    onChange={(e) => setLandmark(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label>Describe the problem · ችግሩን ይግለጹ</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Kitchen sink is leaking under the cabinet…"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </div>
+                <div className="spread">
+                  <button className="btn btn-line btn-sm" onClick={() => setStep(1)}>
+                    ← Back
+                  </button>
+                  <button className="btn btn-primary" disabled={busy} onClick={loadNearby}>
+                    {busy ? 'Searching…' : 'Find technicians →'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* step 3 — technician */}
+            {step === 3 && (
+              <div className="panel">
+                <h2>Choose your technician · ባለሙያ ይምረጡ</h2>
+                {providers && providers.length === 0 && (
+                  <div className="ok-box">
+                    No verified {category?.nameEn.toLowerCase()} technician is online in this area
+                    right now — you can still post the request and the first available professional
+                    will take it.
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                  {providers?.map((p) => (
+                    <button
+                      key={p.id}
+                      className={`tech-card${providerId === p.id ? ' selected' : ''}`}
+                      onClick={() => setProviderId(p.id)}
+                    >
+                      <span className="avatar">{(p.name ?? 'T').slice(0, 1)}</span>
+                      <span className="meta">
+                        <span className="name">
+                          {p.name ?? 'Technician'}
+                          <span className="verified">✔ verified</span>
+                        </span>
+                        <span className="sub">
+                          <Stars value={p.ratingAvg} small />{' '}
+                          {p.ratingCount > 0 ? `${p.ratingAvg.toFixed(1)} (${p.ratingCount})` : 'New'}{' '}
+                          · {p.jobsCompleted} jobs
+                          {p.subCity ? ` · ${p.woreda ? `Woreda ${p.woreda}, ` : ''}${p.subCity}` : ''}
+                          {p.yearsExperience ? ` · ${p.yearsExperience}+ yrs` : ''}
+                        </span>
+                      </span>
+                      <span className="dist-chip">{fmtDistance(p.distanceM)}</span>
+                    </button>
+                  ))}
+                  {providers && providers.length > 0 && (
+                    <button
+                      className={`tech-card${providerId === undefined ? ' selected' : ''}`}
+                      onClick={() => setProviderId(undefined)}
+                    >
+                      <span className="avatar" style={{ background: 'var(--muted)' }}>
+                        ✦
+                      </span>
+                      <span className="meta">
+                        <span className="name">First available technician</span>
+                        <span className="sub">Broadcast the job — fastest response</span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+                <div className="spread mt">
+                  <button className="btn btn-line btn-sm" onClick={() => setStep(2)}>
+                    ← Back
+                  </button>
+                  <button className="btn btn-primary" onClick={() => setStep(4)}>
+                    Review booking →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* step 4 — confirm */}
+            {step === 4 && (
+              <div className="panel">
+                <h2>Confirm · ያረጋግጡ</h2>
+                <div className="receipt-row">
+                  <span className="k">Service</span>
+                  <span className="v">
+                    {category?.nameAm} — {category?.nameEn}
+                  </span>
+                </div>
+                <div className="receipt-row">
+                  <span className="k">Technician</span>
+                  <span className="v">
+                    {providerId ? chosenProvider?.name ?? 'Selected technician' : 'First available'}
+                  </span>
+                </div>
+                <div className="receipt-row">
+                  <span className="k">Location</span>
+                  <span className="v">
+                    {areaLabel || `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`}
+                    {landmark && <div className="hint">“{landmark}”</div>}
+                  </span>
+                </div>
+                {description && (
+                  <div className="receipt-row">
+                    <span className="k">Problem</span>
+                    <span className="v" style={{ fontWeight: 400 }}>
+                      {description}
+                    </span>
+                  </div>
+                )}
+                {category?.priceFloorEtb && (
+                  <div className="receipt-row">
+                    <span className="k">Estimate</span>
+                    <span className="v">
+                      ከ ETB {category.priceFloorEtb} ጀምሮ · from ETB {category.priceFloorEtb}
+                    </span>
+                  </div>
+                )}
+                <p className="hint mt mb">
+                  The nearest verified technician is dispatched — average arrival {ARRIVAL}. When
+                  the job is done you pay the technician directly (cash, Telebirr, CBE Birr or
+                  mobile banking) at the standard platform rate, and every repair carries a{' '}
+                  {GUARANTEE_DAYS}-day guarantee. Cancelling is free until the technician starts
+                  traveling; if they arrive and you choose not to proceed, a diagnostic fee of{' '}
+                  {DIAGNOSTIC_FEE.min}–{DIAGNOSTIC_FEE.max} ETB applies.
+                </p>
+                <div className="spread">
+                  <button className="btn btn-line btn-sm" onClick={() => setStep(3)}>
+                    ← Back
+                  </button>
+                  <button className="btn btn-primary" disabled={busy} onClick={confirm}>
+                    {busy ? 'Booking…' : 'ማስያዣ ያረጋግጡ · Confirm booking'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* live summary — fills in as you go */}
+          <aside className="sum-card" aria-label="Booking summary">
+            <h3>Your booking · ማስያዣዎ</h3>
+            <div className="sum-row">
+              <span className="k">Service</span>
+              <span className={`v${category ? '' : ' empty'}`}>
+                {category ? category.nameAm : '—'}
+              </span>
+            </div>
+            <div className="sum-row">
+              <span className="k">Location</span>
+              <span className={`v${step > 1 || areaLabel ? '' : ' empty'}`}>
+                {areaLabel || (step > 1 ? `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}` : '—')}
+              </span>
+            </div>
+            <div className="sum-row">
+              <span className="k">Landmark</span>
+              <span className={`v${landmark ? '' : ' empty'}`}>{landmark || '—'}</span>
+            </div>
+            <div className="sum-row">
+              <span className="k">Technician</span>
+              <span className={`v${step > 2 ? '' : ' empty'}`}>
+                {step > 2 ? (providerId ? chosenProvider?.name ?? 'Selected' : 'First available') : '—'}
+              </span>
+            </div>
+            <p className="sum-note">
+              {category?.priceFloorEtb
+                ? `ከ ETB ${category.priceFloorEtb} ጀምሮ · from ETB ${category.priceFloorEtb} — final price follows the standard platform range.`
+                : 'Price follows the standard platform ranges.'}{' '}
+              You pay the technician directly — cash, Telebirr, CBE Birr or mobile banking — and
+              every repair carries a {GUARANTEE_DAYS}-day guarantee.
+            </p>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function BookPage() {
+  return (
+    <Suspense>
+      <BookWizard />
+    </Suspense>
+  );
+}

@@ -1,0 +1,13 @@
+# Caddy reverse proxy — automatic HTTPS via Let's Encrypt.
+# Domains come from deploy/.env (WEB_DOMAIN / API_DOMAIN); DNS A records for both
+# must point at the ECS elastic IP BEFORE first start, or cert issuance fails.
+
+{$WEB_DOMAIN} {
+	encode gzip
+	reverse_proxy web:4000
+}
+
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy api:4001
+}

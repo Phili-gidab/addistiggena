@@ -1,0 +1,89 @@
+# Addis Tiggena — production stack for a single Telecloud ECS (2 vCPU / 4 GB).
+# Runs everything on one box: PostgreSQL+PostGIS, API, web, bot, and Caddy
+# (reverse proxy with automatic Let's Encrypt TLS).
+#
+#   cd deploy
+#   cp .env.example .env    # fill in every value
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# When the second (DB) ECS from docs/03 arrives, move the `db` service there
+# and point DATABASE_URL at it — nothing else changes.
+
+name: tiggena
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tiggena
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: tiggena
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tiggena -d tiggena']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: tiggena-api:latest
+    build: ../apps/api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '4001'
+      DATABASE_URL: postgresql://tiggena:${POSTGRES_PASSWORD}@db:5432/tiggena?schema=public
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: tiggena-web:latest
+    build:
+      context: ../apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL:?set API_PUBLIC_URL in deploy/.env}
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  bot:
+    image: tiggena-bot:latest
+    build: ../apps/bot
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in deploy/.env}
+      BOT_API_KEY: ${BOT_API_KEY:?set BOT_API_KEY in deploy/.env}
+      API_URL: http://api:4001
+      WEB_URL: ${WEB_PUBLIC_URL:?set WEB_PUBLIC_URL in deploy/.env}
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:?set WEB_DOMAIN in deploy/.env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

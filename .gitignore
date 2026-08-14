@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+build/
+coverage/
+*.log
+.env
+.env.local
+.env.production
+.DS_Store
+Thumbs.db
+apps/api/prisma/migrations/dev.db*
+.expo/
+apps/api/uploads/
+*.pem

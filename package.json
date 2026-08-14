@@ -1,0 +1,19 @@
+{
+  "name": "addis-tiggena",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Addis Tiggena — integrated digital maintenance service platform for Addis Ababa",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "apps/bot"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

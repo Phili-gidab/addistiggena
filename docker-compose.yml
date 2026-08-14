@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: tiggena-db
+    environment:
+      POSTGRES_USER: tiggena
+      POSTGRES_PASSWORD: tiggena_dev
+      POSTGRES_DB: tiggena
+    ports:
+      - "5432:5432"
+    volumes:
+      - tiggena_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiggena"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: tiggena-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - tiggena_redisdata:/data
+
+volumes:
+  tiggena_pgdata:
+  tiggena_redisdata:
