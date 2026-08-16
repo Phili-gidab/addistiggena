@@ -133,10 +133,10 @@ body.scroll-locked .site-header { transform: none; }
   transition: transform 0.3s var(--ease); border-radius: 2px;
 }
 .nav-link:hover::after, .nav-link.active::after { transform: scaleX(1); transform-origin: left; }
-@media (max-width: 920px) { .nav a.hide-sm, .nav button.hide-sm { display: none; } }
+@media (max-width: 960px) { .nav a.hide-sm, .nav button.hide-sm { display: none; } }
 /* narrow-laptop band: with every nav item visible (signed-in admin) the row runs
    out of room before the 920px burger collapse - tighten instead of clipping */
-@media (min-width: 921px) and (max-width: 1140px) {
+@media (min-width: 961px) and (max-width: 1140px) {
   .nav { gap: 0.55rem; }
   .nav a { font-size: 0.85rem; }
   .nav .btn { padding: 0.5rem 0.85rem; font-size: 0.82rem; }
