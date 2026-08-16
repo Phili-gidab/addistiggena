@@ -1,6 +1,6 @@
 /**
  * Photography manifest (Unsplash, free license). Every photo renders behind a
- * navy wash with mix-blend-mode: luminosity, so imagery stays on-brand — the
+ * navy wash with mix-blend-mode: luminosity, so imagery stays on-brand - the
  * blue/navy grade comes from the plate, not the photo.
  */
 

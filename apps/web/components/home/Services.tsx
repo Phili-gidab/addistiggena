@@ -6,7 +6,7 @@ import { iconFor } from '../../lib/catalog';
 import { FALLBACK_IMG, tradeImg } from '../../lib/images';
 import { Reveal } from '../motion/Reveal';
 
-/** "All categories" — icon tile grid with hover photography, one tap to book. */
+/** "All categories" - icon tile grid with hover photography, one tap to book. */
 export function Services({ categories }: { categories: Category[] }) {
   return (
     <section className="section" id="services">
@@ -55,7 +55,7 @@ export function Services({ categories }: { categories: Category[] }) {
           ))}
           {categories.length === 0 && (
             <p style={{ gridColumn: '1/-1', color: 'var(--muted)' }}>
-              The API is offline — start it with <code>npm run start:dev -w apps/api</code>.
+              The API is offline - start it with <code>npm run start:dev -w apps/api</code>.
             </p>
           )}
         </div>

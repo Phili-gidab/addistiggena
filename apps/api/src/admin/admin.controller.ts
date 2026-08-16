@@ -108,9 +108,9 @@ export class AdminController {
 
     const messages: Record<VerificationStatus, string> = {
       VERIFIED:
-        'Addis Tiggena: ተረጋግጠዋል · your technician profile is verified — go online to receive jobs!',
-      REJECTED: `Addis Tiggena: ማመልከቻዎ ውድቅ ሆኗል · your application was rejected${note ? ` — ${note}` : ''}. You can re-apply with corrected documents.`,
-      SUSPENDED: `Addis Tiggena: መለያዎ ታግዷል · your account is suspended${note ? ` — ${note}` : ''}.`,
+        'Addis Tiggena: ተረጋግጠዋል · your technician profile is verified - go online to receive jobs!',
+      REJECTED: `Addis Tiggena: ማመልከቻዎ ውድቅ ሆኗል · your application was rejected${note ? ` - ${note}` : ''}. You can re-apply with corrected documents.`,
+      SUSPENDED: `Addis Tiggena: መለያዎ ታግዷል · your account is suspended${note ? ` - ${note}` : ''}.`,
       PENDING: 'Addis Tiggena: your application is back in review.',
     };
     this.notifications.notifyUserId(profile.user.id, messages[status]).catch(() => {});
@@ -223,7 +223,7 @@ export class AdminController {
           walletId: payout.walletId,
           type: 'ADJUSTMENT',
           amountEtb: payout.amountEtb,
-          note: `Payout rejected${dto.note ? ` — ${dto.note}` : ''} (refund)`,
+          note: `Payout rejected${dto.note ? ` - ${dto.note}` : ''} (refund)`,
         },
       });
       await tx.wallet.update({

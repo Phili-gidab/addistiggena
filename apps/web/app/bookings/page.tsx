@@ -42,7 +42,7 @@ export default function BookingsPage() {
         {bookings?.length === 0 && (
           <div className="panel" style={{ textAlign: 'center' }}>
             <p style={{ marginBottom: '1.2rem', color: 'var(--muted)' }}>
-              No bookings yet — your first fix is a minute away.
+              No bookings yet - your first fix is a minute away.
             </p>
             <Link href="/book" className="btn btn-primary">
               Book a service
@@ -58,8 +58,8 @@ export default function BookingsPage() {
               </span>
               <span className="when" style={{ display: 'block' }}>
                 {fmtDate(b.createdAt)}
-                {b.provider?.user?.name ? ` — ${b.provider.user.name}` : ''}
-                {b.finalPriceEtb ? ` — ${b.finalPriceEtb} ETB` : ''}
+                {b.provider?.user?.name ? ` - ${b.provider.user.name}` : ''}
+                {b.finalPriceEtb ? ` - ${b.finalPriceEtb} ETB` : ''}
               </span>
             </span>
             <StatusBadge status={b.status} />

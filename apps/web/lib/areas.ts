@@ -1,5 +1,5 @@
 /**
- * Geographic coverage — the 10 sub-cities of Addis Ababa and their
+ * Geographic coverage - the 10 sub-cities of Addis Ababa and their
  * neighbourhood mapping, from the official "Geographic Coverage" document
  * (for app design and call-center data).
  */

@@ -51,7 +51,7 @@ export function Hero({ categories }: { categories: Category[] }) {
   return (
     <section className="hero">
       <span className="hero-bgphoto" aria-hidden>
-        {/* Photo: Scott Blake on Unsplash (free license) — faint texture wash */}
+        {/* Photo: Scott Blake on Unsplash (free license) - faint texture wash */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={BAND_IMG} alt="" loading="eager" />
       </span>
@@ -65,10 +65,10 @@ export function Hero({ categories }: { categories: Category[] }) {
             A verified technician,
             <br />
             <span className="b">at your door in minutes.</span>
-            <span className="am">የተረጋገጠ ባለሙያ — በደቂቃዎች ውስጥ በርዎ ላይ።</span>
+            <span className="am">የተረጋገጠ ባለሙያ - በደቂቃዎች ውስጥ በርዎ ላይ።</span>
           </h1>
           <p className="hero-p">
-            Mitad, wiring, plumbing, appliances, Wi-Fi — pick a service, pin your location, and the
+            Mitad, wiring, plumbing, appliances, Wi-Fi - pick a service, pin your location, and the
             nearest Woreda-cleared, CoC-certified technician is dispatched to you. As easy as
             ordering a ride.
           </p>
@@ -145,7 +145,7 @@ export function Hero({ categories }: { categories: Category[] }) {
 
         <div className="hero-card">
           <span className="photo" aria-hidden>
-            {/* Photo: Emmanuel Ikwuegbu on Unsplash (free license) — electrician at a panel */}
+            {/* Photo: Emmanuel Ikwuegbu on Unsplash (free license) - electrician at a panel */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={HERO_IMG} alt="" loading="eager" />
           </span>
@@ -153,7 +153,7 @@ export function Hero({ categories }: { categories: Category[] }) {
             ጥገና
           </span>
           <div className="brand-badge">
-            <Image src="/logo.png" alt="Addis Tiggena — Connect, Fix, Care" width={150} height={150} priority />
+            <Image src="/logo.png" alt="Addis Tiggena - Connect, Fix, Care" width={150} height={150} priority />
           </div>
           <div className="hero-chip">
             <span className="ic">⚡</span>
@@ -174,7 +174,7 @@ export function Hero({ categories }: { categories: Category[] }) {
           <div className="hero-chip">
             <span className="ic">✔</span>
             <span>
-              <b>Abebe T. — Verified</b>
+              <b>Abebe T. - Verified</b>
               <small>Woreda ✓ · CoC ✓ · Fayda ID ✓</small>
             </span>
             <span className="ok">★ 4.9</span>

@@ -16,7 +16,7 @@ import { AuthUser } from '../auth/jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { UPLOAD_DIR } from './uploads.controller';
 
-/** Uploaded object keys are always `<timestamp>-<hex><ext>` — anything else is rejected. */
+/** Uploaded object keys are always `<timestamp>-<hex><ext>` - anything else is rejected. */
 const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** Content types are set explicitly from the stored (MIME-derived) extension so the

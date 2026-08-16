@@ -21,7 +21,7 @@ const MapPicker = dynamic(() => import('../../components/MapPicker'), {
   loading: () => <div className="skeleton" style={{ height: 380 }} />,
 });
 
-// Meskel Square — a landmark every Addis resident knows
+// Meskel Square - a landmark every Addis resident knows
 const ADDIS = { lat: 9.0108, lng: 38.7613 };
 
 const WIZ_STEPS = [
@@ -59,8 +59,8 @@ function BookWizard() {
   const category = categories.find((c) => c.id === categoryId);
   const chosenProvider = providers?.find((p) => p.id === providerId);
   const areaLabel = [subCity, neighborhood].filter(Boolean).join(' · ');
-  // the API stores one landmark note — prefix it with the mapped service area
-  const fullLandmark = [areaLabel, landmark].filter(Boolean).join(' — ');
+  // the API stores one landmark note - prefix it with the mapped service area
+  const fullLandmark = [areaLabel, landmark].filter(Boolean).join(' - ');
 
   async function loadNearby() {
     setBusy(true);
@@ -131,7 +131,7 @@ function BookWizard() {
 
         <div className="wizard-grid">
           <div>
-            {/* step 1 — category */}
+            {/* step 1 - category */}
             {step === 1 && (
               <div className="panel">
                 <h2>Which service? · የትኛው አገልግሎት?</h2>
@@ -164,7 +164,7 @@ function BookWizard() {
               </div>
             )}
 
-            {/* step 2 — location */}
+            {/* step 2 - location */}
             {step === 2 && (
               <div className="panel">
                 <h2>Where? · የት?</h2>
@@ -250,14 +250,14 @@ function BookWizard() {
               </div>
             )}
 
-            {/* step 3 — technician */}
+            {/* step 3 - technician */}
             {step === 3 && (
               <div className="panel">
                 <h2>Choose your technician · ባለሙያ ይምረጡ</h2>
                 {providers && providers.length === 0 && (
                   <div className="ok-box">
                     No verified {category?.nameEn.toLowerCase()} technician is online in this area
-                    right now — you can still post the request and the first available professional
+                    right now - you can still post the request and the first available professional
                     will take it.
                   </div>
                 )}
@@ -295,7 +295,7 @@ function BookWizard() {
                       </span>
                       <span className="meta">
                         <span className="name">First available technician</span>
-                        <span className="sub">Broadcast the job — fastest response</span>
+                        <span className="sub">Broadcast the job - fastest response</span>
                       </span>
                     </button>
                   )}
@@ -311,14 +311,14 @@ function BookWizard() {
               </div>
             )}
 
-            {/* step 4 — confirm */}
+            {/* step 4 - confirm */}
             {step === 4 && (
               <div className="panel">
                 <h2>Confirm · ያረጋግጡ</h2>
                 <div className="receipt-row">
                   <span className="k">Service</span>
                   <span className="v">
-                    {category?.nameAm} — {category?.nameEn}
+                    {category?.nameAm} - {category?.nameEn}
                   </span>
                 </div>
                 <div className="receipt-row">
@@ -351,7 +351,7 @@ function BookWizard() {
                   </div>
                 )}
                 <p className="hint mt mb">
-                  The nearest verified technician is dispatched — average arrival {ARRIVAL}. When
+                  The nearest verified technician is dispatched - average arrival {ARRIVAL}. When
                   the job is done you pay the technician directly (cash, Telebirr, CBE Birr or
                   mobile banking) at the standard platform rate, and every repair carries a{' '}
                   {GUARANTEE_DAYS}-day guarantee. Cancelling is free until the technician starts
@@ -370,36 +370,36 @@ function BookWizard() {
             )}
           </div>
 
-          {/* live summary — fills in as you go */}
+          {/* live summary - fills in as you go */}
           <aside className="sum-card" aria-label="Booking summary">
             <h3>Your booking · ማስያዣዎ</h3>
             <div className="sum-row">
               <span className="k">Service</span>
               <span className={`v${category ? '' : ' empty'}`}>
-                {category ? category.nameAm : '—'}
+                {category ? category.nameAm : '-'}
               </span>
             </div>
             <div className="sum-row">
               <span className="k">Location</span>
               <span className={`v${step > 1 || areaLabel ? '' : ' empty'}`}>
-                {areaLabel || (step > 1 ? `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}` : '—')}
+                {areaLabel || (step > 1 ? `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}` : '-')}
               </span>
             </div>
             <div className="sum-row">
               <span className="k">Landmark</span>
-              <span className={`v${landmark ? '' : ' empty'}`}>{landmark || '—'}</span>
+              <span className={`v${landmark ? '' : ' empty'}`}>{landmark || '-'}</span>
             </div>
             <div className="sum-row">
               <span className="k">Technician</span>
               <span className={`v${step > 2 ? '' : ' empty'}`}>
-                {step > 2 ? (providerId ? chosenProvider?.name ?? 'Selected' : 'First available') : '—'}
+                {step > 2 ? (providerId ? chosenProvider?.name ?? 'Selected' : 'First available') : '-'}
               </span>
             </div>
             <p className="sum-note">
               {category?.priceFloorEtb
-                ? `ከ ETB ${category.priceFloorEtb} ጀምሮ · from ETB ${category.priceFloorEtb} — final price follows the standard platform range.`
+                ? `ከ ETB ${category.priceFloorEtb} ጀምሮ · from ETB ${category.priceFloorEtb} - final price follows the standard platform range.`
                 : 'Price follows the standard platform ranges.'}{' '}
-              You pay the technician directly — cash, Telebirr, CBE Birr or mobile banking — and
+              You pay the technician directly - cash, Telebirr, CBE Birr or mobile banking - and
               every repair carries a {GUARANTEE_DAYS}-day guarantee.
             </p>
           </aside>

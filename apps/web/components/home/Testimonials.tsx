@@ -1,6 +1,6 @@
 import { TESTIMONIALS } from '../../lib/content';
 
-/** Customer voices — from the official testimonies document. */
+/** Customer voices - from the official testimonies document. */
 export function Testimonials() {
   return (
     <section className="section alt" id="testimonials">

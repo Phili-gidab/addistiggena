@@ -45,8 +45,8 @@ interface WalletDetail {
 }
 
 // Official vetting checklist (technician registration & vetting document):
-// mandatory — Fayda/Resident ID, Woreda recommendation letter, CoC practical
-// pass, Woreda/police clearance; optional — TVET/trade certificate, portfolio.
+// mandatory - Fayda/Resident ID, Woreda recommendation letter, CoC practical
+// pass, Woreda/police clearance; optional - TVET/trade certificate, portfolio.
 const DOC_TYPES = [
   { value: 'NATIONAL_ID', label: 'Fayda / Resident ID · መታወቂያ', required: true },
   { value: 'WOREDA_RECOMMENDATION', label: 'Woreda recommendation letter · የወረዳ ደብዳቤ', required: true },
@@ -93,7 +93,7 @@ export default function ProviderPage() {
         api<WalletDetail>('/wallet/me').then(setWalletDetail).catch(() => {});
       })
       .catch((e) => {
-        // only a real 404 means "no profile yet" — on transient poll errors
+        // only a real 404 means "no profile yet" - on transient poll errors
         // keep the last good profile instead of flashing the signup form
         if (e instanceof ApiError && e.status === 404) {
           setProfile(null);
@@ -111,7 +111,7 @@ export default function ProviderPage() {
         method: 'POST',
         body: JSON.stringify({ amountEtb: Number(payoutAmount), destination: payoutDest }),
       });
-      setNotice(`Payout of ${payoutAmount} ETB requested — processed same-day.`);
+      setNotice(`Payout of ${payoutAmount} ETB requested - processed same-day.`);
       setPayoutAmount('');
       load();
     } catch (err) {
@@ -136,7 +136,7 @@ export default function ProviderPage() {
         method: 'POST',
         body: JSON.stringify({ type: docType, objectKey: body.objectKey }),
       });
-      setNotice('Document uploaded — our team reviews it within 3–5 days.');
+      setNotice('Document uploaded - our team reviews it within 3–5 days.');
       load();
     } catch (err) {
       setError((err as Error).message);
@@ -208,7 +208,7 @@ export default function ProviderPage() {
     }
   }
 
-  // REQUESTED = an incoming offer awaiting accept/reject (90s window) — surface
+  // REQUESTED = an incoming offer awaiting accept/reject (90s window) - surface
   // it above the in-flight jobs so the technician responds in time.
   const offers = jobs.filter((j) => j.status === 'REQUESTED');
   const actionable = jobs.filter((j) =>
@@ -230,7 +230,7 @@ export default function ProviderPage() {
           <div className="panel">
             <h2>Become a technician · ባለሙያ ይሁኑ</h2>
             <p className="hint mb">
-              Free to join — skill and trust over certification, no degree required. After
+              Free to join - skill and trust over certification, no degree required. After
               registration, upload your vetting documents (Fayda ID, Woreda recommendation letter,
               CoC pass, police clearance); once our team verifies them you appear in customer
               searches and start receiving jobs. Clients pay you directly.
@@ -242,7 +242,7 @@ export default function ProviderPage() {
                   <option value="">Choose…</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.nameAm} — {c.nameEn}
+                      {c.nameAm} - {c.nameEn}
                     </option>
                   ))}
                 </select>
@@ -304,7 +304,7 @@ export default function ProviderPage() {
           <>
             {profile.verificationStatus !== 'VERIFIED' && (
               <div className="error-box">
-                Verification status: <strong>{profile.verificationStatus}</strong> — you can go
+                Verification status: <strong>{profile.verificationStatus}</strong> - you can go
                 online once an admin verifies your documents.
                 {['REJECTED', 'SUSPENDED'].includes(profile.verificationStatus) &&
                   profile.verificationNote && (
@@ -315,12 +315,12 @@ export default function ProviderPage() {
               </div>
             )}
 
-            {/* incoming REQUESTED offers — 90s response window, so show first */}
+            {/* incoming REQUESTED offers - 90s response window, so show first */}
             {offers.length > 0 && (
               <div className="panel">
                 <div className="dispatch-note" style={{ marginBottom: '0.9rem' }}>
                   <strong>{offers.length}</strong> new job offer{offers.length > 1 ? 's' : ''} ·
-                  አዲስ የስራ ጥያቄ — respond now (90s window)
+                  አዲስ የስራ ጥያቄ - respond now (90s window)
                 </div>
                 {offers.map((j) => (
                   <Link key={j.id} href={`/bookings/${j.id}`} className="booking-row">
@@ -330,7 +330,7 @@ export default function ProviderPage() {
                       </span>
                       <span className="when" style={{ display: 'block' }}>
                         {fmtDate(j.createdAt)}
-                        {j.landmarkNote ? ` — “${j.landmarkNote}”` : ''}
+                        {j.landmarkNote ? ` - “${j.landmarkNote}”` : ''}
                       </span>
                     </span>
                     <span className="offer-count">Respond now →</span>
@@ -351,7 +351,7 @@ export default function ProviderPage() {
                 <div className="k">jobs completed</div>
               </div>
               <div className="tile">
-                <div className="v">{profile.ratingCount ? profile.ratingAvg.toFixed(1) : '—'}</div>
+                <div className="v">{profile.ratingCount ? profile.ratingAvg.toFixed(1) : '-'}</div>
                 <div className="k">rating ({profile.ratingCount} reviews)</div>
               </div>
             </div>
@@ -372,7 +372,7 @@ export default function ProviderPage() {
                   </span>
                 </div>
                 <div className="row">
-                  <span className="hint">{profile.isAvailable ? 'Online — receiving jobs' : 'Offline'}</span>
+                  <span className="hint">{profile.isAvailable ? 'Online - receiving jobs' : 'Offline'}</span>
                   <button
                     aria-label="availability"
                     className={`toggle${profile.isAvailable ? ' on' : ''}`}
@@ -441,7 +441,7 @@ export default function ProviderPage() {
                           <td style={{ color: Number(t.amountEtb) < 0 ? '#a03020' : 'var(--teal-dark)' }}>
                             {t.amountEtb} ETB
                           </td>
-                          <td className="hint">{t.note ?? '—'}</td>
+                          <td className="hint">{t.note ?? '-'}</td>
                           <td className="hint">{fmtDate(t.createdAt)}</td>
                         </tr>
                       ))}
@@ -501,7 +501,7 @@ export default function ProviderPage() {
 
             <div className="panel">
               <h2>Active jobs</h2>
-              {actionable.length === 0 && <p className="hint">No active jobs — stay online to receive requests.</p>}
+              {actionable.length === 0 && <p className="hint">No active jobs - stay online to receive requests.</p>}
               {actionable.map((j) => (
                 <Link key={j.id} href={`/bookings/${j.id}`} className="booking-row">
                   <span>
@@ -510,7 +510,7 @@ export default function ProviderPage() {
                     </span>
                     <span className="when" style={{ display: 'block' }}>
                       {fmtDate(j.createdAt)}
-                      {j.landmarkNote ? ` — “${j.landmarkNote}”` : ''}
+                      {j.landmarkNote ? ` - “${j.landmarkNote}”` : ''}
                     </span>
                   </span>
                   <StatusBadge status={j.status} />
@@ -527,7 +527,7 @@ export default function ProviderPage() {
                       <span className="what">{j.category.nameAm}</span>
                       <span className="when" style={{ display: 'block' }}>
                         {fmtDate(j.createdAt)}
-                        {j.finalPriceEtb ? ` — ${j.finalPriceEtb} ETB` : ''}
+                        {j.finalPriceEtb ? ` - ${j.finalPriceEtb} ETB` : ''}
                       </span>
                     </span>
                     <StatusBadge status={j.status} />
@@ -537,7 +537,7 @@ export default function ProviderPage() {
             )}
 
             <p className="hint mt">
-              <Stars value={profile.ratingAvg} small /> Public profile preview — customers see your
+              <Stars value={profile.ratingAvg} small /> Public profile preview - customers see your
               trade, rating, distance and bio when choosing a technician.
             </p>
           </>

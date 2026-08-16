@@ -5,7 +5,7 @@ export interface SmsProvider {
   send(phone: string, message: string): Promise<void>;
 }
 
-/** Logs SMS to the console — the dev default until a gateway contract is signed. */
+/** Logs SMS to the console - the dev default until a gateway contract is signed. */
 class ConsoleSmsProvider implements SmsProvider {
   private readonly logger = new Logger('SMS');
   async send(phone: string, message: string): Promise<void> {
@@ -85,7 +85,7 @@ export class SmsService {
         );
       } else {
         this.logger.warn(
-          'SMS_PROVIDER=africastalking but AT_USERNAME/AT_API_KEY missing — falling back to console (dev only)',
+          'SMS_PROVIDER=africastalking but AT_USERNAME/AT_API_KEY missing - falling back to console (dev only)',
         );
         this.provider = new ConsoleSmsProvider();
       }

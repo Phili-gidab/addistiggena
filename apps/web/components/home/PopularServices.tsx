@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { fmtRange, POPULAR } from '../../lib/pricing';
 
-/** Popular repairs with the official standard price ranges — action-first. */
+/** Popular repairs with the official standard price ranges - action-first. */
 export function PopularServices() {
   return (
     <section className="section alt" id="popular">
@@ -29,7 +29,7 @@ export function PopularServices() {
           ))}
         </div>
         <p className="hint mt">
-          Rates are base inspection + labor ranges set by the platform — you pay the technician
+          Rates are base inspection + labor ranges set by the platform - you pay the technician
           directly, and spare parts are best purchased by you with the technician&rsquo;s
           specifications.
         </p>

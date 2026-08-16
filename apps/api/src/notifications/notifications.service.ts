@@ -11,7 +11,7 @@ export interface NotifyTarget {
 /**
  * Fan-out dispatcher for user-facing notifications: SMS mirror (connectivity
  * resilience, proposal §3) plus Telegram push for accounts linked via the bot.
- * Delivery is fire-and-forget — a failed channel never blocks the request path.
+ * Delivery is fire-and-forget - a failed channel never blocks the request path.
  */
 @Injectable()
 export class NotificationsService {

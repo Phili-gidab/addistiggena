@@ -30,7 +30,7 @@ loadDotEnv();
 
 export const BOT_TOKEN = process.env.BOT_TOKEN ?? '';
 export const API_URL = process.env.API_URL ?? 'http://localhost:4001';
-// Shared secret for /auth/telegram/* — must match BOT_API_KEY in apps/api/.env
+// Shared secret for /auth/telegram/* - must match BOT_API_KEY in apps/api/.env
 // (the API's dev default is `dev-bot-key`).
 export const BOT_API_KEY = process.env.BOT_API_KEY ?? 'dev-bot-key';
 export const WEB_URL = process.env.WEB_URL ?? 'http://localhost:4000';

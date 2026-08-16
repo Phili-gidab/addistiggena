@@ -12,7 +12,7 @@ const TRADES = [
   'መኪና · Automotive',
 ];
 
-/** Infinite trades ticker — pure CSS animation, duplicated track. */
+/** Infinite trades ticker - pure CSS animation, duplicated track. */
 export function Marquee() {
   return (
     <div className="marquee" aria-hidden>

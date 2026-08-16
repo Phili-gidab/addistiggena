@@ -106,7 +106,7 @@ export default function AdminPage() {
     }
   }
 
-  // /files/:objectKey now requires a Bearer token — plain <a href> would 401,
+  // /files/:objectKey now requires a Bearer token - plain <a href> would 401,
   // so fetch with auth (silent token refresh included) and open the blob in a
   // new tab.
   async function openDocument(objectKey: string) {
@@ -161,7 +161,7 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="panel">
-              <h2>Bookings — last 14 days</h2>
+              <h2>Bookings - last 14 days</h2>
               <DailyBars data={analytics.daily} />
             </div>
             <div className="panel">
@@ -179,7 +179,7 @@ export default function AdminPage() {
             <div key={p.id} className="booking-row" style={{ cursor: 'default' }}>
               <span>
                 <span className="what">
-                  {p.amountEtb} ETB — {p.wallet.provider.user.name ?? p.wallet.provider.user.phone}
+                  {p.amountEtb} ETB - {p.wallet.provider.user.name ?? p.wallet.provider.user.phone}
                 </span>
                 <span className="when" style={{ display: 'block' }}>
                   → {p.destination} · {fmtDate(p.requestedAt)}
@@ -285,7 +285,7 @@ export default function AdminPage() {
               <span>
                 <span className="what">{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</span>
                 <span className="when" style={{ display: 'block' }}>
-                  {r.text ?? '(no text)'} — {fmtDate(r.createdAt)}
+                  {r.text ?? '(no text)'} - {fmtDate(r.createdAt)}
                 </span>
               </span>
               <span className="row">
@@ -324,7 +324,7 @@ export default function AdminPage() {
             >
               Save
             </button>
-            <span className="hint">fraction of gross, e.g. 0.10 = 10% — applies to new settlements</span>
+            <span className="hint">fraction of gross, e.g. 0.10 = 10% - applies to new settlements</span>
           </div>
         </div>
 
@@ -347,9 +347,9 @@ export default function AdminPage() {
                   <tr key={b.id}>
                     <td className="hint">#{b.id.slice(-6).toUpperCase()}</td>
                     <td>{b.category.nameEn}</td>
-                    <td>{b.customer?.name ?? b.customer?.phone ?? '—'}</td>
-                    <td>{b.provider?.user?.name ?? '—'}</td>
-                    <td>{b.payment ? `${b.payment.amountEtb} ETB` : b.finalPriceEtb ? `${b.finalPriceEtb} ETB` : '—'}</td>
+                    <td>{b.customer?.name ?? b.customer?.phone ?? '-'}</td>
+                    <td>{b.provider?.user?.name ?? '-'}</td>
+                    <td>{b.payment ? `${b.payment.amountEtb} ETB` : b.finalPriceEtb ? `${b.finalPriceEtb} ETB` : '-'}</td>
                     <td>
                       <StatusBadge status={b.status} />
                     </td>

@@ -3,7 +3,7 @@ import { hashSync } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-/** Demo credentials (all roles) — username/password login for demos alongside phone OTP. */
+/** Demo credentials (all roles) - username/password login for demos alongside phone OTP. */
 const DEMO_PASSWORDS: Record<string, string> = {
   admin: 'admin1234',
   technician: 'tech1234',
@@ -14,7 +14,7 @@ const hash = (u: string) => hashSync(DEMO_PASSWORDS[u], 10);
 // The 11 official service categories from the company "Service Catalog"
 // document. priceFloorEtb doubles as the "from ETB…" estimate shown at booking
 // time and is the minimum of the category's documented standard price ranges
-// (250 ETB — the diagnostic/call-out floor — where no range is documented yet).
+// (250 ETB - the diagnostic/call-out floor - where no range is documented yet).
 const categories = [
   { slug: 'electrical', nameEn: 'Electrical', nameAm: 'ኤሌክትሪክ', icon: 'zap', priceFloorEtb: 250 },
   { slug: 'plumbing', nameEn: 'Plumbing & Sanitary', nameAm: 'ቧንቧ እና ሳኒተሪ', icon: 'wrench', priceFloorEtb: 550 },
@@ -104,7 +104,7 @@ async function main() {
     create: {
       userId: providerUser.id,
       categoryId: plumbing.id,
-      bio: 'Experienced plumber — demo account',
+      bio: 'Experienced plumber - demo account',
       serviceRadiusKm: 10,
       isAvailable: true,
       verificationStatus: 'VERIFIED',

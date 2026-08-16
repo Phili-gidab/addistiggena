@@ -35,7 +35,7 @@ export class PaymentsController {
     return this.payments.initiate(bookingId, dto.gateway, user.userId);
   }
 
-  /** Gateway callback — unauthenticated but signature-verified per driver, idempotent. */
+  /** Gateway callback - unauthenticated but signature-verified per driver, idempotent. */
   @Post('webhook/:gateway')
   @HttpCode(200)
   webhook(

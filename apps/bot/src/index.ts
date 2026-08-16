@@ -15,7 +15,7 @@ import {
 } from './session';
 
 /**
- * Addis Tiggena Telegram bot — the low-data booking channel (proposal §3).
+ * Addis Tiggena Telegram bot - the low-data booking channel (proposal §3).
  * Full conversational booking flow: category → contact link (request_contact)
  * → location share → optional description → confirm → POST /bookings.
  * Booking status updates are pushed to this chat by the API itself.
@@ -28,7 +28,7 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// The bot links accounts and receives booking updates (with amounts) — private
+// The bot links accounts and receives booking updates (with amounts) - private
 // chats only. A group /start gets a short pointer; everything else is ignored.
 bot.use(async (ctx, next) => {
   if (!ctx.chat || ctx.chat.type === 'private') return next();
@@ -94,7 +94,7 @@ function categoryLabel(lang: Lang, category: api.Category): string {
   const name = lang === 'en' ? category.nameEn : category.nameAm;
   const icon = category.icon ? `${category.icon} ` : '';
   const price = category.priceFloorEtb
-    ? ` — ${t(lang, 'priceFrom', { x: formatEtb(category.priceFloorEtb) })}`
+    ? ` - ${t(lang, 'priceFrom', { x: formatEtb(category.priceFloorEtb) })}`
     : '';
   return `${icon}${name}${price}`;
 }
@@ -194,10 +194,10 @@ async function showBookings(ctx: Context, session: Session): Promise<void> {
     const lines = bookings.slice(0, 5).map((b) => {
       const name = session.lang === 'en' ? b.category.nameEn : b.category.nameAm;
       const price = b.finalPriceEtb ?? b.priceQuoteEtb;
-      const priceNote = price ? ` — ETB ${formatEtb(price)}` : '';
+      const priceNote = price ? ` - ETB ${formatEtb(price)}` : '';
       return [
         `${statusLabel(session.lang, b.status)} · #${b.id.slice(-6)}`,
-        `${name} — ${formatDate(session.lang, b.createdAt)}${priceNote}`,
+        `${name} - ${formatDate(session.lang, b.createdAt)}${priceNote}`,
         `${WEB_URL}/bookings/${b.id}`,
       ].join('\n');
     });
@@ -218,7 +218,7 @@ async function showBookings(ctx: Context, session: Session): Promise<void> {
 
 async function confirmBooking(ctx: Context, session: Session): Promise<void> {
   const flow = session.flow;
-  if (flow.step !== 'awaiting_confirm') return; // stale button — ignore
+  if (flow.step !== 'awaiting_confirm') return; // stale button - ignore
   const draft = flow.draft;
   if (draft.lat === undefined || draft.lng === undefined) {
     session.flow = { step: 'awaiting_location', draft };
@@ -269,7 +269,7 @@ async function cancelFlow(ctx: Context, session: Session): Promise<void> {
   await ctx.reply(t(session.lang, 'flowCancelled'), mainMenu(session.lang));
 }
 
-/** Best-effort push of the chosen language to the API — resumes auth if the
+/** Best-effort push of the chosen language to the API - resumes auth if the
  * in-memory token is gone (e.g. after a restart); unlinked chats are skipped. */
 async function syncLanguage(session: Session, chatId: number): Promise<void> {
   try {
@@ -419,7 +419,7 @@ bot.on(message('contact'), async (ctx) => {
     }
     console.error('Account link failed', err);
     // 400 = the API validated and refused the phone; anything else (network,
-    // 5xx, …) is not the user's fault — show the generic error instead.
+    // 5xx, …) is not the user's fault - show the generic error instead.
     await ctx.reply(t(session.lang, status === 400 ? 'linkFailed' : 'genericError'));
   }
 });
@@ -438,7 +438,7 @@ bot.on(message('location'), async (ctx) => {
       await askDescription(ctx, session);
       return;
     case 'awaiting_confirm': {
-      // The user is correcting the pin — take it and re-show the summary.
+      // The user is correcting the pin - take it and re-show the summary.
       const draft = { ...flow.draft, lat: latitude, lng: longitude };
       session.flow = { step: 'awaiting_confirm', draft };
       await sendSummary(ctx, session, draft);
@@ -510,8 +510,8 @@ async function main(): Promise<void> {
   } catch (err) {
     console.warn('Failed to register bot commands (non-fatal)', err);
   }
-  // Telegraf 4: bot.launch() resolves only on shutdown — log before launching.
-  console.log(`Addis Tiggena bot starting — API ${API_URL}, web ${WEB_URL}`);
+  // Telegraf 4: bot.launch() resolves only on shutdown - log before launching.
+  console.log(`Addis Tiggena bot starting - API ${API_URL}, web ${WEB_URL}`);
   bot.launch().catch((err) => {
     console.error('Bot stopped with an error', err);
     process.exit(1);

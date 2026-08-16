@@ -16,7 +16,7 @@ export { gsap, ScrollTrigger, SplitText, useGSAP };
 export const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** True on mouse-driven devices — gates cursor & magnetic effects. */
+/** True on mouse-driven devices - gates cursor & magnetic effects. */
 export const finePointer = () =>
   typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
 

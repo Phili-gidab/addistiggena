@@ -15,7 +15,7 @@ export interface Category {
   slug: string;
   nameEn: string;
   nameAm: string;
-  /** Prisma Decimal serialises as string — the "from ETB…" estimate */
+  /** Prisma Decimal serialises as string - the "from ETB…" estimate */
   priceFloorEtb: string | null;
 }
 
@@ -168,7 +168,7 @@ export async function api<T>(path: string, init: RequestInit = {}, retried = fal
   if (res.status === 401 && !path.startsWith('/auth/') && token) {
     if (!retried && (await tryRefresh())) return api<T>(path, init, true);
     redirectToLogin();
-    throw new ApiError('Your session expired — please sign in again.', 401);
+    throw new ApiError('Your session expired - please sign in again.', 401);
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -187,7 +187,7 @@ export async function authorizedFetch(path: string, init: RequestInit = {}, retr
   const token = getToken();
   if (!token) {
     redirectToLogin();
-    throw new ApiError('Your session expired — please sign in again.', 401);
+    throw new ApiError('Your session expired - please sign in again.', 401);
   }
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -196,7 +196,7 @@ export async function authorizedFetch(path: string, init: RequestInit = {}, retr
   if (res.status === 401) {
     if (!retried && (await tryRefresh())) return authorizedFetch(path, init, true);
     redirectToLogin();
-    throw new ApiError('Your session expired — please sign in again.', 401);
+    throw new ApiError('Your session expired - please sign in again.', 401);
   }
   return res;
 }

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { COMPANY } from '../../lib/content';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Addis Tiggena',
+  title: 'Privacy Policy - Addis Tiggena',
   description: 'How Addis Tiggena collects, uses, stores and protects the personal data of clients and technicians.',
 };
 
@@ -70,9 +70,9 @@ export default function PrivacyPage() {
           <li>
             <strong>Service Duration &amp; Transaction Monitoring:</strong> since payments are made
             directly to technicians, Addis Tiggena does not process or handle direct customer
-            funds. We record basic service logs — the duration of time a technician spends at a
+            funds. We record basic service logs - the duration of time a technician spends at a
             client&rsquo;s location and the final amount collected based on platform rate
-            guidelines — strictly for quality control, record keeping, rate compliance, and
+            guidelines - strictly for quality control, record keeping, rate compliance, and
             service tracking under our guarantee policy.
           </li>
           <li>

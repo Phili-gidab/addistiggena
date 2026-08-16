@@ -4,9 +4,9 @@ import { PACKAGES } from '../../lib/catalog';
 import { DIAGNOSTIC, fmtRange, PRICE_GROUPS } from '../../lib/pricing';
 
 export const metadata: Metadata = {
-  title: 'Price list — Addis Tiggena',
+  title: 'Price list - Addis Tiggena',
   description:
-    'Standard base service price ranges (inspection + labor) in ETB for repairs on Addis Tiggena — fair, transparent reference rates for clients and technicians.',
+    'Standard base service price ranges (inspection + labor) in ETB for repairs on Addis Tiggena - fair, transparent reference rates for clients and technicians.',
 };
 
 export default function PricingPage() {
@@ -18,7 +18,7 @@ export default function PricingPage() {
         <p className="page-sub" style={{ maxWidth: '64ch' }}>
           All payments are made directly to technicians, and final charges depend on job complexity
           and required spare parts. These rates are <strong>standard price ranges</strong>{' '}
-          (inspection + base labor) in Ethiopian Birr — a fair reference for both clients and
+          (inspection + base labor) in Ethiopian Birr - a fair reference for both clients and
           technicians. Spare parts / materials are recommended to be purchased by the client.
         </p>
 

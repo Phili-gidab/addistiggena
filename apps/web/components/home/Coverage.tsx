@@ -1,6 +1,6 @@
 import { SUB_CITIES } from '../../lib/areas';
 
-/** Geographic coverage — all 10 sub-cities with their neighbourhoods. */
+/** Geographic coverage - all 10 sub-cities with their neighbourhoods. */
 export function Coverage() {
   return (
     <section className="section" id="coverage">
@@ -15,7 +15,7 @@ export function Coverage() {
           </div>
         </div>
         <p className="cov-note">
-          Technicians are matched from your own surroundings — tap a sub-city to see the
+          Technicians are matched from your own surroundings - tap a sub-city to see the
           neighbourhoods we map for dispatch.
         </p>
         <div className="cov-grid">

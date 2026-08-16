@@ -37,12 +37,12 @@ export class PaymentsService {
     ];
     this.drivers = new Map(list.map((d) => [d.name, d]));
     // Dev-only escape hatch: local envs have no gateway dashboards to sign webhooks with.
-    // Fail closed — requires an explicit NODE_ENV=development, not merely "not production".
+    // Fail closed - requires an explicit NODE_ENV=development, not merely "not production".
     this.allowUnsigned =
       this.config.get<string>('PAYMENTS_ALLOW_UNSIGNED_WEBHOOKS', 'false') === 'true' &&
       this.config.get<string>('NODE_ENV') === 'development';
     if (this.allowUnsigned) {
-      this.logger.warn('PAYMENTS_ALLOW_UNSIGNED_WEBHOOKS is on — never enable this in production');
+      this.logger.warn('PAYMENTS_ALLOW_UNSIGNED_WEBHOOKS is on - never enable this in production');
     }
   }
 
@@ -68,7 +68,7 @@ export class PaymentsService {
     const amount = booking.finalPriceEtb ?? booking.priceQuoteEtb;
     if (!amount) {
       throw new BadRequestException(
-        'No price on this booking — ask the technician to set the final price on completion',
+        'No price on this booking - ask the technician to set the final price on completion',
       );
     }
 
@@ -148,7 +148,7 @@ export class PaymentsService {
 
   /**
    * Idempotent settlement: confirm payment, mark booking PAID, split commission,
-   * credit provider wallet — all in one transaction (money invariants, doc 04).
+   * credit provider wallet - all in one transaction (money invariants, doc 04).
    */
   private async settle(gatewayRef: string, success: boolean, bookingIdForCash?: string) {
     const payment = bookingIdForCash
@@ -233,12 +233,12 @@ export class PaymentsService {
     const jobRef = booking.id.slice(-6);
     this.notifications.notify(
       booking.customer,
-      `Addis Tiggena ደረሰኝ · receipt — job #${jobRef} (${booking.category.nameEn}) paid: ETB ${gross.toFixed(2)}. እናመሰግናለን!`,
+      `Addis Tiggena ደረሰኝ · receipt - job #${jobRef} (${booking.category.nameEn}) paid: ETB ${gross.toFixed(2)}. እናመሰግናለን!`,
     );
     if (booking.provider) {
       this.notifications.notify(
         booking.provider.user,
-        `Addis Tiggena: ክፍያ ተቀብለዋል · job #${jobRef} paid — ETB ${net.toFixed(2)} credited to your wallet`,
+        `Addis Tiggena: ክፍያ ተቀብለዋል · job #${jobRef} paid - ETB ${net.toFixed(2)} credited to your wallet`,
       );
     }
   }

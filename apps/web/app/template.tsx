@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import { gsap, reducedMotion, useGSAP } from '../lib/motion';
 
-/** Soft page transition — every route change fades/slides its content in. */
+/** Soft page transition - every route change fades/slides its content in. */
 export default function Template({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
 

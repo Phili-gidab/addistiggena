@@ -19,7 +19,7 @@ export interface WebhookResult {
 export interface PaymentGatewayDriver {
   readonly name: PaymentGatewayType;
   initiate(amountEtb: string, bookingId: string): Promise<CheckoutInfo>;
-  /** rawBody is the exact bytes the gateway sent (Nest rawBody buffer) — always prefer it
+  /** rawBody is the exact bytes the gateway sent (Nest rawBody buffer) - always prefer it
    *  over re-serializing the parsed payload, which breaks byte-sensitive HMACs. */
   verifyWebhook(
     payload: Record<string, unknown>,
@@ -59,7 +59,7 @@ function header(headers: Record<string, string>, ...names: string[]): string | u
 
 /**
  * Telebirr H5/SuperApp. Until merchant onboarding completes there is no public sandbox,
- * so initiation stays instruction-based — but the webhook is still HMAC-protected via
+ * so initiation stays instruction-based - but the webhook is still HMAC-protected via
  * TELEBIRR_WEBHOOK_SECRET so the settlement path is never open to forgery.
  */
 export class TelebirrGateway implements PaymentGatewayDriver {
@@ -92,7 +92,7 @@ export class TelebirrGateway implements PaymentGatewayDriver {
  * Chapa (https://developer.chapa.co). With CHAPA_SECRET_KEY set this calls the real
  * transaction/initialize API and returns the hosted checkout URL; without it (local dev)
  * it degrades to an instruction-based stub. Webhook trust is two-layered: HMAC of the raw
- * body against the dashboard webhook secret, then — whenever the secret key is present —
+ * body against the dashboard webhook secret, then - whenever the secret key is present -
  * the authoritative GET /transaction/verify/{tx_ref}, so a forged or replayed body can
  * never settle a payment Chapa doesn't consider paid.
  */
@@ -173,7 +173,7 @@ export class ChapaGateway implements PaymentGatewayDriver {
         );
         const data = (await res.json()) as { status?: string; data?: { status?: string } };
         success = res.ok && data.status === 'success' && data.data?.status === 'success';
-        // the verify API call is itself authenticated proof — treat it as a valid signature
+        // the verify API call is itself authenticated proof - treat it as a valid signature
         signatureValid = true;
       } catch {
         // verification unavailable → keep HMAC-based result; if that also failed, the
@@ -185,7 +185,7 @@ export class ChapaGateway implements PaymentGatewayDriver {
   }
 }
 
-/** CBEBirr USSD push — instruction-based until merchant credentials arrive; webhook HMAC-protected. */
+/** CBEBirr USSD push - instruction-based until merchant credentials arrive; webhook HMAC-protected. */
 export class CbeBirrGateway implements PaymentGatewayDriver {
   readonly name = PaymentGatewayType.CBEBIRR;
   constructor(private readonly config: ConfigService) {}

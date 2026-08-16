@@ -54,7 +54,7 @@ export class AuthService {
     });
     await this.sms.send(phone, `Addis Tiggena: የማረጋገጫ ኮድዎ / your verification code is ${code}`);
     // Dev convenience only: with the console SMS driver there is no phone to receive the
-    // code, so surface it in the response. Fail closed — requires an explicit
+    // code, so surface it in the response. Fail closed - requires an explicit
     // NODE_ENV=development, not merely "not production".
     if (
       this.config.get<string>('SMS_PROVIDER', 'console') === 'console' &&
@@ -71,8 +71,8 @@ export class AuthService {
       where: { phone, consumedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
-    if (!otp) throw new UnauthorizedException('No valid code — request a new one');
-    if (otp.attempts >= 5) throw new UnauthorizedException('Too many attempts — request a new code');
+    if (!otp) throw new UnauthorizedException('No valid code - request a new one');
+    if (otp.attempts >= 5) throw new UnauthorizedException('Too many attempts - request a new code');
 
     if (otp.codeHash !== this.hash(code)) {
       await this.prisma.otpCode.update({
@@ -104,8 +104,8 @@ export class AuthService {
   }
 
   /**
-   * Credentials login (demo accounts, staff): username — or the account's phone
-   * number — plus password. Phone-OTP remains the primary consumer flow.
+   * Credentials login (demo accounts, staff): username - or the account's phone
+   * number - plus password. Phone-OTP remains the primary consumer flow.
    */
   async passwordLogin(usernameOrPhone: string, password: string) {
     const id = usernameOrPhone.trim();
@@ -127,12 +127,12 @@ export class AuthService {
   /**
    * Bot-channel login: Telegram itself verified the phone via the contact-share button
    * (we require contact.user_id === sender id bot-side), so no OTP round-trip is needed.
-   * Guarded by the shared BOT_API_KEY — only our bot process may call this.
+   * Guarded by the shared BOT_API_KEY - only our bot process may call this.
    */
   async telegramLink(botKey: string, chatId: string, rawPhone: string, name?: string) {
     this.assertBotKey(botKey);
     const phone = normalizePhone(rawPhone);
-    // a chat id can only point at one account — release it from any previous owner
+    // a chat id can only point at one account - release it from any previous owner
     await this.prisma.user.updateMany({
       where: { telegramChatId: chatId, NOT: { phone } },
       data: { telegramChatId: null },
@@ -149,7 +149,7 @@ export class AuthService {
   async telegramResume(botKey: string, chatId: string) {
     this.assertBotKey(botKey);
     const user = await this.prisma.user.findUnique({ where: { telegramChatId: chatId } });
-    if (!user) throw new UnauthorizedException('Chat not linked — share your contact first');
+    if (!user) throw new UnauthorizedException('Chat not linked - share your contact first');
     return { ...this.issueTokens(user.id, user.role), user };
   }
 

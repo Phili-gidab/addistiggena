@@ -22,13 +22,13 @@ import {
 
 const OFFER_WINDOW_MS = 90_000; // provider has 90 seconds to respond (proposal §4.2)
 
-/** Average urban travel speed used for the ETA estimate — Addis traffic, mixed transport. */
+/** Average urban travel speed used for the ETA estimate - Addis traffic, mixed transport. */
 const AVG_SPEED_KMH = 18;
 
 /** Advisory-lock key so only ONE api instance runs the sweep at a time (multi-replica safe). */
 const SWEEP_LOCK_KEY = 874203001;
 
-/** How the booking + relations are returned to clients — contact fields limited to id/name/phone.
+/** How the booking + relations are returned to clients - contact fields limited to id/name/phone.
  *  telegramChatId is dispatch-internal and must never appear in an HTTP response. */
 const PUBLIC_INCLUDE = {
   category: true,
@@ -57,7 +57,7 @@ const STATUS_MIRRORS: Partial<Record<string, (b: { id: string }) => string>> = {
   enroute: (b) => `Addis Tiggena: ባለሙያው በመንገድ ላይ ነው · technician en route for job #${b.id.slice(-6)}`,
   arrive: (b) => `Addis Tiggena: ባለሙያው ደርሷል · technician arrived for job #${b.id.slice(-6)}`,
   complete: (b) =>
-    `Addis Tiggena: ስራው ተጠናቋል · job #${b.id.slice(-6)} completed — open the app to pay`,
+    `Addis Tiggena: ስራው ተጠናቋል · job #${b.id.slice(-6)} completed - open the app to pay`,
 };
 
 function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -189,7 +189,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (dto.providerId) {
-      // Customer picked this technician directly — record the offer and alert them.
+      // Customer picked this technician directly - record the offer and alert them.
       await this.prisma.bookingOffer.create({
         data: {
           bookingId: created.id,
@@ -199,12 +199,12 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       });
       this.notifyProvider(
         dto.providerId,
-        `Addis Tiggena: አዲስ ስራ · new ${category.nameEn} job #${created.id.slice(-6)} — respond within 90s`,
+        `Addis Tiggena: አዲስ ስራ · new ${category.nameEn} job #${created.id.slice(-6)} - respond within 90s`,
       );
       return this.getPublic(created.id);
     }
 
-    // "First available" — dispatch to the best-ranked nearby technician (proposal §4.1 step 04).
+    // "First available" - dispatch to the best-ranked nearby technician (proposal §4.1 step 04).
     // Never fail the request after the row exists: the sweeper rescues stranded bookings.
     try {
       return await this.offerToNext(created.id);
@@ -269,7 +269,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       if (count > 0) {
         this.notifications.notify(
           booking.customer,
-          `Addis Tiggena: ይቅርታ · no ${booking.category.nameEn} technician is available right now for job #${bookingId.slice(-6)} — please try again shortly`,
+          `Addis Tiggena: ይቅርታ · no ${booking.category.nameEn} technician is available right now for job #${bookingId.slice(-6)} - please try again shortly`,
         );
         this.logger.log(
           `Booking ${bookingId} expired: candidate pool exhausted (${exclude.length} offered)`,
@@ -284,7 +284,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       data: { providerId: next.id, offerExpiresAt: expiresAt },
     });
     if (count === 0) {
-      // someone else (accept, cancel, or a competing cascade) won the race — do nothing
+      // someone else (accept, cancel, or a competing cascade) won the race - do nothing
       return this.getPublic(bookingId);
     }
     await this.prisma.bookingOffer.create({
@@ -292,7 +292,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     });
     this.notifications.notify(
       { phone: next.phone, telegramChatId: next.telegramChatId },
-      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} ~${(next.distanceM / 1000).toFixed(1)}km away — respond within 90s`,
+      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} ~${(next.distanceM / 1000).toFixed(1)}km away - respond within 90s`,
     );
     return this.getPublic(bookingId);
   }
@@ -353,7 +353,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         data: { outcome: 'EXPIRED' },
       });
       await this.offerToNext(id);
-      throw new BadRequestException('Offer expired — the 90-second window has passed');
+      throw new BadRequestException('Offer expired - the 90-second window has passed');
     }
 
     // A reject is not terminal: record the verdict and cascade to the next technician.
@@ -376,8 +376,8 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     }
     if (action === 'accept') data.offerExpiresAt = null;
 
-    // Optimistic guard: only commit if the booking is still in the state we validated —
-    // pinned to this provider — so a concurrent sweep/cascade/cancel can't be clobbered.
+    // Optimistic guard: only commit if the booking is still in the state we validated -
+    // pinned to this provider - so a concurrent sweep/cascade/cancel can't be clobbered.
     const guard: Prisma.BookingWhereInput = {
       id,
       status: { in: rule.from },
@@ -389,7 +389,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     const { count } = await this.prisma.booking.updateMany({ where: guard, data });
     if (count === 0) {
       throw new BadRequestException(
-        `Booking state changed — cannot ${action} anymore (refresh to see the latest status)`,
+        `Booking state changed - cannot ${action} anymore (refresh to see the latest status)`,
       );
     }
 
@@ -414,7 +414,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     return this.getPublic(id);
   }
 
-  /** Current technician position + ETA for an active booking — polled by the customer app. */
+  /** Current technician position + ETA for an active booking - polled by the customer app. */
   async track(id: string, user: AuthUser) {
     const booking = await this.getForParty(id, user);
     const active: BookingStatus[] = ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
@@ -491,7 +491,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       return res;
     });
     if (count === 0) {
-      throw new BadRequestException('Booking state changed — it can no longer be cancelled');
+      throw new BadRequestException('Booking state changed - it can no longer be cancelled');
     }
     if (booking.provider) {
       this.notifications.notify(

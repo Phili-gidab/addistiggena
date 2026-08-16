@@ -5,7 +5,7 @@ import { BAND_IMG } from '../../lib/images';
 
 /**
  * Full-bleed photographic divider. The photo sits taller than its window and
- * is dragged vertically with the scroll (classic parallax) via rAF — no
+ * is dragged vertically with the scroll (classic parallax) via rAF - no
  * library, disabled under reduced motion.
  */
 export function ImageBand() {
@@ -47,7 +47,7 @@ export function ImageBand() {
       <span className="img-band-word" aria-hidden>
         እንጠግናለን
       </span>
-      <span className="img-band-caption">We fix. — every trade, one platform</span>
+      <span className="img-band-caption">We fix. - every trade, one platform</span>
     </section>
   );
 }

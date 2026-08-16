@@ -18,7 +18,7 @@ interface TrackInfo {
   lng?: number;
   updatedAt?: string | null;
   distanceM?: number;
-  /** minutes away while ACCEPTED/EN_ROUTE — null once arrived/started */
+  /** minutes away while ACCEPTED/EN_ROUTE - null once arrived/started */
   etaMinutes?: number | null;
 }
 
@@ -36,7 +36,7 @@ const FLOW = [
   { key: 'ARRIVED', t: 'Arrived · ደርሷል', s: 'At your location' },
   { key: 'IN_PROGRESS', t: 'In progress · በስራ ላይ', s: 'Work underway' },
   { key: 'COMPLETED', t: 'Completed · ተጠናቋል', s: 'Awaiting payment' },
-  { key: 'PAID', t: 'Paid · ተከፍሏል', s: 'Receipt issued — thank you!' },
+  { key: 'PAID', t: 'Paid · ተከፍሏል', s: 'Receipt issued - thank you!' },
 ];
 
 const GATEWAYS = ['TELEBIRR', 'CHAPA', 'CBEBIRR', 'CASH'] as const;
@@ -81,7 +81,7 @@ export default function BookingDetailPage() {
       })
       .catch((e) => {
         // auto-dispatch cascade: a provider who rejected/expired is no longer a
-        // party to the booking — the API answers 403. Show a friendly note
+        // party to the booking - the API answers 403. Show a friendly note
         // instead of a raw error and stop polling.
         if (e instanceof ApiError && e.status === 403 && user.current?.role === 'PROVIDER') {
           setReassigned(true);
@@ -102,7 +102,7 @@ export default function BookingDetailPage() {
     return () => clearInterval(t);
   }, [id, refresh, router, reassigned]);
 
-  // auto-dispatch: 90s offer window — tick every second while an offer is open.
+  // auto-dispatch: 90s offer window - tick every second while an offer is open.
   // Polling may bring a new offerExpiresAt/provider (cascade re-offer); keying the
   // interval on the deadline makes the countdown reset cleanly.
   const offerExpiresAt = booking?.status === 'REQUESTED' ? booking.offerExpiresAt ?? null : null;
@@ -228,7 +228,7 @@ export default function BookingDetailPage() {
           {dead ? (
             booking.status === 'EXPIRED' ? (
               <div className="error-box" style={{ marginBottom: 0 }}>
-                No technician available right now — please try again shortly.
+                No technician available right now - please try again shortly.
                 <div style={{ marginTop: '0.7rem' }}>
                   <Link className="btn btn-primary btn-sm" href="/book">
                     + New booking
@@ -238,7 +238,7 @@ export default function BookingDetailPage() {
             ) : (
               <div className="error-box" style={{ marginBottom: 0 }}>
                 This booking ended: <strong>{booking.status}</strong>
-                {booking.status === 'CANCELLED' && ' — you can book again any time.'}
+                {booking.status === 'CANCELLED' && ' - you can book again any time.'}
               </div>
             )
           ) : (
@@ -251,7 +251,7 @@ export default function BookingDetailPage() {
                       {offerSecondsLeft !== null && (
                         <>
                           {' '}
-                          — <strong>{offerSecondsLeft}s</strong> left
+                          - <strong>{offerSecondsLeft}s</strong> left
                         </>
                       )}{' '}
                       · if they don&rsquo;t respond we&rsquo;ll offer the job to the next technician
@@ -285,7 +285,7 @@ export default function BookingDetailPage() {
               <span className="hint">
                 technician position
                 {track.updatedAt
-                  ? ` — updated ${new Date(track.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+                  ? ` - updated ${new Date(track.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
                   : ''}
               </span>
             </div>
@@ -299,7 +299,7 @@ export default function BookingDetailPage() {
             <TrackMap booking={{ lat: booking.lat, lng: booking.lng }} tech={{ lat: track.lat, lng: track.lng }} />
             <p className="hint" style={{ marginTop: 0 }}>
               <span style={{ color: 'var(--orange)' }}>●</span> your location ·{' '}
-              <span style={{ color: 'var(--teal)' }}>●</span> technician — refreshes every few seconds
+              <span style={{ color: 'var(--teal)' }}>●</span> technician - refreshes every few seconds
             </p>
           </div>
         )}
@@ -307,7 +307,7 @@ export default function BookingDetailPage() {
         {/* ── parties & details ─────────────────────────────────────────── */}
         <div className="panel">
           <h2>Details</h2>
-          {/* while REQUESTED the provider is merely offered the job — don't show
+          {/* while REQUESTED the provider is merely offered the job - don't show
               them as "your technician" (the dispatch-note countdown covers it) */}
           {booking.provider && booking.status !== 'REQUESTED' && (
             <div className="tech-card mb" style={{ cursor: 'default' }}>
@@ -342,11 +342,11 @@ export default function BookingDetailPage() {
           )}
           <p className="hint">
             📍 {booking.lat.toFixed(5)}, {booking.lng.toFixed(5)}
-            {booking.landmarkNote && <> — “{booking.landmarkNote}”</>}
+            {booking.landmarkNote && <> - “{booking.landmarkNote}”</>}
           </p>
           {!booking.finalPriceEtb && booking.priceQuoteEtb && (
             <p className="hint" style={{ marginTop: '0.4rem' }}>
-              Estimate: from ETB {booking.priceQuoteEtb} · ከ ETB {booking.priceQuoteEtb} ጀምሮ —
+              Estimate: from ETB {booking.priceQuoteEtb} · ከ ETB {booking.priceQuoteEtb} ጀምሮ -
               final price agreed on completion
             </p>
           )}
@@ -374,7 +374,7 @@ export default function BookingDetailPage() {
             <div className="receipt-row">
               <span className="k">Service</span>
               <span className="v">
-                {booking.category.nameAm} — {booking.category.nameEn}
+                {booking.category.nameAm} - {booking.category.nameEn}
               </span>
             </div>
             {booking.provider && (
@@ -408,7 +408,7 @@ export default function BookingDetailPage() {
               <span>{booking.payment.amountEtb} ETB</span>
             </div>
             <p className="receipt-thanks">
-              እናመሰግናለን — thank you for choosing Addis Tiggena. Wezete Technology for Amnen
+              እናመሰግናለን - thank you for choosing Addis Tiggena. Wezete Technology for Amnen
               Promotion, Addis Ababa.
             </p>
             <button className="btn btn-line btn-sm mt no-print" onClick={() => window.print()}>
@@ -442,7 +442,7 @@ export default function BookingDetailPage() {
                     (offerSecondsLeft > 0 ? (
                       <span className="offer-count">Respond within {offerSecondsLeft}s</span>
                     ) : (
-                      <span className="offer-count">ጊዜው አልፏል · expired — reassigning…</span>
+                      <span className="offer-count">ጊዜው አልፏል · expired - reassigning…</span>
                     ))}
                 </>
               )}
@@ -504,7 +504,7 @@ export default function BookingDetailPage() {
           <div className="panel">
             <h2>Pay {booking.finalPriceEtb ?? booking.priceQuoteEtb} ETB · ይክፈሉ</h2>
             <p className="hint mb">
-              You pay the technician directly — cash, Telebirr, CBE Birr or mobile banking — at the
+              You pay the technician directly - cash, Telebirr, CBE Birr or mobile banking - at the
               standard platform rate. Recording the payment here keeps your 5-day service guarantee
               active and gives you an e-receipt.
             </p>
@@ -587,7 +587,7 @@ export default function BookingDetailPage() {
             <h2>Your review</h2>
             <Stars value={booking.review.stars} small />{' '}
             <span className="hint">
-              {booking.review.state === 'PENDING' ? '— published after moderation (24h)' : '— published'}
+              {booking.review.state === 'PENDING' ? '- published after moderation (24h)' : '- published'}
             </span>
           </div>
         )}
@@ -597,7 +597,7 @@ export default function BookingDetailPage() {
           <div className="panel">
             <h2>Chat · መልዕክት</h2>
             {msgs.length === 0 && (
-              <p className="hint">No messages yet — coordinate arrival details here.</p>
+              <p className="hint">No messages yet - coordinate arrival details here.</p>
             )}
             <div className="chat-box">
               {msgs.map((m) => (

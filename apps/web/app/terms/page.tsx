@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { COMPANY } from '../../lib/content';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Addis Tiggena',
+  title: 'Terms of Service - Addis Tiggena',
   description: 'Terms of Service for the Addis Tiggena platform, operated by Amnen Marketing & Promotion.',
 };
 

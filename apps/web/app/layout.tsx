@@ -20,9 +20,9 @@ const sansEthiopic = Noto_Sans_Ethiopic({
 });
 
 export const metadata: Metadata = {
-  title: 'Addis Tiggena — አዲስ ጥገና · Connect. Fix. Care.',
+  title: 'Addis Tiggena - አዲስ ጥገና · Connect. Fix. Care.',
   description:
-    'Addis Tiggena connects you with verified maintenance technicians across all 10 sub-cities of Addis Ababa — electrical, plumbing, appliances, IT, carpentry and more. Average arrival 15–30 minutes, 5-day service guarantee, open 6:00 AM – 8:00 PM every day. A project of Amnen Marketing & Promotion.',
+    'Addis Tiggena connects you with verified maintenance technicians across all 10 sub-cities of Addis Ababa - electrical, plumbing, appliances, IT, carpentry and more. Average arrival 15–30 minutes, 5-day service guarantee, open 6:00 AM – 8:00 PM every day. A project of Amnen Marketing & Promotion.',
   icons: { icon: '/logo.png', apple: '/logo.png' },
 };
 

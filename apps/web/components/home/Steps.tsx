@@ -3,29 +3,29 @@ const STEPS = [
     n: '1',
     en: 'Choose a service',
     am: 'አገልግሎት ይምረጡ',
-    text: 'Pick the repair you need — Mitad, wiring, plumbing, appliances, Wi-Fi and more — and describe the problem.',
+    text: 'Pick the repair you need - Mitad, wiring, plumbing, appliances, Wi-Fi and more - and describe the problem.',
   },
   {
     n: '2',
     en: 'Pin your location',
     am: 'ቦታዎን ያመልክቱ',
-    text: 'Drop a pin, pick your sub-city and add a landmark note — built for Addis Ababa addresses.',
+    text: 'Drop a pin, pick your sub-city and add a landmark note - built for Addis Ababa addresses.',
   },
   {
     n: '3',
     en: 'Technician dispatched',
     am: 'ባለሙያ ይላካል',
-    text: 'The nearest verified technician in your surroundings accepts and heads over — average arrival 15–30 minutes.',
+    text: 'The nearest verified technician in your surroundings accepts and heads over - average arrival 15–30 minutes.',
   },
   {
     n: '4',
     en: 'Pay the technician directly',
     am: 'በቀጥታ ይክፈሉ',
-    text: 'Cash, Telebirr, CBE Birr or mobile banking — at the standard platform rate. Every repair carries a 5-day guarantee.',
+    text: 'Cash, Telebirr, CBE Birr or mobile banking - at the standard platform rate. Every repair carries a 5-day guarantee.',
   },
 ];
 
-/** "How it works" — four clean numbered cards. */
+/** "How it works" - four clean numbered cards. */
 export function Steps() {
   return (
     <section className="section" id="how">

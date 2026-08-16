@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { FAQ_GROUPS } from '../../lib/faq';
 
 export const metadata: Metadata = {
-  title: 'FAQ — Addis Tiggena',
+  title: 'FAQ - Addis Tiggena',
   description:
     'Frequently asked questions about booking, payments, cancellations, guarantees and technician safety on Addis Tiggena.',
 };

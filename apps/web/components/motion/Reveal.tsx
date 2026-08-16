@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Scroll-reveal wrapper: fades/slides children in the first time they enter
- * the viewport. Pure IntersectionObserver + CSS — respects reduced motion via
+ * the viewport. Pure IntersectionObserver + CSS - respects reduced motion via
  * the .reveal styles in globals.css.
  */
 export function Reveal({
@@ -24,7 +24,7 @@ export function Reveal({
     const el = ref.current;
     if (!el) return;
     // fail-open: anything already in (or near) the viewport on mount reveals
-    // immediately — covers anchor deep-links and environments without IO
+    // immediately - covers anchor deep-links and environments without IO
     const rect = el.getBoundingClientRect();
     if (rect.top < window.innerHeight * 1.15 && rect.bottom > -40) {
       el.classList.add('in');
@@ -52,7 +52,7 @@ export function Reveal({
 
   return (
     <Tag
-      // @ts-expect-error — ref type varies with the rendered tag
+      // @ts-expect-error - ref type varies with the rendered tag
       ref={ref}
       className={`reveal ${className}`.trim()}
       style={delay ? ({ '--reveal-delay': `${delay}s` } as React.CSSProperties) : undefined}

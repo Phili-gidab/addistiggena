@@ -104,7 +104,7 @@ function LoginForm() {
         <p className="page-sub">
           {stage === 'password'
             ? 'Sign in with your username and password.'
-            : 'One phone number is all you need — we will text you a code.'}
+            : 'One phone number is all you need - we will text you a code.'}
         </p>
 
         <div className="login-grid">
@@ -151,7 +151,7 @@ function LoginForm() {
                   Use phone code instead · በስልክ ኮድ ይግቡ
                 </button>
                 <p className="hint mt">
-                  Demo — customer: <code>customer / customer1234</code> · technician:{' '}
+                  Demo - customer: <code>customer / customer1234</code> · technician:{' '}
                   <code>technician / tech1234</code> · admin: <code>admin / admin1234</code>
                 </p>
               </form>
@@ -204,7 +204,7 @@ function LoginForm() {
                 </div>
                 {devCode && (
                   <p className="hint mb">
-                    Dev mode (no SMS gateway yet) — your code is <code>{devCode}</code>
+                    Dev mode (no SMS gateway yet) - your code is <code>{devCode}</code>
                   </p>
                 )}
                 <button
@@ -229,7 +229,7 @@ function LoginForm() {
 
             {stage === 'name' && (
               <form onSubmit={submitName}>
-                <div className="ok-box">Verified ✓ — welcome to Addis Tiggena.</div>
+                <div className="ok-box">Verified ✓ - welcome to Addis Tiggena.</div>
                 <div className="field">
                   <label>Your name · ስምዎ</label>
                   <input
@@ -241,7 +241,7 @@ function LoginForm() {
                   />
                 </div>
                 <p className="hint mb">
-                  Shown to your technician when they arrive — you can change it any time.
+                  Shown to your technician when they arrive - you can change it any time.
                 </p>
                 <button
                   className="btn btn-primary"
@@ -269,7 +269,7 @@ function LoginForm() {
             />
             <div className="quote">
               <div className="am">የተረጋገጡ ባለሙያዎች፣ በደቂቃዎች።</div>
-              <div className="en">Verified professionals, minutes away — across Addis Ababa.</div>
+              <div className="en">Verified professionals, minutes away - across Addis Ababa.</div>
             </div>
           </div>
         </div>

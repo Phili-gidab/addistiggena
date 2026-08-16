@@ -17,7 +17,7 @@ async function bootstrap() {
   const allowedOrigins = [process.env.WEB_PUBLIC_URL].filter((o): o is string => !!o);
   app.enableCors({ origin: isProd ? allowedOrigins : true, credentials: true });
   // Uploads (ID scans, certificates) are served ONLY via the authenticated
-  // FilesController — never as public static assets.
+  // FilesController - never as public static assets.
   const port = process.env.PORT ? Number(process.env.PORT) : 4001;
   await app.listen(port);
   console.log(`Addis Tiggena API listening on http://localhost:${port}`);

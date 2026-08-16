@@ -1,5 +1,5 @@
 /**
- * Service catalog details — from the official "Service Catalog and description
+ * Service catalog details - from the official "Service Catalog and description
  * for each service" document (11 categories + service packages). Keyed by the
  * category slug used in the API seed.
  */
@@ -141,7 +141,7 @@ export const catalogBySlug = (slug: string): CatalogEntry | undefined =>
 
 export const iconFor = (slug: string): string => catalogBySlug(slug)?.icon ?? '🔧';
 
-/** Service packages — section 2 of the catalog document. */
+/** Service packages - section 2 of the catalog document. */
 export const PACKAGES = [
   {
     name: 'Basic Service',

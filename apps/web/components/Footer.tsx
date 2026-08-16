@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { COMPANY, HOURS, SLOGAN } from '../lib/content';
 
-/** Site-wide footer — company facts from the official contact/license docs. */
+/** Site-wide footer - company facts from the official contact/license docs. */
 export function Footer() {
   return (
     <footer className="site-footer on-dark">
@@ -17,7 +17,7 @@ export function Footer() {
             <div className="slogan">{SLOGAN}</div>
             <p>
               A technology-driven maintenance marketplace connecting verified field technicians
-              with homes and businesses across Addis Ababa — a project of {COMPANY.operator}.
+              with homes and businesses across Addis Ababa - a project of {COMPANY.operator}.
             </p>
           </div>
 
@@ -59,14 +59,14 @@ export function Footer() {
             </div>
             <div className="footer-fact">
               <span className="ic">🌐</span>
-              <span>Social media — coming soon</span>
+              <span>Social media - coming soon</span>
             </div>
           </div>
         </div>
 
         <div className="footer-legal">
           <span>
-            © {new Date().getFullYear()} {COMPANY.operator} — Addis Tiggena project. All rights
+            © {new Date().getFullYear()} {COMPANY.operator} - Addis Tiggena project. All rights
             reserved.
           </span>
           <span>Business License No. {COMPANY.licenseNo}</span>

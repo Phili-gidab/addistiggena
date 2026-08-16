@@ -39,7 +39,7 @@ export class WalletService {
       const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
       if (fresh.balanceEtb.lessThan(dto.amountEtb)) {
         throw new BadRequestException(
-          `Insufficient balance — available ${fresh.balanceEtb.toString()} ETB`,
+          `Insufficient balance - available ${fresh.balanceEtb.toString()} ETB`,
         );
       }
       const payout = await tx.payout.create({

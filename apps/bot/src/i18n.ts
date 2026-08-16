@@ -103,8 +103,8 @@ const table = {
     en: 'Briefly describe the problem (optional). Tap "Skip" to continue without one.',
   },
   confirmTitle: {
-    am: '🧾 ማጠቃለያ — እባክዎ ያረጋግጡ',
-    en: '🧾 Summary — please confirm',
+    am: '🧾 ማጠቃለያ - እባክዎ ያረጋግጡ',
+    en: '🧾 Summary - please confirm',
   },
   sumCategory: {
     am: 'አገልግሎት',
@@ -123,8 +123,8 @@ const table = {
     en: 'Description',
   },
   none: {
-    am: '—',
-    en: '—',
+    am: '-',
+    en: '-',
   },
   creating: {
     am: '⏳ ትዕዛዝዎን በመመዝገብ ላይ…',
@@ -175,8 +175,8 @@ const table = {
     en: 'ለመጀመር መጀመሪያ «📋 አገልግሎት ይዘዙ» ይንኩ።\nTap "📋 Book a service" first to start a booking.',
   },
   privateOnly: {
-    am: 'ይህ ቦት በግል ውይይት ብቻ ይሰራል። እባክዎ በቀጥታ መልዕክት ይላኩልኝ።\nThis bot works in private chat only — please message me directly.',
-    en: 'ይህ ቦት በግል ውይይት ብቻ ይሰራል። እባክዎ በቀጥታ መልዕክት ይላኩልኝ።\nThis bot works in private chat only — please message me directly.',
+    am: 'ይህ ቦት በግል ውይይት ብቻ ይሰራል። እባክዎ በቀጥታ መልዕክት ይላኩልኝ።\nThis bot works in private chat only - please message me directly.',
+    en: 'ይህ ቦት በግል ውይይት ብቻ ይሰራል። እባክዎ በቀጥታ መልዕክት ይላኩልኝ።\nThis bot works in private chat only - please message me directly.',
   },
   unknownText: {
     am: 'አልገባኝም። ከታች ያሉትን አዝራሮች ይጠቀሙ ወይም /help ይላኩ።',
@@ -187,8 +187,8 @@ const table = {
     en: 'Sorry, something went wrong. Please try again.',
   },
   help: {
-    am: '🛠 አዲስ ጥገና — የቤት ጥገና ባለሙያዎችን በቀላሉ ማዘዣ።\n\nትዕዛዞች:\n/book — አገልግሎት ይዘዙ\n/bookings — ማስያዣዎቼ\n/lang — ቋንቋ ይቀይሩ\n/cancel — ያለውን ሂደት ይሰርዙ\n/help — ይህ መልዕክት\n\nየትዕዛዝ ሁኔታ ዝመናዎች እዚሁ በቴሌግራም ይደርስዎታል።',
-    en: '🛠 Addis Tiggena — book trusted home-repair technicians with ease.\n\nCommands:\n/book — book a service\n/bookings — my bookings\n/lang — change language\n/cancel — cancel the current step\n/help — this message\n\nBooking status updates arrive right here in Telegram.',
+    am: '🛠 አዲስ ጥገና - የቤት ጥገና ባለሙያዎችን በቀላሉ ማዘዣ።\n\nትዕዛዞች:\n/book - አገልግሎት ይዘዙ\n/bookings - ማስያዣዎቼ\n/lang - ቋንቋ ይቀይሩ\n/cancel - ያለውን ሂደት ይሰርዙ\n/help - ይህ መልዕክት\n\nየትዕዛዝ ሁኔታ ዝመናዎች እዚሁ በቴሌግራም ይደርስዎታል።',
+    en: '🛠 Addis Tiggena - book trusted home-repair technicians with ease.\n\nCommands:\n/book - book a service\n/bookings - my bookings\n/lang - change language\n/cancel - cancel the current step\n/help - this message\n\nBooking status updates arrive right here in Telegram.',
   },
 };
 
@@ -204,7 +204,7 @@ export function t(lang: Lang, key: StringKey, params?: Record<string, string | n
   return value;
 }
 
-/** Both language variants of a string — for Telegraf `hears` triggers. */
+/** Both language variants of a string - for Telegraf `hears` triggers. */
 export function variants(key: StringKey): string[] {
   const entry: Entry = table[key];
   return entry.am === entry.en ? [entry.am] : [entry.am, entry.en];

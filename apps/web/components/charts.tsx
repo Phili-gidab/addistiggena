@@ -35,7 +35,7 @@ export function DailyBars({ data }: { data: DayPoint[] }) {
     const x = PAD.left + i * slot + (slot - barW) / 2;
     const y = PAD.top + plotH - h;
     const r = Math.min(4, barW / 2, h);
-    // rounded top corners only — the data end; square at the baseline
+    // rounded top corners only - the data end; square at the baseline
     const path = `M ${x} ${y + h} L ${x} ${y + r} Q ${x} ${y} ${x + r} ${y}
       L ${x + barW - r} ${y} Q ${x + barW} ${y} ${x + barW} ${y + r} L ${x + barW} ${y + h} Z`;
     return (
@@ -96,7 +96,7 @@ export function DailyBars({ data }: { data: DayPoint[] }) {
       </svg>
       {tip && (
         <div className="chart-tip" style={{ left: `${(tip.x / W) * 100}%`, top: `${(tip.y / H) * 100}%` }}>
-          {dayLabel(data[tip.i].day)} — {data[tip.i].count} booking{data[tip.i].count === 1 ? '' : 's'}
+          {dayLabel(data[tip.i].day)} - {data[tip.i].count} booking{data[tip.i].count === 1 ? '' : 's'}
         </div>
       )}
       <details className="hint data-table">

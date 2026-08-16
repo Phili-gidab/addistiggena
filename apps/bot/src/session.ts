@@ -55,7 +55,7 @@ export function applyAuth(session: Session, auth: AuthResult): void {
   session.user = auth.user;
 }
 
-/** POST /auth/telegram/resume — restores tokens after e.g. a bot restart. */
+/** POST /auth/telegram/resume - restores tokens after e.g. a bot restart. */
 async function resume(session: Session, chatId: number): Promise<void> {
   try {
     const auth = await resumeTelegram(String(chatId));

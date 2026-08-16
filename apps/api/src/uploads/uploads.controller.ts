@@ -12,12 +12,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards';
 
-// resolve(): express res.sendFile requires an absolute path — a relative UPLOAD_DIR
+// resolve(): express res.sendFile requires an absolute path - a relative UPLOAD_DIR
 // would accept uploads but 500 on every read.
 export const UPLOAD_DIR = resolve(process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads'));
 
 /**
- * The stored extension is derived from the validated MIME type — NEVER from the
+ * The stored extension is derived from the validated MIME type - NEVER from the
  * client-supplied filename. A client declaring image/png but uploading "id.html"
  * must not produce an .html object that later gets served as text/html (stored XSS).
  */
@@ -32,7 +32,7 @@ const ALLOWED = Object.keys(EXT_BY_MIME);
 
 /**
  * Local-disk storage driver for development. In production this module is swapped
- * for Telecloud OBS pre-signed URLs (docs/03) — the client contract stays the same:
+ * for Telecloud OBS pre-signed URLs (docs/03) - the client contract stays the same:
  * upload a file, get back an objectKey to attach to a document record.
  */
 @Controller('uploads')
@@ -59,7 +59,7 @@ export class UploadsController {
     }),
   )
   upload(@UploadedFile() file?: Express.Multer.File) {
-    if (!file) throw new BadRequestException('No file received — send multipart field "file"');
+    if (!file) throw new BadRequestException('No file received - send multipart field "file"');
     return { objectKey: file.filename, url: `/files/${file.filename}`, size: file.size };
   }
 }

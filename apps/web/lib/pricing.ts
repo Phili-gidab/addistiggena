@@ -1,6 +1,6 @@
 /**
- * Initial base service price list — verbatim from the official
- * "Addis Tiggena — Initial Base Service Price List" document.
+ * Initial base service price list - verbatim from the official
+ * "Addis Tiggena - Initial Base Service Price List" document.
  *
  * Rates are standard price ranges (inspection + base labor) in ETB and act as
  * a fair reference for clients and technicians. Payments go directly to the
@@ -69,7 +69,7 @@ export const fmtRange = (i: { min: number; max: number }) =>
 
 /** A short "popular services" cut used on the home page. */
 export const POPULAR: PriceItem[] = [
-  PRICE_GROUPS[0].items[0], // Mitad repair — the origin story service
+  PRICE_GROUPS[0].items[0], // Mitad repair - the origin story service
   PRICE_GROUPS[1].items[0], // Faucet / tap repair
   PRICE_GROUPS[0].items[2], // Socket & switch
   PRICE_GROUPS[2].items[0], // Wi-Fi router fix

@@ -1,4 +1,4 @@
-/** FAQ content — verbatim from the official "Frequently Asked Questions" document. */
+/** FAQ content - verbatim from the official "Frequently Asked Questions" document. */
 
 export interface FaqItem {
   q: string;
