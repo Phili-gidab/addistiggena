@@ -16,21 +16,29 @@ class UpdateMeDto {
   language?: Language;
 }
 
+/** Credential secrets must never leave the API - strip before returning a user row. */
+function sanitize<T extends { passwordHash?: string | null }>(row: T) {
+  const { passwordHash: _ph, ...safe } = row;
+  return safe;
+}
+
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get('me')
-  me(@CurrentUser() user: AuthUser) {
-    return this.prisma.user.findUniqueOrThrow({
+  async me(@CurrentUser() user: AuthUser) {
+    const row = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.userId },
       include: { providerProfile: { include: { category: true } } },
     });
+    return sanitize(row);
   }
 
   @Patch('me')
-  update(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
-    return this.prisma.user.update({ where: { id: user.userId }, data: dto });
+  async update(@CurrentUser() user: AuthUser, @Body() dto: UpdateMeDto) {
+    const row = await this.prisma.user.update({ where: { id: user.userId }, data: dto });
+    return sanitize(row);
   }
 }

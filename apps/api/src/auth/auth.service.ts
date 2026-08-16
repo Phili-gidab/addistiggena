@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { User } from '@prisma/client';
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { compare } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -87,7 +88,7 @@ export class AuthService {
       this.prisma.user.upsert({ where: { phone }, update: {}, create: { phone } }),
     ]);
 
-    return { ...this.issueTokens(user.id, user.role), user };
+    return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }
 
   async refresh(refreshToken: string) {
@@ -121,7 +122,7 @@ export class AuthService {
     if (!ok || !user?.passwordHash) {
       throw new UnauthorizedException('Wrong username or password');
     }
-    return { ...this.issueTokens(user.id, user.role), user };
+    return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }
 
   /**
@@ -142,7 +143,7 @@ export class AuthService {
       update: { telegramChatId: chatId, ...(name ? { name } : {}) },
       create: { phone, telegramChatId: chatId, name },
     });
-    return { ...this.issueTokens(user.id, user.role), user };
+    return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }
 
   /** Re-issue tokens for an already-linked Telegram chat (bot restart, session loss). */
@@ -150,7 +151,7 @@ export class AuthService {
     this.assertBotKey(botKey);
     const user = await this.prisma.user.findUnique({ where: { telegramChatId: chatId } });
     if (!user) throw new UnauthorizedException('Chat not linked - share your contact first');
-    return { ...this.issueTokens(user.id, user.role), user };
+    return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }
 
   private assertBotKey(botKey: string) {
@@ -161,6 +162,12 @@ export class AuthService {
     if (!expected || !timingSafeEqual(a, b)) {
       throw new UnauthorizedException('Invalid bot key');
     }
+  }
+
+  /** Credential secrets must never leave the API - strip before returning a user row. */
+  private publicUser(user: User) {
+    const { passwordHash: _ph, ...safe } = user;
+    return safe;
   }
 
   private issueTokens(userId: string, role: string) {
