@@ -12,9 +12,14 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
-  // CORS: reflect-any-origin is a dev convenience only; production pins to the web app.
+  // CORS: reflect-any-origin is a dev convenience only; production pins to the web
+  // app plus localhost (local dev servers previewing against the live API - safe,
+  // since auth is Bearer-token based, not cookie based).
   const isProd = process.env.NODE_ENV === 'production';
-  const allowedOrigins = [process.env.WEB_PUBLIC_URL].filter((o): o is string => !!o);
+  const allowedOrigins: (string | RegExp)[] = [
+    ...[process.env.WEB_PUBLIC_URL].filter((o): o is string => !!o),
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+  ];
   app.enableCors({ origin: isProd ? allowedOrigins : true, credentials: true });
   // Uploads (ID scans, certificates) are served ONLY via the authenticated
   // FilesController - never as public static assets.

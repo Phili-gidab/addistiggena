@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { OfferRing } from '../../../components/OfferRing';
 import { Stars } from '../../../components/Stars';
 import { StatusBadge } from '../../../components/StatusBadge';
 import { api, ApiError, Booking, fmtDistance, getToken, getUser } from '../../../lib/api';
@@ -247,18 +248,14 @@ export default function BookingDetailPage() {
                 <div className="dispatch-note">
                   {booking.provider ? (
                     <>
-                      Waiting for technician response
-                      {offerSecondsLeft !== null && (
-                        <>
-                          {' '}
-                          - <strong>{offerSecondsLeft}s</strong> left
-                        </>
-                      )}{' '}
-                      · if they don&rsquo;t respond we&rsquo;ll offer the job to the next technician
-                      automatically.
+                      {offerSecondsLeft !== null && <OfferRing seconds={offerSecondsLeft} />}
+                      <span>
+                        Waiting for technician response · if they don&rsquo;t respond we&rsquo;ll
+                        offer the job to the next technician automatically.
+                      </span>
                     </>
                   ) : (
-                    <>Finding a technician near you…</>
+                    <span>Finding a technician near you…</span>
                   )}
                 </div>
               )}

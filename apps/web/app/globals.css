@@ -307,6 +307,9 @@ body.scroll-locked .site-header { transform: none; }
   font-size: clamp(1.9rem, 5vw, 3.1rem); line-height: 1.14; margin: 1.1rem 0 0.5rem;
 }
 .hero-h1 .b { color: var(--blue); }
+/* masked line reveal: each headline line rises out of its own overflow slot */
+.hero-h1 .hl-mask { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.hero-h1 .hl-line { display: block; }
 .hero-h1 .am { display: block; font-family: var(--font-am); font-weight: 700; font-size: 0.62em; color: var(--muted); margin-top: 0.45rem; }
 .hero-p { color: var(--muted); max-width: 54ch; line-height: 1.7; margin-top: 0.7rem; }
 
@@ -414,6 +417,33 @@ body.scroll-locked .site-header { transform: none; }
 .hero-chip:nth-of-type(1) { rotate: -1deg; translate: -0.5rem 0; }
 .hero-chip:nth-of-type(2) { rotate: 0.8deg; translate: 0.6rem 0; }
 .hero-chip:nth-of-type(3) { rotate: -0.6deg; }
+/* live-dispatch feed wrapper: same rhythm as the card's own column */
+.hero-feed { display: flex; flex-direction: column; gap: inherit; }
+/* pulsing "live" dot on en-route jobs */
+.hero-chip .dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--teal); margin-right: 6px; vertical-align: 1px;
+  animation: tg-pulse 1.7s ease-out infinite;
+}
+@keyframes tg-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(20, 160, 145, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(20, 160, 145, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(20, 160, 145, 0); }
+}
+/* radar ping behind the verified checkmark */
+.hero-chip .ic-ping { position: relative; }
+.hero-chip .ic-ping::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  border: 1.5px solid var(--blue);
+  animation: tg-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes tg-ping {
+  0% { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(1.55); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-chip .dot, .hero-chip .ic-ping::after { animation: none; }
+}
 .hero-chip .ic {
   width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
   display: grid; place-items: center; background: var(--blue-tint); font-size: 1rem;
@@ -1058,6 +1088,14 @@ body.scroll-locked .site-header { transform: none; }
 .dispatch-note {
   background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-line);
   padding: 0.8rem 1.1rem; border-radius: 12px; font-size: 0.9rem;
+  display: flex; align-items: center; gap: 0.75rem;
+}
+/* 90s dispatch countdown ring */
+.offer-ring { position: relative; display: inline-flex; flex-shrink: 0; }
+.offer-ring b {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 0.74rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--warn-fg);
 }
 .dispatch-note strong { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
 .offer-count {
