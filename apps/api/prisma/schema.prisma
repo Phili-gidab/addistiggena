@@ -93,6 +93,9 @@ model User {
   id              String           @id @default(cuid())
   phone           String           @unique
   name            String?
+  /// optional credentials login (demo accounts, staff) alongside phone OTP
+  username        String?          @unique
+  passwordHash    String?
   role            Role             @default(CUSTOMER)
   language        Language         @default(AM)
   telegramChatId  String?          @unique

@@ -1,6 +1,15 @@
 import { PrismaClient } from '@prisma/client';
+import { hashSync } from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+/** Demo credentials (all roles) — username/password login for demos alongside phone OTP. */
+const DEMO_PASSWORDS: Record<string, string> = {
+  admin: 'admin1234',
+  technician: 'tech1234',
+  customer: 'customer1234',
+};
+const hash = (u: string) => hashSync(DEMO_PASSWORDS[u], 10);
 
 // The 11 official service categories from the company "Service Catalog"
 // document. priceFloorEtb doubles as the "from ETB…" estimate shown at booking
@@ -52,16 +61,42 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { phone: '+251900000001' },
-    update: { role: 'ADMIN' },
-    create: { phone: '+251900000001', name: 'Platform Admin', role: 'ADMIN', language: 'EN' },
+    update: { role: 'ADMIN', username: 'admin', passwordHash: hash('admin') },
+    create: {
+      phone: '+251900000001',
+      name: 'Platform Admin',
+      role: 'ADMIN',
+      language: 'EN',
+      username: 'admin',
+      passwordHash: hash('admin'),
+    },
+  });
+
+  // Demo customer (username/password login for demos)
+  await prisma.user.upsert({
+    where: { phone: '+251900000003' },
+    update: { username: 'customer', passwordHash: hash('customer') },
+    create: {
+      phone: '+251900000003',
+      name: 'Marta Abebe',
+      role: 'CUSTOMER',
+      username: 'customer',
+      passwordHash: hash('customer'),
+    },
   });
 
   // Demo provider (verified, available, located near Meskel Square) for local development
   const plumbing = await prisma.serviceCategory.findUniqueOrThrow({ where: { slug: 'plumbing' } });
   const providerUser = await prisma.user.upsert({
     where: { phone: '+251911000002' },
-    update: { role: 'PROVIDER' },
-    create: { phone: '+251911000002', name: 'Demo Technician', role: 'PROVIDER' },
+    update: { role: 'PROVIDER', username: 'technician', passwordHash: hash('technician') },
+    create: {
+      phone: '+251911000002',
+      name: 'Abebe Tesfaye',
+      role: 'PROVIDER',
+      username: 'technician',
+      passwordHash: hash('technician'),
+    },
   });
   const profile = await prisma.providerProfile.upsert({
     where: { userId: providerUser.id },

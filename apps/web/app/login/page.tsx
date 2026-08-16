@@ -12,10 +12,30 @@ function LoginForm() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
-  const [stage, setStage] = useState<'phone' | 'code' | 'name'>('phone');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [stage, setStage] = useState<'password' | 'phone' | 'code' | 'name'>('password');
   const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  async function passwordLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const res = await api<{ accessToken: string; refreshToken: string; user: User }>(
+        '/auth/login',
+        { method: 'POST', body: JSON.stringify({ username: username.trim(), password }) },
+      );
+      saveSession(res.accessToken, res.user, res.refreshToken);
+      router.push(res.user.role === 'ADMIN' ? '/admin' : res.user.role === 'PROVIDER' ? '/provider' : next);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function requestOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -81,11 +101,61 @@ function LoginForm() {
       <div className="container" style={{ maxWidth: 880 }}>
         <span className="sec-no">Welcome · እንኳን ደህና መጡ</span>
         <h1 className="page-title">ይግቡ · Sign in</h1>
-        <p className="page-sub">One phone number is all you need — we will text you a code.</p>
+        <p className="page-sub">
+          {stage === 'password'
+            ? 'Sign in with your username and password.'
+            : 'One phone number is all you need — we will text you a code.'}
+        </p>
 
         <div className="login-grid">
           <div className="panel">
             {error && <div className="error-box">{error}</div>}
+
+            {stage === 'password' && (
+              <form onSubmit={passwordLogin}>
+                <div className="field">
+                  <label>Username · መለያ ስም</label>
+                  <input
+                    placeholder="e.g. customer"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoFocus
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="field">
+                  <label>Password · የይለፍ ቃል</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%' }}
+                  disabled={busy || username.trim().length < 2 || password.length < 6}
+                >
+                  {busy ? 'Signing in…' : 'Sign in · ይግቡ'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-line btn-sm mt"
+                  onClick={() => {
+                    setError('');
+                    setStage('phone');
+                  }}
+                >
+                  Use phone code instead · በስልክ ኮድ ይግቡ
+                </button>
+                <p className="hint mt">
+                  Demo — customer: <code>customer / customer1234</code> · technician:{' '}
+                  <code>technician / tech1234</code> · admin: <code>admin / admin1234</code>
+                </p>
+              </form>
+            )}
 
             {stage === 'phone' && (
               <form onSubmit={requestOtp}>
@@ -106,10 +176,16 @@ function LoginForm() {
                 >
                   {busy ? 'Sending…' : 'Send code · ኮድ ላክ'}
                 </button>
-                <p className="hint mt">
-                  Demo accounts — technician: <code>0911000002</code>, admin: <code>0900000001</code>,
-                  or any other number to join as a customer.
-                </p>
+                <button
+                  type="button"
+                  className="btn btn-line btn-sm mt"
+                  onClick={() => {
+                    setError('');
+                    setStage('password');
+                  }}
+                >
+                  ← Username &amp; password
+                </button>
               </form>
             )}
 

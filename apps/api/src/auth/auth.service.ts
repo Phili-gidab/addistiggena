@@ -8,9 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
+import { compare } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from './sms.service';
-import { normalizePhone } from './auth.dto';
+import { ET_PHONE_REGEX, normalizePhone } from './auth.dto';
 
 export interface JwtPayload {
   sub: string;
@@ -100,6 +101,27 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) throw new BadRequestException('User no longer exists');
     return this.issueTokens(user.id, user.role);
+  }
+
+  /**
+   * Credentials login (demo accounts, staff): username — or the account's phone
+   * number — plus password. Phone-OTP remains the primary consumer flow.
+   */
+  async passwordLogin(usernameOrPhone: string, password: string) {
+    const id = usernameOrPhone.trim();
+    const user = ET_PHONE_REGEX.test(id)
+      ? await this.prisma.user.findUnique({ where: { phone: normalizePhone(id) } })
+      : await this.prisma.user.findUnique({ where: { username: id.toLowerCase() } });
+    // bcrypt-compare against a constant hash even when the user is missing,
+    // so response timing doesn't reveal which usernames exist
+    const hash =
+      user?.passwordHash ??
+      '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZUgkQfxwLXIYimlvbXBmpe/BwALvVy';
+    const ok = await compare(password, hash);
+    if (!ok || !user?.passwordHash) {
+      throw new UnauthorizedException('Wrong username or password');
+    }
+    return { ...this.issueTokens(user.id, user.role), user };
   }
 
   /**

@@ -1,6 +1,7 @@
 import { Body, Controller, Headers, HttpCode, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import {
+  PasswordLoginDto,
   RefreshDto,
   RequestOtpDto,
   TelegramLinkDto,
@@ -28,6 +29,12 @@ export class AuthController {
   @HttpCode(200)
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto.refreshToken);
+  }
+
+  @Post('login')
+  @HttpCode(200)
+  login(@Body() dto: PasswordLoginDto) {
+    return this.auth.passwordLogin(dto.username, dto.password);
   }
 
   // ── Bot channel (guarded by the shared BOT_API_KEY header) ─────────────────

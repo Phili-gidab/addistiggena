@@ -26,6 +26,18 @@ export class RefreshDto {
   refreshToken: string;
 }
 
+export class PasswordLoginDto {
+  /** username, or an Ethiopian phone number for accounts that set a password */
+  @IsString()
+  @IsNotEmpty()
+  @Length(2, 100)
+  username: string;
+
+  @IsString()
+  @Length(6, 100)
+  password: string;
+}
+
 export class TelegramLinkDto {
   @IsString()
   @IsNotEmpty()
