@@ -68,7 +68,7 @@ export function DailyBars({ data }: { data: DayPoint[] }) {
         {data.map(bar)}
         {/* selective direct labels: peak and latest day */}
         {[peakIdx, data.length - 1]
-          .filter((i, idx, arr) => data[i].count > 0 && arr.indexOf(i) === idx)
+          .filter((i, idx, arr) => i >= 0 && data[i].count > 0 && arr.indexOf(i) === idx)
           .map((i) => {
             const h = (data[i].count / max) * plotH;
             return (
