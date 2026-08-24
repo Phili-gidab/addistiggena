@@ -38,3 +38,6 @@ export const CurrentUser = createParamDecorator(
   (_data: unknown, context: ExecutionContext): AuthUser =>
     context.switchToHttp().getRequest().user,
 );
+
+/** Back-office roles (spec section 2, Day 1 set). ADMIN is the Super Admin. */
+export const STAFF_ROLES = ['ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER', 'SUPPORT_AGENT'];

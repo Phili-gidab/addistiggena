@@ -6,7 +6,7 @@ export interface User {
   id: string;
   phone: string;
   name: string | null;
-  role: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
+  role: 'CUSTOMER' | 'PROVIDER' | 'ADMIN' | 'OPS_MANAGER' | 'VERIFICATION_OFFICER' | 'SUPPORT_AGENT';
   language: 'AM' | 'EN';
 }
 
@@ -57,6 +57,11 @@ export interface Booking {
   priceQuoteEtb: string | null;
   /** auto-dispatch: current offer deadline (90s window) while REQUESTED */
   offerExpiresAt: string | null;
+  /** dispatch escalated to Ops for manual assignment (spec: 3 declines/timeouts) */
+  escalatedAt?: string | null;
+  /** an open dispute/guarantee ticket exists on this booking */
+  disputedAt?: string | null;
+  completedAt?: string | null;
   createdAt: string;
   category: Category;
   customerId: string;
@@ -68,6 +73,39 @@ export interface Booking {
   } | null;
   payment?: { gateway: string; status: string; amountEtb: string; commissionEtb: string | null } | null;
   review?: { stars: number; state: string } | null;
+}
+
+export type StaffRole = 'ADMIN' | 'OPS_MANAGER' | 'VERIFICATION_OFFICER' | 'SUPPORT_AGENT';
+
+/** Back-office roles that may open /admin (each sees its own scoped view). */
+export function isStaff(role: User['role'] | undefined): role is StaffRole {
+  return (
+    role === 'ADMIN' ||
+    role === 'OPS_MANAGER' ||
+    role === 'VERIFICATION_OFFICER' ||
+    role === 'SUPPORT_AGENT'
+  );
+}
+
+export interface Ticket {
+  id: string;
+  type: 'DISPUTE' | 'GUARANTEE_CLAIM' | 'SAFETY';
+  status: 'OPEN' | 'RE_INSPECTION' | 'RESOLVED' | 'REJECTED';
+  note: string;
+  resolutionNote: string | null;
+  refundEtb: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  booking: {
+    id: string;
+    status: BookingStatus;
+    completedAt: string | null;
+    category: { nameEn: string; nameAm: string };
+    customer: { id: string; name: string | null; phone: string };
+    provider: { user: { id: string; name: string | null; phone: string } } | null;
+  };
+  openedBy: { id: string; name: string | null; phone: string; role: string };
+  resolvedBy: { id: string; name: string | null; role: string } | null;
 }
 
 // ── auth storage ─────────────────────────────────────────────────────────────

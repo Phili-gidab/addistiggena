@@ -10,11 +10,66 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { IsEnum, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { PayoutStatus, Prisma, ReviewState, VerificationStatus } from '@prisma/client';
-import { JwtAuthGuard, Roles, RolesGuard } from '../auth/guards';
+import {
+  IsEnum,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
+import { PayoutStatus, Prisma, ReviewState, Role, VerificationStatus } from '@prisma/client';
+import { hashSync } from 'bcryptjs';
+import { AuditService } from '../audit/audit.service';
+import { normalizePhone } from '../auth/auth.dto';
+import { CurrentUser, JwtAuthGuard, Roles, RolesGuard, STAFF_ROLES } from '../auth/guards';
+import { AuthUser } from '../auth/jwt.strategy';
+import { BookingsService } from '../bookings/bookings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+
+/** Roles Super Admin may hand out (spec section 3: only role that creates admin-level accounts). */
+const CREATABLE_STAFF_ROLES = ['ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER', 'SUPPORT_AGENT'];
+
+/** GPS stall detection threshold while EN_ROUTE (spec section 5). */
+const GPS_STALL_MS = 15 * 60 * 1000;
+
+class CreateStaffDto {
+  @IsString()
+  @Length(2, 100)
+  name: string;
+
+  @IsString()
+  @Length(9, 20)
+  phone: string;
+
+  @IsString()
+  @Length(3, 40)
+  @Matches(/^[a-z0-9._-]+$/i, { message: 'username: letters, digits, dot, dash, underscore only' })
+  username: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(100)
+  password: string;
+
+  @IsIn(CREATABLE_STAFF_ROLES)
+  role: Role;
+}
+
+class AssignBookingDto {
+  @IsString()
+  providerId: string;
+
+  @IsString()
+  @Length(3, 500)
+  reason: string;
+}
 
 class VerdictDto {
   @IsOptional()
@@ -44,11 +99,13 @@ class PayoutQueueQuery {
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
+@Roles(...STAFF_ROLES)
 export class AdminController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly bookingsService: BookingsService,
+    private readonly audit: AuditService,
   ) {}
 
   // ── Provider verification queue (proposal §4.3 step 01) ────────────────────
@@ -63,17 +120,23 @@ export class AdminController {
   }
 
   @Post('providers/:id/verify')
-  verify(@Param('id') id: string) {
+  @Roles('ADMIN', 'VERIFICATION_OFFICER')
+  verify(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    this.audit.log(actor, 'PROVIDER_VERIFY', 'ProviderProfile', id);
     return this.setVerification(id, 'VERIFIED');
   }
 
   @Post('providers/:id/reject')
-  reject(@Param('id') id: string, @Body() dto: VerdictDto) {
+  @Roles('ADMIN', 'VERIFICATION_OFFICER')
+  reject(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: VerdictDto) {
+    this.audit.log(actor, 'PROVIDER_REJECT', 'ProviderProfile', id, dto.note);
     return this.setVerification(id, 'REJECTED', dto.note);
   }
 
   @Post('providers/:id/suspend')
-  suspend(@Param('id') id: string, @Body() dto: VerdictDto) {
+  @Roles('ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER')
+  suspend(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: VerdictDto) {
+    this.audit.log(actor, 'PROVIDER_SUSPEND', 'ProviderProfile', id, dto.note);
     return this.setVerification(id, 'SUSPENDED', dto.note);
   }
 
@@ -136,6 +199,7 @@ export class AdminController {
   // ── Review moderation (published after 24h review, proposal §4.1) ──────────
 
   @Get('reviews')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
   reviews() {
     return this.prisma.review.findMany({
       where: { state: 'PENDING' },
@@ -145,11 +209,13 @@ export class AdminController {
   }
 
   @Post('reviews/:id/publish')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
   async publishReview(@Param('id') id: string) {
     return this.moderateReview(id, 'PUBLISHED');
   }
 
   @Post('reviews/:id/reject')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
   async rejectReview(@Param('id') id: string) {
     return this.moderateReview(id, 'REJECTED');
   }
@@ -182,6 +248,7 @@ export class AdminController {
   // ── Payout processing (proposal §4.4 steps 09-10) ──────────────────────────
 
   @Get('payouts')
+  @Roles('ADMIN')
   payouts(@Query() query: PayoutQueueQuery) {
     return this.prisma.payout.findMany({
       where: { status: query.status ?? 'REQUESTED' },
@@ -196,7 +263,9 @@ export class AdminController {
   }
 
   @Post('payouts/:id/process')
-  async processPayout(@Param('id') id: string) {
+  @Roles('ADMIN')
+  async processPayout(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    this.audit.log(actor, 'PAYOUT_PROCESS', 'Payout', id);
     const payout = await this.prisma.payout.findUnique({ where: { id } });
     if (!payout) throw new NotFoundException('Payout not found');
     if (payout.status !== 'REQUESTED') throw new BadRequestException('Payout already handled');
@@ -208,7 +277,13 @@ export class AdminController {
   }
 
   @Post('payouts/:id/reject')
-  async rejectPayout(@Param('id') id: string, @Body() dto: VerdictDto) {
+  @Roles('ADMIN')
+  async rejectPayout(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: VerdictDto,
+  ) {
+    this.audit.log(actor, 'PAYOUT_REJECT', 'Payout', id, dto.note);
     const payout = await this.prisma.payout.findUnique({ where: { id } });
     if (!payout) throw new NotFoundException('Payout not found');
     if (payout.status !== 'REQUESTED') throw new BadRequestException('Payout already handled');
@@ -237,6 +312,7 @@ export class AdminController {
   // ── Analytics & KPI reporting (proposal §4.3 step 05) ──────────────────────
 
   @Get('analytics')
+  @Roles('ADMIN', 'OPS_MANAGER')
   async analytics() {
     const since = new Date();
     since.setDate(since.getDate() - 13);
@@ -307,12 +383,124 @@ export class AdminController {
   }
 
   @Put('config/commission')
-  async setCommission(@Body() dto: CommissionDto) {
+  @Roles('ADMIN', 'OPS_MANAGER')
+  async setCommission(@CurrentUser() actor: AuthUser, @Body() dto: CommissionDto) {
+    this.audit.log(actor, 'COMMISSION_SET', 'AppConfig', 'commission_rate', String(dto.rate));
     await this.prisma.appConfig.upsert({
       where: { key: 'commission_rate' },
       update: { value: String(dto.rate) },
       create: { key: 'commission_rate', value: String(dto.rate) },
     });
     return { rate: dto.rate };
+  }
+
+  // -- Ops queue: escalated dispatches + GPS-stalled en-route jobs (spec section 5) --
+
+  @Get('ops/queue')
+  @Roles('ADMIN', 'OPS_MANAGER')
+  async opsQueue() {
+    const stallBefore = new Date(Date.now() - GPS_STALL_MS);
+    const include = {
+      category: { select: { nameEn: true, nameAm: true } },
+      customer: { select: { name: true, phone: true } },
+      provider: {
+        select: {
+          id: true,
+          locationUpdatedAt: true,
+          user: { select: { name: true, phone: true } },
+        },
+      },
+    } as const;
+    const [escalated, enRoute] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: { status: 'REQUESTED', escalatedAt: { not: null } },
+        include,
+        orderBy: { escalatedAt: 'asc' },
+      }),
+      this.prisma.booking.findMany({
+        where: { status: 'EN_ROUTE', enRouteAt: { lt: stallBefore } },
+        include,
+        orderBy: { enRouteAt: 'asc' },
+      }),
+    ]);
+    const stalled = enRoute.filter(
+      (b) => !b.provider?.locationUpdatedAt || b.provider.locationUpdatedAt < stallBefore,
+    );
+    return { escalated, stalled };
+  }
+
+  @Post('bookings/:id/assign')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
+  async assignBooking(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: AssignBookingDto,
+  ) {
+    this.audit.log(actor, 'BOOKING_ASSIGN', 'Booking', id, dto.reason, {
+      providerId: dto.providerId,
+    });
+    return this.bookingsService.assign(id, dto.providerId);
+  }
+
+  // -- Staff accounts (spec section 3: Super Admin only) ----------------------
+
+  @Get('staff')
+  @Roles('ADMIN')
+  staff() {
+    return this.prisma.user.findMany({
+      where: { role: { in: CREATABLE_STAFF_ROLES as Role[] } },
+      select: { id: true, name: true, phone: true, username: true, role: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  @Post('staff')
+  @Roles('ADMIN')
+  async createStaff(@CurrentUser() actor: AuthUser, @Body() dto: CreateStaffDto) {
+    const phone = normalizePhone(dto.phone);
+    const username = dto.username.toLowerCase();
+    const clash = await this.prisma.user.findFirst({
+      where: { OR: [{ phone }, { username }] },
+      select: { id: true },
+    });
+    if (clash) throw new BadRequestException('Phone or username already in use');
+    const user = await this.prisma.user.create({
+      data: {
+        name: dto.name,
+        phone,
+        username,
+        passwordHash: hashSync(dto.password, 10),
+        role: dto.role,
+        language: 'EN',
+      },
+      select: { id: true, name: true, phone: true, username: true, role: true, createdAt: true },
+    });
+    this.audit.log(actor, 'STAFF_CREATE', 'User', user.id, undefined, {
+      role: dto.role,
+      username,
+    });
+    return user;
+  }
+
+  // -- Audit log (spec section 8: every manual override, with reason) ---------
+
+  @Get('audit')
+  @Roles('ADMIN')
+  auditLog() {
+    return this.prisma.auditLog.findMany({
+      include: { actor: { select: { name: true, username: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  // -- Support refund cap (spec section 5) ------------------------------------
+
+  @Get('config/refund-cap')
+  async refundCap() {
+    const row = await this.prisma.appConfig.findUnique({
+      where: { key: 'support_refund_cap_etb' },
+    });
+    return { capEtb: Number(row?.value ?? 500) };
   }
 }

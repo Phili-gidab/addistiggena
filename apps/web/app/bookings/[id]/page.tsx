@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { OfferRing } from '../../../components/OfferRing';
 import { Stars } from '../../../components/Stars';
 import { StatusBadge } from '../../../components/StatusBadge';
-import { api, ApiError, Booking, fmtDistance, getToken, getUser } from '../../../lib/api';
+import { api, ApiError, Booking, fmtDistance, getToken, getUser, Ticket } from '../../../lib/api';
 
 const TrackMap = dynamic(() => import('../../../components/TrackMap'), { ssr: false });
 
@@ -42,6 +42,9 @@ const FLOW = [
 
 const GATEWAYS = ['TELEBIRR', 'CHAPA', 'CBEBIRR', 'CASH'] as const;
 
+/** Every repair carries a 5-day guarantee from completion (spec section 5). */
+const GUARANTEE_DAYS = 5;
+
 export default function BookingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -63,6 +66,7 @@ export default function BookingDetailPage() {
   const [price, setPrice] = useState('');
   const [track, setTrack] = useState<TrackInfo | null>(null);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [chatText, setChatText] = useState('');
   const chatEnd = useRef<HTMLDivElement>(null);
 
@@ -78,6 +82,9 @@ export default function BookingDetailPage() {
         }
         if (!['REJECTED', 'EXPIRED', 'CANCELLED'].includes(b.status)) {
           api<ChatMessage[]>(`/bookings/${id}/messages`).then(setMsgs).catch(() => {});
+        }
+        if (b.customerId === user.current?.id) {
+          api<Ticket[]>('/tickets/mine').then(setMyTickets).catch(() => {});
         }
       })
       .catch((e) => {
@@ -175,6 +182,22 @@ export default function BookingDetailPage() {
   const dead = ['CANCELLED', 'REJECTED', 'EXPIRED'].includes(booking.status);
   const flowIdx = FLOW.findIndex((f) => f.key === booking.status);
 
+  // 5-day guarantee window from completion; the claim button disables on expiry
+  const guaranteeUntil = booking.completedAt
+    ? new Date(new Date(booking.completedAt).getTime() + GUARANTEE_DAYS * 24 * 60 * 60 * 1000)
+    : null;
+  const guaranteeOpen =
+    isCustomer &&
+    ['COMPLETED', 'PAID'].includes(booking.status) &&
+    !!guaranteeUntil &&
+    guaranteeUntil.getTime() > Date.now() &&
+    !myTickets.some(
+      (t) =>
+        t.booking.id === booking.id &&
+        t.type === 'GUARANTEE_CLAIM' &&
+        ['OPEN', 'RE_INSPECTION'].includes(t.status),
+    );
+
   async function act(path: string, body?: object) {
     setActionErr('');
     setBusy(true);
@@ -254,6 +277,11 @@ export default function BookingDetailPage() {
                         offer the job to the next technician automatically.
                       </span>
                     </>
+                  ) : booking.escalatedAt ? (
+                    <span>
+                      Our operations team is assigning a technician for you manually - we will
+                      notify you as soon as one is confirmed.
+                    </span>
                   ) : (
                     <span>Finding a technician near you…</span>
                   )}
@@ -620,6 +648,65 @@ export default function BookingDetailPage() {
                   Send
                 </button>
               </form>
+            )}
+          </div>
+        )}
+
+        {/* ── support: something is wrong + 5-day guarantee claim ───────── */}
+        {isCustomer && !['CANCELLED', 'EXPIRED'].includes(booking.status) && (
+          <div className="panel">
+            <h2>Need help? · እርዳታ ይፈልጋሉ?</h2>
+            {myTickets
+              .filter((t) => t.booking.id === booking.id)
+              .map((t) => (
+                <p className="hint" key={t.id}>
+                  {t.type === 'GUARANTEE_CLAIM' ? 'Guarantee claim' : 'Report'}:{' '}
+                  <strong>{t.status.replace(/_/g, ' ').toLowerCase()}</strong>
+                  {t.resolutionNote ? ` - ${t.resolutionNote}` : ' - our support team is on it.'}
+                </p>
+              ))}
+            <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+              {!['COMPLETED', 'PAID'].includes(booking.status) && (
+                <button
+                  className="btn btn-line btn-sm"
+                  disabled={busy}
+                  onClick={() => {
+                    const note = window.prompt(
+                      'Tell us what is wrong · ችግሩን ይግለጹ (our support team responds fast):',
+                    );
+                    if (note === null || note.trim().length < 5) return;
+                    act('/tickets', { bookingId: booking.id, type: 'DISPUTE', note: note.trim() });
+                  }}
+                >
+                  Something&rsquo;s wrong · ችግር አለ
+                </button>
+              )}
+              {guaranteeOpen && (
+                <button
+                  className="btn btn-line btn-sm"
+                  disabled={busy}
+                  onClick={() => {
+                    const note = window.prompt(
+                      'Describe the issue for your guarantee claim · ለዋስትና ጥያቄዎ ችግሩን ይግለጹ:',
+                    );
+                    if (note === null || note.trim().length < 5) return;
+                    act('/tickets', {
+                      bookingId: booking.id,
+                      type: 'GUARANTEE_CLAIM',
+                      note: note.trim(),
+                    });
+                  }}
+                >
+                  Submit guarantee claim · የዋስትና ጥያቄ
+                </button>
+              )}
+            </div>
+            {['COMPLETED', 'PAID'].includes(booking.status) && (
+              <p className="hint" style={{ marginTop: '0.5rem' }}>
+                {guaranteeOpen
+                  ? `Every repair carries a ${GUARANTEE_DAYS}-day guarantee - claims close ${guaranteeUntil ? guaranteeUntil.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}.`
+                  : `The ${GUARANTEE_DAYS}-day guarantee window for this job has closed.`}
+              </p>
             )}
           </div>
         )}

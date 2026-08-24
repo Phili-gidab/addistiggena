@@ -9,6 +9,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AdminModule } from './admin/admin.module';
+import { TicketsModule } from './tickets/tickets.module';
 import { HealthModule } from './health/health.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { WalletModule } from './wallet/wallet.module';
@@ -25,6 +26,7 @@ import { WalletModule } from './wallet/wallet.module';
     PaymentsModule,
     ReviewsModule,
     AdminModule,
+    TicketsModule,
     HealthModule,
     UploadsModule,
     WalletModule,

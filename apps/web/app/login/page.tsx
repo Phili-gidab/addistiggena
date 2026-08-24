@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { api, saveSession, User } from '../../lib/api';
+import { api, isStaff, saveSession, User } from '../../lib/api';
 
 function LoginForm() {
   const router = useRouter();
@@ -29,7 +29,7 @@ function LoginForm() {
         { method: 'POST', body: JSON.stringify({ username: username.trim(), password }) },
       );
       saveSession(res.accessToken, res.user, res.refreshToken);
-      router.push(res.user.role === 'ADMIN' ? '/admin' : res.user.role === 'PROVIDER' ? '/provider' : next);
+      router.push(isStaff(res.user.role) ? '/admin' : res.user.role === 'PROVIDER' ? '/provider' : next);
     } catch (err) {
       setError((err as Error).message);
     } finally {

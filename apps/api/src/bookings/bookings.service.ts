@@ -22,6 +22,10 @@ import {
 
 const OFFER_WINDOW_MS = 90_000; // provider has 90 seconds to respond (proposal §4.2)
 
+/** After this many declines/timeouts the job escalates to the Ops queue for manual
+ *  assignment instead of walking the whole pool (roles/workflow spec section 5). */
+const ESCALATE_AFTER_ATTEMPTS = 3;
+
 /** Average urban travel speed used for the ETA estimate - Addis traffic, mixed transport. */
 const AVG_SPEED_KMH = 18;
 
@@ -254,6 +258,25 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     };
 
     const exclude = booking.offers.map((o) => o.providerId);
+
+    // 3 declines/timeouts -> hold for manual assignment by Ops (spec section 5)
+    if (exclude.length >= ESCALATE_AFTER_ATTEMPTS && !booking.escalatedAt) {
+      const { count } = await this.prisma.booking.updateMany({
+        where: claim,
+        data: { providerId: null, offerExpiresAt: null, escalatedAt: new Date() },
+      });
+      if (count > 0) {
+        this.notifications.notify(
+          booking.customer,
+          `Addis Tiggena: job #${bookingId.slice(-6)} - our operations team is assigning a technician for you manually. We will notify you shortly.`,
+        );
+        this.logger.warn(
+          `Booking ${bookingId} escalated to Ops after ${exclude.length} declined/expired offers`,
+        );
+      }
+      return this.getPublic(bookingId);
+    }
+
     const [next] = await this.providers.candidates(
       booking.lat,
       booking.lng,
@@ -415,6 +438,59 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Current technician position + ETA for an active booking - polled by the customer app. */
+  /**
+   * Staff manual override (spec section 3: reassign a live booking): hard-picks a
+   * technician, superseding the auto-ranked queue. The technician still gets the
+   * standard 90s accept window; a live job resets to REQUESTED first.
+   */
+  async assign(bookingId: string, providerId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { category: true, customer: { select: { phone: true, telegramChatId: true } } },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (!['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED'].includes(booking.status)) {
+      throw new BadRequestException(`Cannot reassign a ${booking.status} booking`);
+    }
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+      include: { user: { select: { name: true, phone: true, telegramChatId: true } } },
+    });
+    if (!profile || profile.verificationStatus !== 'VERIFIED') {
+      throw new BadRequestException('Technician must exist and be VERIFIED');
+    }
+    const expiresAt = new Date(Date.now() + OFFER_WINDOW_MS);
+    await this.prisma.$transaction([
+      this.prisma.bookingOffer.updateMany({
+        where: { bookingId, outcome: 'PENDING' },
+        data: { outcome: 'SUPERSEDED' },
+      }),
+      this.prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'REQUESTED',
+          providerId,
+          offerExpiresAt: expiresAt,
+          escalatedAt: null,
+          acceptedAt: null,
+          enRouteAt: null,
+          arrivedAt: null,
+          startedAt: null,
+        },
+      }),
+      this.prisma.bookingOffer.create({ data: { bookingId, providerId, expiresAt } }),
+    ]);
+    this.notifications.notify(
+      profile.user,
+      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} assigned to you by dispatch - respond within 90s`,
+    );
+    this.notifications.notify(
+      booking.customer,
+      `Addis Tiggena: job #${bookingId.slice(-6)} - a technician (${profile.user.name ?? 'assigned'}) has been selected for you.`,
+    );
+    return this.getPublic(bookingId);
+  }
+
   async track(id: string, user: AuthUser) {
     const booking = await this.getForParty(id, user);
     const active: BookingStatus[] = ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];

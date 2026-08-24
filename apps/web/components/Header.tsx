@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { clearSession, getUser, User } from '../lib/api';
+import { clearSession, getUser, isStaff, User } from '../lib/api';
 import { lockScroll } from '../lib/motion';
 
 const LINKS = [
@@ -85,7 +85,7 @@ export function Header() {
                 {l.en}
               </Link>
             ))}
-            {user?.role === 'ADMIN' && (
+            {isStaff(user?.role) && (
               <Link href="/admin" className="hide-sm nav-link">
                 Admin
               </Link>
@@ -126,7 +126,7 @@ export function Header() {
                 <span className="en">{l.en}</span>
               </Link>
             ))}
-            {user?.role === 'ADMIN' && (
+            {isStaff(user?.role) && (
               <Link href="/admin" className="mnav-link" onClick={() => setOpen(false)}>
                 <span className="idx">0{LINKS.length + 1}</span>
                 <span className="am">አስተዳደር</span>

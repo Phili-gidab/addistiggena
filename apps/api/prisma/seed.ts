@@ -8,6 +8,9 @@ const DEMO_PASSWORDS: Record<string, string> = {
   admin: 'admin1234',
   technician: 'tech1234',
   customer: 'customer1234',
+  ops: 'ops12345',
+  verifier: 'verify1234',
+  support: 'support1234',
 };
 const hash = (u: string) => hashSync(DEMO_PASSWORDS[u], 10);
 
@@ -70,6 +73,28 @@ async function main() {
       username: 'admin',
       passwordHash: hash('admin'),
     },
+  });
+
+  // Day-1 staff roles (roles/workflow spec section 2): Ops Manager,
+  // Verification Officer, Support Agent - one demo account each.
+  const staff: [string, string, string, 'OPS_MANAGER' | 'VERIFICATION_OFFICER' | 'SUPPORT_AGENT'][] = [
+    ['+251900000004', 'Operations Manager', 'ops', 'OPS_MANAGER'],
+    ['+251900000005', 'Verification Officer', 'verifier', 'VERIFICATION_OFFICER'],
+    ['+251900000006', 'Support Agent', 'support', 'SUPPORT_AGENT'],
+  ];
+  for (const [phone, name, username, role] of staff) {
+    await prisma.user.upsert({
+      where: { phone },
+      update: { role, username, passwordHash: hash(username) },
+      create: { phone, name, role, language: 'EN', username, passwordHash: hash(username) },
+    });
+  }
+
+  // Support refund auto-approval cap (spec section 5) - above it routes to Ops/Admin.
+  await prisma.appConfig.upsert({
+    where: { key: 'support_refund_cap_etb' },
+    update: {},
+    create: { key: 'support_refund_cap_etb', value: '500' },
   });
 
   // Demo customer (username/password login for demos)
