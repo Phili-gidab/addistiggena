@@ -132,6 +132,8 @@ model ServiceCategory {
   nameAm        String
   icon          String?
   priceFloorEtb Decimal?          @db.Decimal(12, 2)
+  /// named sub-services shown in search and pricing (e.g. "Mitad repair", "Socket fix")
+  subServices   String[]          @default([])
   isActive      Boolean           @default(true)
   providers     ProviderProfile[]
   bookings      Booking[]

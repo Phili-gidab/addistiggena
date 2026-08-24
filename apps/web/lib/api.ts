@@ -17,6 +17,8 @@ export interface Category {
   nameAm: string;
   /** Prisma Decimal serialises as string - the "from ETB…" estimate */
   priceFloorEtb: string | null;
+  /** named sub-services managed in the admin console */
+  subServices?: string[];
 }
 
 export interface NearbyProvider {

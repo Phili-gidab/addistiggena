@@ -1087,7 +1087,7 @@ body.scroll-locked .site-header { transform: none; }
 /* -- staff console shell: sidebar nav + content (roles/workflow spec section 6) -- */
 .admin-shell { display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
 .admin-side {
-  position: sticky; top: 92px;
+  position: sticky; top: 92px; min-width: 0;
   background: #fff; border: 1px solid var(--line); border-radius: 14px;
   padding: 0.85rem 0.6rem; box-shadow: 0 10px 30px -24px rgba(7, 20, 41, 0.35);
 }
@@ -1096,7 +1096,17 @@ body.scroll-locked .site-header { transform: none; }
   letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
   padding: 0.15rem 0.65rem 0.6rem;
 }
-.admin-nav { display: flex; flex-direction: column; gap: 2px; }
+.admin-nav { display: flex; flex-direction: column; gap: 0.15rem; }
+.admin-nav .nav-group { display: flex; flex-direction: column; gap: 2px; }
+.admin-nav .nav-group + .nav-group { margin-top: 0.7rem; padding-top: 0.65rem; border-top: 1px solid var(--line); }
+.admin-nav .nav-group-label {
+  font-family: var(--font-display); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+  opacity: 0.75; padding: 0 0.65rem 0.25rem;
+}
+.admin-nav .nav-item { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; }
+.admin-nav .nav-item .ic { display: inline-flex; opacity: 0.75; flex-shrink: 0; }
+.admin-nav button.on .nav-item .ic { opacity: 1; }
 .admin-nav button {
   display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
   width: 100%; text-align: left; padding: 0.52rem 0.65rem; border-radius: 9px;
@@ -1111,6 +1121,14 @@ body.scroll-locked .site-header { transform: none; }
 }
 .admin-nav button.on .badge { background: #fff; color: var(--navy); }
 .admin-main { min-width: 0; }
+.view-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 0.9rem; gap: 0.8rem;
+}
+.view-head .crumb {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; color: var(--navy);
+}
+.cat-create { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .qa-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.3rem 0 1.1rem; }
 .ticket-form { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; max-width: 460px; }
 .ticket-form textarea { width: 100%; }
@@ -1128,10 +1146,26 @@ body.scroll-locked .site-header { transform: none; }
 .booking-photo img { cursor: zoom-in; }
 .booking-photo .hint { display: block; margin-top: 0.35rem; }
 @media (max-width: 920px) {
-  .admin-shell { grid-template-columns: 1fr; }
-  .admin-side { position: static; }
-  .admin-nav { flex-direction: row; overflow-x: auto; padding-bottom: 0.2rem; }
-  .admin-nav button { white-space: nowrap; }
+  .admin-shell { grid-template-columns: 1fr; gap: 0.9rem; }
+  .admin-side { position: static; padding: 0.55rem; }
+  .admin-side .role-tag { display: none; }
+  .admin-nav { flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 0.15rem; }
+  .admin-nav .nav-group { flex-direction: row; gap: 0.25rem; }
+  .admin-nav .nav-group + .nav-group { margin: 0 0 0 0.25rem; padding: 0; border: 0; }
+  .admin-nav .nav-group-label { display: none; }
+  .admin-nav button { white-space: nowrap; padding: 0.45rem 0.6rem; font-size: 0.82rem; }
+}
+@media (max-width: 640px) {
+  .admin-main .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .admin-main .tile .v { font-size: 1.4rem; }
+  .admin-main .panel { padding: 1rem 0.85rem; }
+  .admin-main .table { font-size: 0.8rem; }
+  .admin-main .table th, .admin-main .table td { padding: 0.5rem 0.5rem; }
+  .admin-main .booking-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .admin-main .booking-row .row { justify-content: flex-start; }
+  .view-head { flex-wrap: wrap; }
+  .qa-row .btn { font-size: 0.78rem; padding: 0.45rem 0.7rem; }
+  .cat-create .input { min-width: 0 !important; flex: 1 1 45%; }
 }
 
 /* auto-dispatch (90s offer window) */

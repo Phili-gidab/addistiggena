@@ -70,6 +70,50 @@ class CategoryUpdateDto {
 
   @IsOptional()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  nameEn?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
+  nameAm?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 40)
+  icon?: string;
+
+  /** named sub-services, e.g. ["Mitad repair", "Socket & breaker fix"] */
+  @IsOptional()
+  @IsString({ each: true })
+  subServices?: string[];
+}
+
+class CategoryCreateDto {
+  @IsString()
+  @Length(2, 80)
+  nameEn: string;
+
+  @IsString()
+  @Length(1, 80)
+  nameAm: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 40)
+  icon?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  priceFloorEtb?: number;
+
+  @IsOptional()
+  @IsString({ each: true })
+  subServices?: string[];
 }
 
 class RefundCapDto {
@@ -636,6 +680,32 @@ export class AdminController {
     return this.prisma.serviceCategory.findMany({ orderBy: { nameEn: 'asc' } });
   }
 
+  @Post('categories')
+  @Roles('ADMIN', 'OPS_MANAGER')
+  async createCategory(@CurrentUser() actor: AuthUser, @Body() dto: CategoryCreateDto) {
+    const base = dto.nameEn
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 40);
+    let slug = base || 'category';
+    for (let i = 2; await this.prisma.serviceCategory.findUnique({ where: { slug } }); i++) {
+      slug = `${base}-${i}`;
+    }
+    const cat = await this.prisma.serviceCategory.create({
+      data: {
+        slug,
+        nameEn: dto.nameEn,
+        nameAm: dto.nameAm,
+        icon: dto.icon ?? 'toolbox',
+        priceFloorEtb: dto.priceFloorEtb ?? 250,
+        subServices: (dto.subServices ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 30),
+      },
+    });
+    this.audit.log(actor, 'CATEGORY_CREATE', 'ServiceCategory', cat.id, dto.nameEn);
+    return cat;
+  }
+
   @Put('categories/:id')
   @Roles('ADMIN', 'OPS_MANAGER')
   async updateCategory(
@@ -654,6 +724,12 @@ export class AdminController {
       data: {
         ...(dto.priceFloorEtb != null ? { priceFloorEtb: dto.priceFloorEtb } : {}),
         ...(typeof dto.isActive === 'boolean' ? { isActive: dto.isActive } : {}),
+        ...(dto.nameEn ? { nameEn: dto.nameEn } : {}),
+        ...(dto.nameAm ? { nameAm: dto.nameAm } : {}),
+        ...(dto.icon ? { icon: dto.icon } : {}),
+        ...(dto.subServices
+          ? { subServices: dto.subServices.map((x) => x.trim()).filter(Boolean).slice(0, 30) }
+          : {}),
       },
     });
   }

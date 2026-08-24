@@ -181,7 +181,7 @@ export function Hero({ categories }: { categories: Category[] }) {
     return categories
       .filter((c) => {
         const entry = catalogBySlug(c.slug);
-        const haystack = [c.nameEn, c.nameAm, entry?.scope ?? '', ...(entry?.services ?? [])]
+        const haystack = [c.nameEn, c.nameAm, entry?.scope ?? '', ...(c.subServices ?? []), ...(entry?.services ?? [])]
           .join(' ')
           .toLowerCase();
         return haystack.includes(term);

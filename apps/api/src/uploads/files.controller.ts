@@ -49,12 +49,29 @@ export class FilesController {
       throw new BadRequestException('Invalid object key');
     }
 
-    if (user.role !== 'ADMIN') {
-      const doc = await this.prisma.providerDocument.findFirst({
-        where: { objectKey, provider: { userId: user.userId } },
-        select: { id: true },
-      });
-      if (!doc) throw new ForbiddenException('Not your document');
+    // Back-office roles read everything (verification documents, problem photos);
+    // a provider reads their own documents; booking parties read the problem photo
+    // attached to their booking (customer, assigned technician, or an offered one).
+    const staff = ['ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER', 'SUPPORT_AGENT'];
+    if (!staff.includes(user.role)) {
+      const [doc, bookingPhoto] = await Promise.all([
+        this.prisma.providerDocument.findFirst({
+          where: { objectKey, provider: { userId: user.userId } },
+          select: { id: true },
+        }),
+        this.prisma.booking.findFirst({
+          where: {
+            photoObjectKey: objectKey,
+            OR: [
+              { customerId: user.userId },
+              { provider: { userId: user.userId } },
+              { offers: { some: { provider: { userId: user.userId } } } },
+            ],
+          },
+          select: { id: true },
+        }),
+      ]);
+      if (!doc && !bookingPhoto) throw new ForbiddenException('Not your document');
     }
 
     const path = join(UPLOAD_DIR, objectKey);

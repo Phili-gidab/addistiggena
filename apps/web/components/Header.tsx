@@ -15,11 +15,15 @@ const LINKS = [
   { href: '/provider', am: 'ለባለሙያዎች', en: 'For technicians' },
 ];
 
+/** Staff accounts work in the console - customer/technician links are noise for them. */
+const STAFF_HIDDEN = ['/bookings', '/provider'];
+
 export function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [open, setOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
+  const links = isStaff(user?.role) ? LINKS.filter((l) => !STAFF_HIDDEN.includes(l.href)) : LINKS;
 
   useEffect(() => {
     const sync = () => setUser(getUser());
@@ -76,7 +80,7 @@ export function Header() {
             </span>
           </Link>
           <nav className="nav">
-            {LINKS.map((l) => (
+            {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
@@ -119,7 +123,7 @@ export function Header() {
       <div className={`mnav${open ? ' open' : ''}`} aria-hidden={!open}>
         <div className="mnav-inner container">
           <div className="mnav-links">
-            {LINKS.map((l, i) => (
+            {links.map((l, i) => (
               <Link key={l.href} href={l.href} className="mnav-link" onClick={() => setOpen(false)}>
                 <span className="idx">0{i + 1}</span>
                 <span className="am">{l.am}</span>
@@ -128,7 +132,7 @@ export function Header() {
             ))}
             {isStaff(user?.role) && (
               <Link href="/admin" className="mnav-link" onClick={() => setOpen(false)}>
-                <span className="idx">0{LINKS.length + 1}</span>
+                <span className="idx">0{links.length + 1}</span>
                 <span className="am">አስተዳደር</span>
                 <span className="en">Admin</span>
               </Link>

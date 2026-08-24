@@ -183,6 +183,35 @@ const VIEW_LABEL: Record<ViewKey, string> = {
   settings: 'Settings',
 };
 
+/** Sidebar grouping - overview, day-to-day queues, platform configuration. */
+const NAV_GROUPS: { label: string; items: ViewKey[] }[] = [
+  { label: 'Overview', items: ['dashboard', 'map'] },
+  { label: 'Operations', items: ['bookings', 'technicians', 'verification', 'tickets', 'payouts', 'reviews'] },
+  { label: 'Platform', items: ['categories', 'staff', 'audit', 'settings'] },
+];
+
+const ICONS: Record<ViewKey, React.ReactNode> = (() => {
+  const I = (d: React.ReactNode) => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {d}
+    </svg>
+  );
+  return {
+    dashboard: I(<><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>),
+    map: I(<><path d="M12 21s-7-5.1-7-11a7 7 0 0 1 14 0c0 5.9-7 11-7 11Z" /><circle cx="12" cy="10" r="2.6" /></>),
+    bookings: I(<><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></>),
+    technicians: I(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5" /><path d="M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20c-.6-2.6-2.2-4.1-4.3-4.7" /></>),
+    verification: I(<><path d="M12 2.5 20 6v5.5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3.5Z" /><path d="m8.7 11.7 2.3 2.3 4.3-4.5" /></>),
+    tickets: I(<><path d="M21 11.5c0 4.1-4 7.5-9 7.5-1 0-2-.1-2.9-.4L3 20l1.5-3.6C3.5 15.1 3 13.4 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5Z" /></>),
+    payouts: I(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5h.01M18 14.5h.01" /></>),
+    reviews: I(<path d="m12 3 2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9l-5.4 2.9 1.1-6.1L3.2 9.4l6.1-.8L12 3Z" />),
+    categories: I(<><path d="M3 10.5V4.8C3 3.8 3.8 3 4.8 3h5.7c.5 0 .9.2 1.3.5l8.7 8.7c.7.7.7 1.8 0 2.6l-5.7 5.7c-.7.7-1.8.7-2.6 0l-8.7-8.7a1.8 1.8 0 0 1-.5-1.3Z" /><circle cx="7.5" cy="7.5" r="1.2" /></>),
+    staff: I(<><circle cx="10" cy="8" r="3.5" /><path d="M3.5 20c.8-3.4 3.4-5 6.5-5 1.7 0 3.2.5 4.4 1.4" /><path d="M18.5 14v6M15.5 17h6" /></>),
+    audit: I(<><path d="M6 2.5h9l4 4V21.5H6z" /><path d="M15 2.5V7h4M9.5 12h6M9.5 16h6" /></>),
+    settings: I(<><path d="M4 21v-6M4 9V3M12 21v-9M12 6V3M20 21v-4M20 11V3" /><path d="M1.5 15h5M9.5 6h5M17.5 17h5" /></>),
+  };
+})();
+
 const ROLE_TITLES: Record<StaffRole, { en: string; am: string; sub: string }> = {
   ADMIN: {
     en: 'Super Admin',
@@ -244,6 +273,7 @@ export default function AdminPage() {
   const [reviews, setReviews] = useState<PendingReview[]>([]);
   const [cats, setCats] = useState<(Category & { isActive?: boolean })[]>([]);
   const [catEdit, setCatEdit] = useState<Record<string, string>>({});
+  const [subsEdit, setSubsEdit] = useState<Record<string, string>>({});
   const [staff, setStaff] = useState<StaffAccount[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [rate, setRate] = useState('');
@@ -838,16 +868,43 @@ export default function AdminPage() {
             <aside className="admin-side">
               <div className="role-tag">{role.replace(/_/g, ' ')}</div>
               <nav className="admin-nav">
-                {MENU[role].map((v) => (
-                  <button key={v} className={view === v ? 'on' : ''} onClick={() => { setView(v); if (v === 'tickets') setTicketHistory(null); }}>
-                    <span>{VIEW_LABEL[v]}</span>
-                    {badge(v) != null && <span className="badge">{badge(v)}</span>}
-                  </button>
-                ))}
+                {NAV_GROUPS.map((g) => {
+                  const items = g.items.filter((v) => MENU[role].includes(v));
+                  if (items.length === 0) return null;
+                  return (
+                    <div className="nav-group" key={g.label}>
+                      <span className="nav-group-label">{g.label}</span>
+                      {items.map((v) => (
+                        <button
+                          key={v}
+                          className={view === v ? 'on' : ''}
+                          onClick={() => {
+                            setView(v);
+                            if (v === 'tickets') setTicketHistory(null);
+                          }}
+                        >
+                          <span className="nav-item">
+                            <span className="ic">{ICONS[v]}</span>
+                            {VIEW_LABEL[v]}
+                          </span>
+                          {badge(v) != null && <span className="badge">{badge(v)}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
               </nav>
             </aside>
 
             <section className="admin-main">
+              <div className="view-head">
+                <span className="crumb">
+                  {VIEW_LABEL[view]}
+                </span>
+                <button className="btn btn-line btn-sm" onClick={reload}>
+                  ↻ Refresh
+                </button>
+              </div>
               {view === 'dashboard' && dashboardView}
 
               {view === 'map' && can('map') && (
@@ -1041,14 +1098,49 @@ export default function AdminPage() {
                   <h2>Categories & pricing</h2>
                   <p className="hint">
                     The floor price is the &quot;from ETB…&quot; estimate customers see at booking
-                    time. Changes apply immediately and are audit-logged.
+                    time. Sub-services feed the search box. Changes apply immediately and are
+                    audit-logged.
                   </p>
+                  <form
+                    className="row cat-create"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const f = new FormData(e.currentTarget);
+                      const nameEn = String(f.get('nameEn') ?? '').trim();
+                      const nameAm = String(f.get('nameAm') ?? '').trim();
+                      if (nameEn.length < 2 || !nameAm) {
+                        setError('English and Amharic names are required.');
+                        return;
+                      }
+                      await act(
+                        '/admin/categories',
+                        {
+                          nameEn,
+                          nameAm,
+                          priceFloorEtb: Number(f.get('floor') || 250),
+                          subServices: String(f.get('subs') ?? '')
+                            .split(',')
+                            .map((x) => x.trim())
+                            .filter(Boolean),
+                        },
+                        'POST',
+                      );
+                      (e.target as HTMLFormElement).reset();
+                    }}
+                  >
+                    <input className="input" name="nameEn" style={{ maxWidth: 180 }} placeholder="New category (English)" />
+                    <input className="input" name="nameAm" style={{ maxWidth: 160 }} placeholder="ስም (Amharic)" />
+                    <input className="input" name="floor" style={{ maxWidth: 110 }} placeholder="Floor ETB" inputMode="numeric" />
+                    <input className="input" name="subs" style={{ minWidth: 220, flex: 1 }} placeholder="Sub-services, comma-separated" />
+                    <button className="btn btn-dark btn-sm">+ Add category</button>
+                  </form>
                   <div style={{ overflowX: 'auto' }}>
                     <table className="table">
                       <thead>
                         <tr>
                           <th>Category</th>
                           <th>Floor price (ETB)</th>
+                          <th>Sub-services</th>
                           <th>Active</th>
                           <th></th>
                         </tr>
@@ -1069,6 +1161,15 @@ export default function AdminPage() {
                                 onChange={(e) => setCatEdit((prev) => ({ ...prev, [c.id]: e.target.value }))}
                               />
                             </td>
+                            <td>
+                              <input
+                                className="input"
+                                style={{ minWidth: 220 }}
+                                placeholder="Sub-services, comma-separated"
+                                value={subsEdit[c.id] ?? (c.subServices ?? []).join(', ')}
+                                onChange={(e) => setSubsEdit((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                              />
+                            </td>
                             <td>{c.isActive === false ? <span className="hint">inactive</span> : 'yes'}</td>
                             <td>
                               <span className="row" style={{ justifyContent: 'flex-end' }}>
@@ -1077,7 +1178,13 @@ export default function AdminPage() {
                                   onClick={() =>
                                     act(
                                       `/admin/categories/${c.id}`,
-                                      { priceFloorEtb: Number(catEdit[c.id] ?? c.priceFloorEtb) },
+                                      {
+                                        priceFloorEtb: Number(catEdit[c.id] ?? c.priceFloorEtb),
+                                        subServices: (subsEdit[c.id] ?? (c.subServices ?? []).join(', '))
+                                          .split(',')
+                                          .map((x: string) => x.trim())
+                                          .filter(Boolean),
+                                      },
                                       'PUT',
                                     )
                                   }

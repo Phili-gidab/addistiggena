@@ -1,0 +1,1 @@
+ALTER TABLE "ServiceCategory" ADD COLUMN "subServices" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

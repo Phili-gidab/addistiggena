@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Stars } from '../../components/Stars';
 import { StatusBadge } from '../../components/StatusBadge';
-import { api, ApiError, API_URL, Booking, Category, fmtDate, getToken } from '../../lib/api';
+import { api, API_URL, ApiError, Booking, Category, fmtDate, getToken, getUser, isStaff } from '../../lib/api';
 import { SUB_CITIES } from '../../lib/areas';
 
 interface ProviderDoc {
@@ -146,6 +146,10 @@ export default function ProviderPage() {
   }
 
   useEffect(() => {
+    if (isStaff(getUser()?.role)) {
+      router.replace('/admin');
+      return;
+    }
     if (!getToken()) {
       router.replace('/login?next=/provider');
       return;
