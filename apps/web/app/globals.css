@@ -1084,6 +1084,56 @@ body.scroll-locked .site-header { transform: none; }
 .tl-item .s { color: var(--muted); font-size: 0.82rem; margin-top: 0.1rem; }
 .tl-item.todo { opacity: 0.45; }
 
+/* -- staff console shell: sidebar nav + content (roles/workflow spec section 6) -- */
+.admin-shell { display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.admin-side {
+  position: sticky; top: 92px;
+  background: #fff; border: 1px solid var(--line); border-radius: 14px;
+  padding: 0.85rem 0.6rem; box-shadow: 0 10px 30px -24px rgba(7, 20, 41, 0.35);
+}
+.admin-side .role-tag {
+  font-family: var(--font-display); font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+  padding: 0.15rem 0.65rem 0.6rem;
+}
+.admin-nav { display: flex; flex-direction: column; gap: 2px; }
+.admin-nav button {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+  width: 100%; text-align: left; padding: 0.52rem 0.65rem; border-radius: 9px;
+  font-size: 0.88rem; font-weight: 500; color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.admin-nav button:hover { background: rgba(0, 114, 206, 0.07); color: var(--navy); }
+.admin-nav button.on { background: var(--navy); color: #fff; }
+.admin-nav .badge {
+  background: var(--blue); color: #fff; font-size: 0.66rem; font-weight: 700;
+  border-radius: 999px; padding: 0.08rem 0.45rem; line-height: 1.4;
+}
+.admin-nav button.on .badge { background: #fff; color: var(--navy); }
+.admin-main { min-width: 0; }
+.qa-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.3rem 0 1.1rem; }
+.ticket-form { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; max-width: 460px; }
+.ticket-form textarea { width: 100%; }
+.tech-dot {
+  width: 13px; height: 13px; border-radius: 50%; background: var(--teal);
+  border: 2px solid #fff; box-shadow: 0 0 0 2px rgba(0, 114, 206, 0.3);
+}
+/* problem photo (booking wizard + booking detail) */
+.photo-attach img, .booking-photo img {
+  max-width: 220px; max-height: 180px; border-radius: 12px; display: block;
+  border: 1px solid var(--line); object-fit: cover;
+}
+.photo-attach { display: flex; align-items: flex-end; gap: 0.7rem; }
+.booking-photo { margin-top: 0.9rem; }
+.booking-photo img { cursor: zoom-in; }
+.booking-photo .hint { display: block; margin-top: 0.35rem; }
+@media (max-width: 920px) {
+  .admin-shell { grid-template-columns: 1fr; }
+  .admin-side { position: static; }
+  .admin-nav { flex-direction: row; overflow-x: auto; padding-bottom: 0.2rem; }
+  .admin-nav button { white-space: nowrap; }
+}
+
 /* auto-dispatch (90s offer window) */
 .dispatch-note {
   background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-line);

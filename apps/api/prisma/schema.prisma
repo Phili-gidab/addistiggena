@@ -196,6 +196,8 @@ model Booking {
   lat                Float
   lng                Float
   landmarkNote       String?
+  /// optional problem photo attached at booking time (spec section 4 customer inputs)
+  photoObjectKey     String?
   priceQuoteEtb      Decimal?         @db.Decimal(12, 2)
   finalPriceEtb      Decimal?         @db.Decimal(12, 2)
   offerExpiresAt     DateTime?

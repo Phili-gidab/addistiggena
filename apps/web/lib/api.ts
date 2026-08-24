@@ -55,8 +55,9 @@ export interface Booking {
   lng: number;
   finalPriceEtb: string | null;
   priceQuoteEtb: string | null;
-  /** auto-dispatch: current offer deadline (90s window) while REQUESTED */
+  /** auto-dispatch: current offer deadline (5-minute window) while REQUESTED */
   offerExpiresAt: string | null;
+  photoObjectKey?: string | null;
   /** dispatch escalated to Ops for manual assignment (spec: 3 declines/timeouts) */
   escalatedAt?: string | null;
   /** an open dispute/guarantee ticket exists on this booking */

@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { CategoryBars, DailyBars } from '../../components/charts';
@@ -17,6 +18,10 @@ import {
   Ticket,
 } from '../../lib/api';
 
+const DispatchMap = dynamic(() => import('../../components/DispatchMap'), { ssr: false });
+
+// ── data shapes ──────────────────────────────────────────────────────────────
+
 interface Analytics {
   totals: {
     bookings: number;
@@ -29,6 +34,28 @@ interface Analytics {
   };
   daily: { day: string; count: number }[];
   byCategory: { categoryId: string; name: string; nameAm: string; count: number }[];
+}
+
+interface Overview {
+  ops: {
+    activeJobs: number;
+    awaitingDispatch: number;
+    escalated: number;
+    stalledEnRoute: number;
+    techniciansOnline: number;
+    avgArrivalMin: number | null;
+  };
+  support: {
+    openTickets: number;
+    activeClaims: number;
+    resolvedToday: number;
+    avgResolutionMin: number | null;
+  };
+  verification: {
+    pendingApplications: number;
+    approvedThisWeek: number;
+    flaggedForReview: number;
+  };
 }
 
 interface AdminPayout {
@@ -56,13 +83,25 @@ interface PendingProvider {
   documents: { id: string; type: string; state: string; objectKey: string }[];
 }
 
+interface Technician {
+  id: string;
+  name: string | null;
+  phone: string;
+  category: { nameEn: string; nameAm: string };
+  subCity: string | null;
+  verificationStatus: string;
+  isAvailable: boolean;
+  ratingAvg: number;
+  ratingCount: number;
+  jobs: number;
+  lat: number | null;
+  lng: number | null;
+  locationUpdatedAt: string | null;
+  createdAt: string;
+}
+
 interface OpsBooking extends Booking {
-  provider?: {
-    id: string;
-    ratingAvg: number;
-    locationUpdatedAt?: string | null;
-    user: { id: string; name: string | null; phone: string };
-  } | null;
+  escalatedAt?: string | null;
 }
 
 interface StaffAccount {
@@ -85,14 +124,6 @@ interface AuditEntry {
   actor: { name: string | null; username: string | null };
 }
 
-// Mandatory checklist from the official vetting protocol.
-const REQUIRED_DOCS = [
-  { type: 'NATIONAL_ID', label: 'Fayda ID' },
-  { type: 'WOREDA_RECOMMENDATION', label: 'Woreda letter' },
-  { type: 'COC_CERTIFICATE', label: 'CoC pass' },
-  { type: 'POLICE_CLEARANCE', label: 'Police clearance' },
-];
-
 interface PendingReview {
   id: string;
   stars: number;
@@ -101,45 +132,77 @@ interface PendingReview {
   booking: { id: string };
 }
 
-/** Which console sections each back-office role sees (spec section 6). */
-const SECTIONS: Record<StaffRole, string[]> = {
+// ── role → console configuration (spec section 6) ────────────────────────────
+
+type ViewKey =
+  | 'dashboard'
+  | 'map'
+  | 'bookings'
+  | 'technicians'
+  | 'verification'
+  | 'tickets'
+  | 'payouts'
+  | 'reviews'
+  | 'categories'
+  | 'staff'
+  | 'audit'
+  | 'settings';
+
+const MENU: Record<StaffRole, ViewKey[]> = {
   ADMIN: [
-    'kpis',
-    'ops',
+    'dashboard',
+    'map',
+    'bookings',
+    'technicians',
+    'verification',
     'tickets',
     'payouts',
-    'verification',
     'reviews',
-    'commission',
-    'bookings',
+    'categories',
     'staff',
     'audit',
+    'settings',
   ],
-  OPS_MANAGER: ['kpis', 'ops', 'reviews', 'commission', 'bookings'],
-  VERIFICATION_OFFICER: ['verification'],
-  SUPPORT_AGENT: ['tickets', 'reviews', 'bookings'],
+  OPS_MANAGER: ['dashboard', 'map', 'bookings', 'technicians', 'reviews', 'categories', 'settings'],
+  VERIFICATION_OFFICER: ['dashboard', 'verification', 'technicians'],
+  SUPPORT_AGENT: ['dashboard', 'tickets', 'bookings', 'technicians', 'reviews'],
+};
+
+const VIEW_LABEL: Record<ViewKey, string> = {
+  dashboard: 'Dashboard',
+  map: 'Live dispatch map',
+  bookings: 'Bookings',
+  technicians: 'Technicians',
+  verification: 'Verification queue',
+  tickets: 'Support tickets',
+  payouts: 'Payouts',
+  reviews: 'Reviews',
+  categories: 'Categories & pricing',
+  staff: 'Staff & roles',
+  audit: 'Audit log',
+  settings: 'Settings',
 };
 
 const ROLE_TITLES: Record<StaffRole, { en: string; am: string; sub: string }> = {
   ADMIN: {
-    en: 'Operations',
-    am: 'አስተዳደር',
+    en: 'Super Admin',
+    am: 'ዋና አስተዳዳሪ',
     sub: 'Full platform control: dispatch, vetting, support, finance, staff, audit.',
   },
   OPS_MANAGER: {
     en: 'Dispatch operations',
     am: 'የስምሪት ክፍል',
-    sub: 'Stuck jobs, manual assignment, live bookings, pricing.',
+    sub: 'Live jobs, stuck dispatches, manual assignment, coverage and pricing.',
   },
   VERIFICATION_OFFICER: {
     en: 'Verification desk',
     am: 'የማረጋገጫ ክፍል',
-    sub: 'Technician vetting queue: approve, reject, suspend - with reason codes.',
+    sub: 'Technician vetting: approve, reject, suspend - always with a reason code.',
   },
   SUPPORT_AGENT: {
     en: 'Support desk',
     am: 'የደንበኞች ድጋፍ',
-    sub: 'Disputes, guarantee claims, re-inspections, booking lookup.',
+    sub: 'Disputes, guarantee claims, re-inspections, customer and technician lookup.',
   },
 };
 
@@ -149,25 +212,50 @@ const TICKET_LABEL: Record<Ticket['type'], string> = {
   SAFETY: 'Safety flag',
 };
 
+const REQUIRED_DOCS = [
+  { type: 'NATIONAL_ID', label: 'Fayda ID' },
+  { type: 'WOREDA_RECOMMENDATION', label: 'Woreda letter' },
+  { type: 'COC_CERTIFICATE', label: 'CoC pass' },
+  { type: 'POLICE_CLEARANCE', label: 'Police clearance' },
+];
+
+const ACTIVE_STATUSES = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
+
+// ── page ─────────────────────────────────────────────────────────────────────
+
 export default function AdminPage() {
   const router = useRouter();
   const [role, setRole] = useState<StaffRole | null>(null);
-  const [queue, setQueue] = useState<PendingProvider[] | null>(null);
-  const [reviews, setReviews] = useState<PendingReview[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [rate, setRate] = useState('');
+  const [view, setView] = useState<ViewKey>('dashboard');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
+  const [overview, setOverview] = useState<Overview | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [payouts, setPayouts] = useState<AdminPayout[]>([]);
+  const [bookings, setBookings] = useState<OpsBooking[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [verifStatus, setVerifStatus] = useState('PENDING');
+  const [verifRows, setVerifRows] = useState<PendingProvider[] | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketHistory, setTicketHistory] = useState<Ticket[] | null>(null);
   const [refundCap, setRefundCap] = useState<number | null>(null);
   const [ops, setOps] = useState<{ escalated: OpsBooking[]; stalled: OpsBooking[] } | null>(null);
-  const [verified, setVerified] = useState<PendingProvider[]>([]);
-  const [assignPick, setAssignPick] = useState<Record<string, string>>({});
+  const [payouts, setPayouts] = useState<AdminPayout[]>([]);
+  const [reviews, setReviews] = useState<PendingReview[]>([]);
+  const [cats, setCats] = useState<(Category & { isActive?: boolean })[]>([]);
+  const [catEdit, setCatEdit] = useState<Record<string, string>>({});
   const [staff, setStaff] = useState<StaffAccount[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [rate, setRate] = useState('');
+  const [capInput, setCapInput] = useState('');
+  const [assignPick, setAssignPick] = useState<Record<string, string>>({});
+  const [bookingFilter, setBookingFilter] = useState('');
+  const [ticketForm, setTicketForm] = useState<{
+    id: string;
+    mode: 'resolve' | 'reject';
+    note: string;
+    refund: string;
+  } | null>(null);
   const [newStaff, setNewStaff] = useState({
     name: '',
     phone: '',
@@ -176,33 +264,47 @@ export default function AdminPage() {
     role: 'SUPPORT_AGENT',
   });
 
-  const load = useCallback((r: StaffRole) => {
-    const has = (s: string) => SECTIONS[r].includes(s);
-    if (has('verification')) {
-      api<PendingProvider[]>('/admin/providers?status=PENDING')
-        .then(setQueue)
-        .catch((e) => setError((e as Error).message));
-    }
-    if (has('reviews')) api<PendingReview[]>('/admin/reviews').then(setReviews).catch(() => {});
-    if (has('bookings')) api<Booking[]>('/admin/bookings').then(setBookings).catch(() => {});
-    if (has('commission')) {
-      api<{ rate: number }>('/admin/config/commission').then((res) => setRate(String(res.rate))).catch(() => {});
-    }
-    if (has('kpis')) api<Analytics>('/admin/analytics').then(setAnalytics).catch(() => {});
-    if (has('payouts')) api<AdminPayout[]>('/admin/payouts').then(setPayouts).catch(() => {});
-    if (has('tickets')) {
-      api<Ticket[]>('/admin/tickets').then(setTickets).catch(() => {});
-      api<{ capEtb: number }>('/admin/config/refund-cap').then((res) => setRefundCap(res.capEtb)).catch(() => {});
-    }
-    if (has('ops')) {
-      api<{ escalated: OpsBooking[]; stalled: OpsBooking[] }>('/admin/ops/queue').then(setOps).catch(() => {});
-    }
-    if (has('ops') || has('tickets')) {
-      api<PendingProvider[]>('/admin/providers?status=VERIFIED').then(setVerified).catch(() => {});
-    }
-    if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
-    if (has('audit')) api<AuditEntry[]>('/admin/audit').then(setAudit).catch(() => {});
-  }, []);
+  const can = useCallback((v: ViewKey, r: StaffRole | null = role) => (r ? MENU[r].includes(v) : false), [role]);
+
+  const load = useCallback(
+    (r: StaffRole) => {
+      const has = (v: ViewKey) => MENU[r].includes(v);
+      api<Overview>('/admin/overview').then(setOverview).catch(() => {});
+      if (has('bookings') || has('map')) {
+        api<OpsBooking[]>('/admin/bookings').then(setBookings).catch(() => {});
+      }
+      api<Technician[]>('/admin/technicians').then(setTechnicians).catch(() => {});
+      if (r === 'ADMIN' || r === 'OPS_MANAGER') {
+        api<Analytics>('/admin/analytics').then(setAnalytics).catch(() => {});
+        api<{ escalated: OpsBooking[]; stalled: OpsBooking[] }>('/admin/ops/queue')
+          .then(setOps)
+          .catch(() => {});
+        api<(Category & { isActive?: boolean })[]>('/admin/categories').then(setCats).catch(() => {});
+        api<{ rate: number }>('/admin/config/commission')
+          .then((res) => setRate(String(res.rate)))
+          .catch(() => {});
+      }
+      if (has('verification')) {
+        api<PendingProvider[]>(`/admin/providers?status=${verifStatus}`)
+          .then(setVerifRows)
+          .catch((e) => setError((e as Error).message));
+      }
+      if (has('tickets')) {
+        api<Ticket[]>('/admin/tickets').then(setTickets).catch(() => {});
+        api<{ capEtb: number }>('/admin/config/refund-cap')
+          .then((res) => {
+            setRefundCap(res.capEtb);
+            setCapInput(String(res.capEtb));
+          })
+          .catch(() => {});
+      }
+      if (has('payouts')) api<AdminPayout[]>('/admin/payouts').then(setPayouts).catch(() => {});
+      if (has('reviews')) api<PendingReview[]>('/admin/reviews').then(setReviews).catch(() => {});
+      if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
+      if (has('audit')) api<AuditEntry[]>('/admin/audit').then(setAudit).catch(() => {});
+    },
+    [verifStatus],
+  );
 
   useEffect(() => {
     if (!getToken()) {
@@ -216,6 +318,8 @@ export default function AdminPage() {
     }
     setRole(r);
     load(r);
+    const t = setInterval(() => load(r), 30000);
+    return () => clearInterval(t);
   }, [load, router]);
 
   const reload = useCallback(() => {
@@ -223,11 +327,11 @@ export default function AdminPage() {
     if (isStaff(r)) load(r);
   }, [load]);
 
-  async function act(path: string, body?: object) {
+  async function act(path: string, body?: object, method: 'POST' | 'PUT' = 'POST') {
     setError('');
     setNotice('');
     try {
-      await api(path, { method: 'POST', body: JSON.stringify(body ?? {}) });
+      await api(path, { method, body: JSON.stringify(body ?? {}) });
       setNotice('Done.');
       reload();
     } catch (e) {
@@ -235,14 +339,13 @@ export default function AdminPage() {
     }
   }
 
-  /** Ops/Support manual assignment: pick a verified technician + mandatory reason code. */
   async function assign(bookingId: string) {
     const providerId = assignPick[bookingId];
     if (!providerId) {
       setError('Pick a technician first.');
       return;
     }
-    const reason = window.prompt('Reason code for this manual assignment (logged to audit):');
+    const reason = window.prompt('Reason code for this manual assignment (goes to the audit log):');
     if (reason === null) return;
     if (reason.trim().length < 3) {
       setError('A short reason is required - it feeds the audit log.');
@@ -251,26 +354,23 @@ export default function AdminPage() {
     await act(`/admin/bookings/${bookingId}/assign`, { providerId, reason: reason.trim() });
   }
 
-  async function resolveTicket(t: Ticket) {
-    const note = window.prompt('Resolution note (sent to the customer):');
-    if (note === null || note.trim().length < 3) return;
-    const refundRaw = window.prompt(
-      `Recorded refund in ETB - leave empty for none${refundCap != null ? ` (your cap: ${refundCap})` : ''}:`,
-      '',
-    );
-    if (refundRaw === null) return;
-    const refundEtb = refundRaw.trim() ? Number(refundRaw) : undefined;
-    if (refundRaw.trim() && !Number.isFinite(refundEtb)) {
+  async function submitTicketForm() {
+    if (!ticketForm) return;
+    const { id, mode, note, refund } = ticketForm;
+    if (note.trim().length < 3) {
+      setError('A resolution note is required - the customer receives it.');
+      return;
+    }
+    const refundEtb = refund.trim() ? Number(refund) : undefined;
+    if (refund.trim() && !Number.isFinite(refundEtb)) {
       setError('Refund must be a number.');
       return;
     }
-    await act(`/admin/tickets/${t.id}/resolve`, { resolutionNote: note.trim(), refundEtb });
-  }
-
-  async function rejectTicket(t: Ticket) {
-    const note = window.prompt('Reason for rejecting this ticket (sent to the customer):');
-    if (note === null || note.trim().length < 3) return;
-    await act(`/admin/tickets/${t.id}/reject`, { resolutionNote: note.trim() });
+    await act(`/admin/tickets/${id}/${mode}`, {
+      resolutionNote: note.trim(),
+      ...(mode === 'resolve' ? { refundEtb } : {}),
+    });
+    setTicketForm(null);
   }
 
   async function createStaff(e: React.FormEvent) {
@@ -286,7 +386,6 @@ export default function AdminPage() {
     }
   }
 
-  // /files/:objectKey requires a Bearer token - fetch with auth and open the blob.
   async function openDocument(objectKey: string) {
     setError('');
     try {
@@ -300,8 +399,42 @@ export default function AdminPage() {
     }
   }
 
-  const show = (s: string) => (role ? SECTIONS[role].includes(s) : false);
+  async function loadTicketHistory() {
+    try {
+      const [resolved, rejected] = await Promise.all([
+        api<Ticket[]>('/admin/tickets?status=RESOLVED'),
+        api<Ticket[]>('/admin/tickets?status=REJECTED'),
+      ]);
+      setTicketHistory(
+        [...resolved, ...rejected].sort(
+          (a, b) => +new Date(b.resolvedAt ?? b.createdAt) - +new Date(a.resolvedAt ?? a.createdAt),
+        ),
+      );
+    } catch {
+      setTicketHistory([]);
+    }
+  }
+
   const titles = role ? ROLE_TITLES[role] : null;
+  const stuckCount = (overview?.ops.escalated ?? 0) + (overview?.ops.stalledEnRoute ?? 0);
+  const badge = (v: ViewKey): number | null => {
+    if (!overview) return null;
+    if (v === 'verification') return overview.verification.pendingApplications || null;
+    if (v === 'tickets') return overview.support.openTickets || null;
+    if (v === 'map') return overview.ops.activeJobs + overview.ops.awaitingDispatch || null;
+    if (v === 'reviews') return reviews.length || null;
+    if (v === 'payouts') return payouts.length || null;
+    return null;
+  };
+
+  // ── reusable pieces ────────────────────────────────────────────────────────
+
+  const tile = (v: string | number, k: string, hi = false) => (
+    <div className={`tile${hi ? ' hi' : ''}`} key={k}>
+      <div className="v">{v}</div>
+      <div className="k">{k}</div>
+    </div>
+  );
 
   const assignRow = (b: OpsBooking, flavor: 'escalated' | 'stalled') => (
     <div key={b.id} className="booking-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
@@ -315,7 +448,7 @@ export default function AdminPage() {
         <span className="when" style={{ display: 'block' }}>
           {b.customer?.name ?? b.customer?.phone ?? 'customer'} ·{' '}
           {flavor === 'escalated'
-            ? `escalated ${b.escalatedAt ? fmtDate(b.escalatedAt) : ''} after 3 declined/expired offers`
+            ? `escalated after 3 declined/expired offers${b.escalatedAt ? ` · ${fmtDate(b.escalatedAt)}` : ''}`
             : `en route since ${fmtDate(b.createdAt)}`}
         </span>
       </span>
@@ -327,11 +460,14 @@ export default function AdminPage() {
           onChange={(e) => setAssignPick((prev) => ({ ...prev, [b.id]: e.target.value }))}
         >
           <option value="">Assign technician…</option>
-          {verified.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.user.name ?? p.user.phone} · {p.category.nameEn}
-            </option>
-          ))}
+          {technicians
+            .filter((t) => t.verificationStatus === 'VERIFIED')
+            .map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name ?? t.phone} · {t.category.nameEn}
+                {t.isAvailable ? ' · online' : ''}
+              </option>
+            ))}
         </select>
         <button className="btn btn-teal btn-sm" onClick={() => assign(b.id)}>
           Assign
@@ -340,443 +476,753 @@ export default function AdminPage() {
     </div>
   );
 
+  const exceptionsPanel = (
+    <div className="panel">
+      <h2>Dispatch exceptions ({(ops?.escalated.length ?? 0) + (ops?.stalled.length ?? 0)})</h2>
+      {ops && ops.escalated.length === 0 && ops.stalled.length === 0 && (
+        <p className="hint">
+          No stuck jobs. Escalations land here after 3 declined or expired offers; en-route jobs
+          appear when the technician stops sending GPS pings for 15 minutes.
+        </p>
+      )}
+      {ops?.escalated.map((b) => assignRow(b, 'escalated'))}
+      {ops?.stalled.map((b) => assignRow(b, 'stalled'))}
+    </div>
+  );
+
+  const ticketRow = (t: Ticket, history = false) => (
+    <div key={t.id} className="booking-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
+      <span>
+        <span className="what">
+          {TICKET_LABEL[t.type]}
+          {t.status === 'RE_INSPECTION' ? ' · re-inspection scheduled' : ''}
+          {history ? ` · ${t.status.toLowerCase()}` : ''} - #{t.booking.id.slice(-6).toUpperCase()} (
+          {t.booking.category.nameEn})
+        </span>
+        <span className="when" style={{ display: 'block', maxWidth: 460 }}>
+          “{t.note}” - {t.openedBy.name ?? t.openedBy.phone} · {fmtDate(t.createdAt)}
+          {t.booking.provider?.user
+            ? ` · technician: ${t.booking.provider.user.name ?? t.booking.provider.user.phone}`
+            : ''}
+          {history && t.resolutionNote ? ` · outcome: ${t.resolutionNote}` : ''}
+        </span>
+        {ticketForm?.id === t.id && (
+          <span className="ticket-form">
+            <textarea
+              rows={2}
+              className="input"
+              placeholder={
+                ticketForm.mode === 'resolve'
+                  ? 'Resolution note (sent to the customer)…'
+                  : 'Why is this ticket being rejected?…'
+              }
+              value={ticketForm.note}
+              onChange={(e) => setTicketForm({ ...ticketForm, note: e.target.value })}
+            />
+            {ticketForm.mode === 'resolve' && (
+              <input
+                className="input"
+                style={{ maxWidth: 190 }}
+                placeholder={`Refund ETB (optional${refundCap != null && role === 'SUPPORT_AGENT' ? `, cap ${refundCap}` : ''})`}
+                inputMode="decimal"
+                value={ticketForm.refund}
+                onChange={(e) => setTicketForm({ ...ticketForm, refund: e.target.value })}
+              />
+            )}
+            <span className="row" style={{ gap: '0.4rem' }}>
+              <button className="btn btn-teal btn-sm" onClick={submitTicketForm}>
+                Confirm {ticketForm.mode}
+              </button>
+              <button className="btn btn-line btn-sm" onClick={() => setTicketForm(null)}>
+                Cancel
+              </button>
+            </span>
+          </span>
+        )}
+      </span>
+      {!history && ticketForm?.id !== t.id && (
+        <span className="row" style={{ gap: '0.4rem' }}>
+          {t.type === 'GUARANTEE_CLAIM' && t.status === 'OPEN' && (
+            <button className="btn btn-dark btn-sm" onClick={() => act(`/admin/tickets/${t.id}/reinspect`)}>
+              Re-inspection
+            </button>
+          )}
+          <button
+            className="btn btn-teal btn-sm"
+            onClick={() => setTicketForm({ id: t.id, mode: 'resolve', note: '', refund: '' })}
+          >
+            Resolve ✓
+          </button>
+          <button
+            className="btn btn-line btn-sm"
+            onClick={() => setTicketForm({ id: t.id, mode: 'reject', note: '', refund: '' })}
+          >
+            Reject
+          </button>
+        </span>
+      )}
+    </div>
+  );
+
+  // ── views ──────────────────────────────────────────────────────────────────
+
+  const dashboardView = (
+    <>
+      {role === 'ADMIN' && analytics && (
+        <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          {tile(analytics.totals.bookings, 'bookings, all time', true)}
+          {tile(`${analytics.totals.grossRevenueEtb} ETB`, 'gross revenue')}
+          {tile(`${analytics.totals.commissionEtb} ETB`, 'platform commission')}
+          {tile(overview?.ops.activeJobs ?? '…', 'jobs live now')}
+          {tile(overview?.support.openTickets ?? '…', 'open tickets')}
+          {tile(overview?.verification.pendingApplications ?? '…', 'pending vetting')}
+        </div>
+      )}
+      {role === 'OPS_MANAGER' && (
+        <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          {tile(overview?.ops.activeJobs ?? '…', 'active jobs', true)}
+          {tile(overview?.ops.awaitingDispatch ?? '…', 'awaiting dispatch')}
+          {tile(stuckCount, 'stuck / stalled')}
+          {tile(overview?.ops.techniciansOnline ?? '…', 'technicians online')}
+          {tile(
+            overview?.ops.avgArrivalMin != null ? `${overview.ops.avgArrivalMin} min` : '-',
+            'avg arrival (7d)',
+          )}
+        </div>
+      )}
+      {role === 'SUPPORT_AGENT' && (
+        <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          {tile(overview?.support.openTickets ?? '…', 'open tickets', true)}
+          {tile(overview?.support.activeClaims ?? '…', 'guarantee claims active')}
+          {tile(overview?.support.resolvedToday ?? '…', 'resolved today')}
+          {tile(
+            overview?.support.avgResolutionMin != null
+              ? `${Math.round(overview.support.avgResolutionMin / 60)}h`
+              : '-',
+            'avg resolution (7d)',
+          )}
+        </div>
+      )}
+      {role === 'VERIFICATION_OFFICER' && (
+        <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          {tile(overview?.verification.pendingApplications ?? '…', 'pending applications', true)}
+          {tile(overview?.verification.approvedThisWeek ?? '…', 'approved this week')}
+          {tile(overview?.verification.flaggedForReview ?? '…', 'suspended / flagged')}
+        </div>
+      )}
+
+      {/* quick actions (spec: one write action or one jump each) */}
+      <div className="qa-row">
+        {can('map') && (
+          <button className="btn btn-line btn-sm" onClick={() => setView('map')}>
+            Live dispatch map
+          </button>
+        )}
+        {(role === 'ADMIN' || role === 'OPS_MANAGER') && (
+          <button className="btn btn-line btn-sm" onClick={() => setView('dashboard')}>
+            Stuck jobs ({stuckCount})
+          </button>
+        )}
+        {can('verification') && (
+          <button className="btn btn-line btn-sm" onClick={() => setView('verification')}>
+            Review next application
+          </button>
+        )}
+        {can('tickets') && (
+          <button className="btn btn-line btn-sm" onClick={() => setView('tickets')}>
+            Ticket queue ({overview?.support.openTickets ?? 0})
+          </button>
+        )}
+        {can('staff') && (
+          <button className="btn btn-line btn-sm" onClick={() => setView('staff')}>
+            + Create staff account
+          </button>
+        )}
+        {can('audit') && (
+          <button className="btn btn-line btn-sm" onClick={() => setView('audit')}>
+            Audit log
+          </button>
+        )}
+      </div>
+
+      {/* the role's primary queue sits on the dashboard (spec section 8) */}
+      {(role === 'ADMIN' || role === 'OPS_MANAGER') && exceptionsPanel}
+      {role === 'SUPPORT_AGENT' && (
+        <div className="panel">
+          <h2>Open tickets ({tickets.length})</h2>
+          {tickets.length === 0 && <p className="hint">No open disputes or guarantee claims.</p>}
+          {tickets.slice(0, 5).map((t) => ticketRow(t))}
+          {tickets.length > 5 && (
+            <button className="btn btn-line btn-sm" onClick={() => setView('tickets')}>
+              See all →
+            </button>
+          )}
+        </div>
+      )}
+      {role === 'VERIFICATION_OFFICER' && verificationTable(verifRows, true)}
+
+      {(role === 'ADMIN' || role === 'OPS_MANAGER') && analytics && (
+        <>
+          <div className="panel">
+            <h2>Bookings - last 14 days</h2>
+            <DailyBars data={analytics.daily} />
+          </div>
+          <div className="panel">
+            <h2>Category demand · የአገልግሎት ፍላጎት</h2>
+            <CategoryBars data={analytics.byCategory} />
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  function verificationTable(rows: PendingProvider[] | null, compact = false) {
+    return (
+      <div className="panel" key="verif">
+        <h2>
+          Verification queue{rows ? ` (${rows.length})` : ''}
+        </h2>
+        {!compact && (
+          <div className="qa-row">
+            {['PENDING', 'VERIFIED', 'REJECTED', 'SUSPENDED'].map((st) => (
+              <button
+                key={st}
+                className={`btn btn-sm ${verifStatus === st ? 'btn-dark' : 'btn-line'}`}
+                onClick={() => setVerifStatus(st)}
+              >
+                {st.toLowerCase()}
+              </button>
+            ))}
+          </div>
+        )}
+        {rows?.length === 0 && <p className="hint">Nothing in this list.</p>}
+        {!!rows?.length && (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>Trade</th>
+                  <th>Documents</th>
+                  <th>Applied</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <strong>{p.user.name ?? 'Unnamed'}</strong>
+                      <div className="hint">{p.user.phone}</div>
+                      <div className="hint">
+                        {[
+                          p.subCity && `${p.woreda ? `Woreda ${p.woreda}, ` : ''}${p.subCity}`,
+                          p.faydaIdNumber && `Fayda: ${p.faydaIdNumber}`,
+                          p.yearsExperience != null && `${p.yearsExperience} yrs exp.`,
+                          p.guarantorName &&
+                            `Guarantor: ${p.guarantorName}${p.guarantorPhone ? ` (${p.guarantorPhone})` : ''}`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || 'no vetting details submitted'}
+                      </div>
+                    </td>
+                    <td>{p.category.nameEn}</td>
+                    <td>
+                      {p.documents.length === 0 && <span className="hint">none yet</span>}
+                      {p.documents.map((d) => (
+                        <button key={d.id} type="button" className="doc-link" onClick={() => openDocument(d.objectKey)}>
+                          {d.type.replace(/_/g, ' ').toLowerCase()}
+                        </button>
+                      ))}
+                      <div className="hint" style={{ marginTop: '0.3rem' }}>
+                        {REQUIRED_DOCS.map((r) => (
+                          <span key={r.type} style={{ marginRight: '0.6rem', whiteSpace: 'nowrap' }}>
+                            {p.documents.some((d) => d.type === r.type) ? '✓' : '✗'} {r.label}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="hint">{fmtDate(p.createdAt)}</td>
+                    <td>
+                      <span className="row" style={{ justifyContent: 'flex-end' }}>
+                        {p.verificationStatus !== 'VERIFIED' && (
+                          <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/providers/${p.id}/verify`)}>
+                            Verify ✓
+                          </button>
+                        )}
+                        {p.verificationStatus === 'PENDING' && (
+                          <button
+                            className="btn btn-line btn-sm"
+                            onClick={() => {
+                              const note = window.prompt('Reason for rejection · ውድቅ የሆነበት ምክንያት');
+                              if (note === null) return;
+                              act(`/admin/providers/${p.id}/reject`, note.trim() ? { note: note.trim() } : undefined);
+                            }}
+                          >
+                            Reject
+                          </button>
+                        )}
+                        {p.verificationStatus === 'VERIFIED' && (
+                          <button
+                            className="btn btn-line btn-sm"
+                            onClick={() => {
+                              const note = window.prompt('Reason for suspension (required):');
+                              if (!note || note.trim().length < 3) return;
+                              act(`/admin/providers/${p.id}/suspend`, { note: note.trim() });
+                            }}
+                          >
+                            Suspend
+                          </button>
+                        )}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const filteredBookings = bookings.filter((b) => {
+    const q = bookingFilter.trim().toLowerCase();
+    if (!q) return true;
+    return [
+      b.id.slice(-6),
+      b.customer?.name,
+      b.customer?.phone,
+      b.provider?.user?.name,
+      b.provider?.user?.phone,
+      b.category.nameEn,
+      b.status,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(q);
+  });
+
+  const mapJobs = bookings
+    .filter((b) => ACTIVE_STATUSES.includes(b.status))
+    .map((b) => ({
+      id: b.id,
+      status: b.status,
+      lat: b.lat,
+      lng: b.lng,
+      label: `#${b.id.slice(-6).toUpperCase()} ${b.category.nameEn}`,
+      sub: `${b.status} · ${b.customer?.name ?? b.customer?.phone ?? ''}`,
+    }));
+  const mapTechs = technicians
+    .filter((t) => t.isAvailable && t.verificationStatus === 'VERIFIED' && t.lat != null && t.lng != null)
+    .map((t) => ({
+      id: t.id,
+      lat: t.lat!,
+      lng: t.lng!,
+      label: t.name ?? t.phone,
+      sub: `${t.category.nameEn} · online`,
+    }));
+
   return (
     <main className="page">
-      <div className="container" style={{ maxWidth: 920 }}>
-        <h1 className="page-title">
-          {titles ? `${titles.en} · ${titles.am}` : 'Operations · አስተዳደር'}
-        </h1>
-        <p className="page-sub">{titles?.sub ?? 'Staff console.'}</p>
+      <div className="container" style={{ maxWidth: 1180 }}>
+        <h1 className="page-title">{titles ? `${titles.en} · ${titles.am}` : 'Staff console'}</h1>
+        <p className="page-sub">{titles?.sub ?? ''}</p>
 
         {error && <div className="error-box">{error}</div>}
         {notice && <div className="ok-box">{notice}</div>}
 
-        {/* ── KPIs & analytics (Super Admin, Ops) ───────────────────────── */}
-        {show('kpis') && analytics && (
-          <>
-            <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-              <div className="tile hi">
-                <div className="v">{analytics.totals.bookings}</div>
-                <div className="k">bookings, all time</div>
-              </div>
-              <div className="tile">
-                <div className="v">
-                  {analytics.totals.grossRevenueEtb} <small>ETB</small>
-                </div>
-                <div className="k">gross revenue</div>
-              </div>
-              <div className="tile">
-                <div className="v">
-                  {analytics.totals.commissionEtb} <small>ETB</small>
-                </div>
-                <div className="k">platform commission</div>
-              </div>
-              <div className="tile">
-                <div className="v">{analytics.totals.customers}</div>
-                <div className="k">customers</div>
-              </div>
-              <div className="tile">
-                <div className="v">{analytics.totals.verifiedProviders}</div>
-                <div className="k">verified technicians</div>
-              </div>
-            </div>
-            <div className="panel">
-              <h2>Bookings - last 14 days</h2>
-              <DailyBars data={analytics.daily} />
-            </div>
-            <div className="panel">
-              <h2>Category demand · የአገልግሎት ፍላጎት</h2>
-              <CategoryBars data={analytics.byCategory} />
-            </div>
-          </>
-        )}
+        {role && (
+          <div className="admin-shell">
+            <aside className="admin-side">
+              <div className="role-tag">{role.replace(/_/g, ' ')}</div>
+              <nav className="admin-nav">
+                {MENU[role].map((v) => (
+                  <button key={v} className={view === v ? 'on' : ''} onClick={() => { setView(v); if (v === 'tickets') setTicketHistory(null); }}>
+                    <span>{VIEW_LABEL[v]}</span>
+                    {badge(v) != null && <span className="badge">{badge(v)}</span>}
+                  </button>
+                ))}
+              </nav>
+            </aside>
 
-        {/* ── Ops queue: escalated + GPS-stalled (spec section 5 timers) ── */}
-        {show('ops') && (
-          <div className="panel">
-            <h2>
-              Dispatch exceptions ({(ops?.escalated.length ?? 0) + (ops?.stalled.length ?? 0)})
-            </h2>
-            {ops && ops.escalated.length === 0 && ops.stalled.length === 0 && (
-              <p className="hint">
-                No stuck jobs. Escalations land here after 3 declined or expired offers; en-route
-                jobs appear when the technician stops sending GPS pings for 15 minutes.
-              </p>
-            )}
-            {ops?.escalated.map((b) => assignRow(b, 'escalated'))}
-            {ops?.stalled.map((b) => assignRow(b, 'stalled'))}
-          </div>
-        )}
+            <section className="admin-main">
+              {view === 'dashboard' && dashboardView}
 
-        {/* ── Support tickets: disputes & guarantee claims ───────────────── */}
-        {show('tickets') && (
-          <div className="panel">
-            <h2>Support tickets ({tickets.length})</h2>
-            {refundCap != null && role === 'SUPPORT_AGENT' && (
-              <p className="hint">
-                You can record refunds up to ETB {refundCap} independently - larger amounts need
-                Ops or the Super Admin.
-              </p>
-            )}
-            {tickets.length === 0 && <p className="hint">No open disputes or guarantee claims.</p>}
-            {tickets.map((t) => (
-              <div key={t.id} className="booking-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
-                <span>
-                  <span className="what">
-                    {TICKET_LABEL[t.type]}
-                    {t.status === 'RE_INSPECTION' ? ' · re-inspection scheduled' : ''} - #
-                    {t.booking.id.slice(-6).toUpperCase()} ({t.booking.category.nameEn})
-                  </span>
-                  <span className="when" style={{ display: 'block', maxWidth: 460 }}>
-                    “{t.note}” - {t.openedBy.name ?? t.openedBy.phone} · {fmtDate(t.createdAt)}
-                    {t.booking.provider?.user
-                      ? ` · technician: ${t.booking.provider.user.name ?? t.booking.provider.user.phone}`
-                      : ''}
-                  </span>
-                </span>
-                <span className="row" style={{ gap: '0.4rem' }}>
-                  {t.type === 'GUARANTEE_CLAIM' && t.status === 'OPEN' && (
+              {view === 'map' && can('map') && (
+                <div className="panel">
+                  <h2>
+                    Live dispatch map · {mapJobs.length} active job{mapJobs.length === 1 ? '' : 's'},{' '}
+                    {mapTechs.length} technician{mapTechs.length === 1 ? '' : 's'} online
+                  </h2>
+                  <DispatchMap jobs={mapJobs} techs={mapTechs} />
+                </div>
+              )}
+
+              {view === 'bookings' && (
+                <div className="panel">
+                  <h2>Bookings ({filteredBookings.length})</h2>
+                  <input
+                    className="input mb"
+                    style={{ maxWidth: 340 }}
+                    placeholder="Search ref, customer, phone, technician…"
+                    value={bookingFilter}
+                    onChange={(e) => setBookingFilter(e.target.value)}
+                  />
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Ref</th>
+                          <th>Service</th>
+                          <th>Customer</th>
+                          <th>Technician</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredBookings.slice(0, 25).map((b) => (
+                          <tr key={b.id}>
+                            <td className="hint">
+                              #{b.id.slice(-6).toUpperCase()}
+                              {b.disputedAt && <span title="open ticket"> ⚑</span>}
+                            </td>
+                            <td>{b.category.nameEn}</td>
+                            <td>
+                              {b.customer?.name ?? '-'}
+                              <div className="hint">{b.customer?.phone}</div>
+                            </td>
+                            <td>{b.provider?.user?.name ?? '-'}</td>
+                            <td>
+                              {b.payment
+                                ? `${b.payment.amountEtb} ETB`
+                                : b.finalPriceEtb
+                                  ? `${b.finalPriceEtb} ETB`
+                                  : '-'}
+                            </td>
+                            <td>
+                              <StatusBadge status={b.status} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {view === 'technicians' && (
+                <div className="panel">
+                  <h2>Technicians ({technicians.length})</h2>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Trade</th>
+                          <th>Sub-city</th>
+                          <th>Status</th>
+                          <th>Rating</th>
+                          <th>Jobs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {technicians.map((t) => (
+                          <tr key={t.id}>
+                            <td>
+                              {t.isAvailable && t.verificationStatus === 'VERIFIED' && (
+                                <span style={{ color: 'var(--teal)' }}>● </span>
+                              )}
+                              {t.name ?? '-'}
+                              <div className="hint">{t.phone}</div>
+                            </td>
+                            <td>{t.category.nameEn}</td>
+                            <td>{t.subCity ?? '-'}</td>
+                            <td className="hint">{t.verificationStatus.toLowerCase()}</td>
+                            <td>{t.ratingCount ? `★ ${t.ratingAvg.toFixed(1)} (${t.ratingCount})` : '-'}</td>
+                            <td>{t.jobs}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {view === 'verification' && can('verification') && verificationTable(verifRows)}
+
+              {view === 'tickets' && can('tickets') && (
+                <>
+                  <div className="panel">
+                    <h2>Open tickets ({tickets.length})</h2>
+                    {refundCap != null && role === 'SUPPORT_AGENT' && (
+                      <p className="hint">
+                        You can record refunds up to ETB {refundCap} independently - larger amounts
+                        need Ops or the Super Admin.
+                      </p>
+                    )}
+                    {tickets.length === 0 && <p className="hint">No open disputes or guarantee claims.</p>}
+                    {tickets.map((t) => ticketRow(t))}
+                  </div>
+                  <div className="panel">
+                    <h2>Resolved history</h2>
+                    {ticketHistory === null ? (
+                      <button className="btn btn-line btn-sm" onClick={loadTicketHistory}>
+                        Load history
+                      </button>
+                    ) : ticketHistory.length === 0 ? (
+                      <p className="hint">No resolved tickets yet.</p>
+                    ) : (
+                      ticketHistory.slice(0, 20).map((t) => ticketRow(t, true))
+                    )}
+                  </div>
+                </>
+              )}
+
+              {view === 'payouts' && can('payouts') && (
+                <div className="panel">
+                  <h2>Payout queue ({payouts.length})</h2>
+                  {payouts.length === 0 && <p className="hint">No payouts waiting.</p>}
+                  {payouts.map((p) => (
+                    <div key={p.id} className="booking-row" style={{ cursor: 'default' }}>
+                      <span>
+                        <span className="what">
+                          {p.amountEtb} ETB - {p.wallet.provider.user.name ?? p.wallet.provider.user.phone}
+                        </span>
+                        <span className="when" style={{ display: 'block' }}>
+                          → {p.destination} · {fmtDate(p.requestedAt)}
+                        </span>
+                      </span>
+                      <span className="row">
+                        <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/payouts/${p.id}/process`)}>
+                          Process ✓
+                        </button>
+                        <button className="btn btn-line btn-sm" onClick={() => act(`/admin/payouts/${p.id}/reject`)}>
+                          Reject
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {view === 'reviews' && can('reviews') && (
+                <div className="panel">
+                  <h2>Review moderation ({reviews.length})</h2>
+                  {reviews.length === 0 && <p className="hint">No reviews pending moderation.</p>}
+                  {reviews.map((r) => (
+                    <div key={r.id} className="booking-row" style={{ cursor: 'default' }}>
+                      <span>
+                        <span className="what">
+                          {'★'.repeat(r.stars)}
+                          {'☆'.repeat(5 - r.stars)}
+                        </span>
+                        <span className="when" style={{ display: 'block' }}>
+                          {r.text ?? '(no text)'} - {fmtDate(r.createdAt)}
+                        </span>
+                      </span>
+                      <span className="row">
+                        <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/reviews/${r.id}/publish`)}>
+                          Publish
+                        </button>
+                        <button className="btn btn-line btn-sm" onClick={() => act(`/admin/reviews/${r.id}/reject`)}>
+                          Reject
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {view === 'categories' && can('categories') && (
+                <div className="panel">
+                  <h2>Categories & pricing</h2>
+                  <p className="hint">
+                    The floor price is the &quot;from ETB…&quot; estimate customers see at booking
+                    time. Changes apply immediately and are audit-logged.
+                  </p>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Category</th>
+                          <th>Floor price (ETB)</th>
+                          <th>Active</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cats.map((c) => (
+                          <tr key={c.id}>
+                            <td>
+                              {c.nameEn}
+                              <div className="hint" style={{ fontFamily: 'var(--font-am)' }}>{c.nameAm}</div>
+                            </td>
+                            <td>
+                              <input
+                                className="input"
+                                style={{ maxWidth: 110 }}
+                                inputMode="numeric"
+                                value={catEdit[c.id] ?? String(c.priceFloorEtb ?? '')}
+                                onChange={(e) => setCatEdit((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                              />
+                            </td>
+                            <td>{c.isActive === false ? <span className="hint">inactive</span> : 'yes'}</td>
+                            <td>
+                              <span className="row" style={{ justifyContent: 'flex-end' }}>
+                                <button
+                                  className="btn btn-dark btn-sm"
+                                  onClick={() =>
+                                    act(
+                                      `/admin/categories/${c.id}`,
+                                      { priceFloorEtb: Number(catEdit[c.id] ?? c.priceFloorEtb) },
+                                      'PUT',
+                                    )
+                                  }
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  className="btn btn-line btn-sm"
+                                  onClick={() => act(`/admin/categories/${c.id}`, { isActive: c.isActive === false }, 'PUT')}
+                                >
+                                  {c.isActive === false ? 'Activate' : 'Deactivate'}
+                                </button>
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {view === 'staff' && can('staff') && (
+                <div className="panel">
+                  <h2>Staff accounts ({staff.length})</h2>
+                  {staff.map((m) => (
+                    <div key={m.id} className="booking-row" style={{ cursor: 'default' }}>
+                      <span>
+                        <span className="what">
+                          {m.name ?? m.username} · <code>{m.username}</code>
+                        </span>
+                        <span className="when" style={{ display: 'block' }}>
+                          {m.role.replace(/_/g, ' ').toLowerCase()} · {m.phone} · since {fmtDate(m.createdAt)}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  <form onSubmit={createStaff} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}>
+                    <input className="input" style={{ maxWidth: 160 }} placeholder="Full name" value={newStaff.name}
+                      onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
+                    <input className="input" style={{ maxWidth: 140 }} placeholder="09… phone" value={newStaff.phone}
+                      onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} />
+                    <input className="input" style={{ maxWidth: 130 }} placeholder="username" value={newStaff.username}
+                      onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })} />
+                    <input className="input" style={{ maxWidth: 140 }} placeholder="password (8+)" type="password" value={newStaff.password}
+                      onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
+                    <select className="input" style={{ maxWidth: 190 }} value={newStaff.role}
+                      onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}>
+                      <option value="OPS_MANAGER">Operations Manager</option>
+                      <option value="VERIFICATION_OFFICER">Verification Officer</option>
+                      <option value="SUPPORT_AGENT">Support Agent</option>
+                      <option value="ADMIN">Super Admin</option>
+                    </select>
                     <button
                       className="btn btn-dark btn-sm"
-                      onClick={() => act(`/admin/tickets/${t.id}/reinspect`)}
+                      disabled={
+                        newStaff.name.length < 2 ||
+                        newStaff.phone.length < 9 ||
+                        newStaff.username.length < 3 ||
+                        newStaff.password.length < 8
+                      }
                     >
-                      Re-inspection
+                      + Create account
                     </button>
-                  )}
-                  <button className="btn btn-teal btn-sm" onClick={() => resolveTicket(t)}>
-                    Resolve ✓
-                  </button>
-                  <button className="btn btn-line btn-sm" onClick={() => rejectTicket(t)}>
-                    Reject
-                  </button>
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+                  </form>
+                </div>
+              )}
 
-        {/* ── payout queue ───────────────────────────────────────────────── */}
-        {show('payouts') && (
-          <div className="panel">
-            <h2>Payout queue ({payouts.length})</h2>
-            {payouts.length === 0 && <p className="hint">No payouts waiting.</p>}
-            {payouts.map((p) => (
-              <div key={p.id} className="booking-row" style={{ cursor: 'default' }}>
-                <span>
-                  <span className="what">
-                    {p.amountEtb} ETB - {p.wallet.provider.user.name ?? p.wallet.provider.user.phone}
-                  </span>
-                  <span className="when" style={{ display: 'block' }}>
-                    → {p.destination} · {fmtDate(p.requestedAt)}
-                  </span>
-                </span>
-                <span className="row">
-                  <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/payouts/${p.id}/process`)}>
-                    Process ✓
-                  </button>
-                  <button className="btn btn-line btn-sm" onClick={() => act(`/admin/payouts/${p.id}/reject`)}>
-                    Reject
-                  </button>
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Verification queue ─────────────────────────────────────────── */}
-        {show('verification') && (
-          <div className="panel">
-            <h2>Verification queue ({queue?.length ?? '…'})</h2>
-            {queue?.length === 0 && <p className="hint">No providers waiting for review.</p>}
-            {!!queue?.length && (
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Provider</th>
-                      <th>Trade</th>
-                      <th>Documents</th>
-                      <th>Applied</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queue.map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          <strong>{p.user.name ?? 'Unnamed'}</strong>
-                          <div className="hint">{p.user.phone}</div>
-                          <div className="hint">
-                            {[
-                              p.subCity && `${p.woreda ? `Woreda ${p.woreda}, ` : ''}${p.subCity}`,
-                              p.faydaIdNumber && `Fayda: ${p.faydaIdNumber}`,
-                              p.yearsExperience != null && `${p.yearsExperience} yrs exp.`,
-                              p.guarantorName &&
-                                `Guarantor: ${p.guarantorName}${p.guarantorPhone ? ` (${p.guarantorPhone})` : ''}`,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ') || 'no vetting details submitted'}
-                          </div>
-                        </td>
-                        <td>{p.category.nameEn}</td>
-                        <td>
-                          {p.documents.length === 0 && <span className="hint">none yet</span>}
-                          {p.documents.map((d) => (
-                            <button
-                              key={d.id}
-                              type="button"
-                              className="doc-link"
-                              onClick={() => openDocument(d.objectKey)}
-                            >
-                              {d.type.replace(/_/g, ' ').toLowerCase()}
-                            </button>
+              {view === 'audit' && can('audit') && (
+                <div className="panel">
+                  <h2>Audit log</h2>
+                  {audit.length === 0 && <p className="hint">No staff overrides recorded yet.</p>}
+                  {audit.length > 0 && (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>When</th>
+                            <th>Who</th>
+                            <th>Action</th>
+                            <th>Target</th>
+                            <th>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {audit.slice(0, 40).map((a) => (
+                            <tr key={a.id}>
+                              <td className="hint">{fmtDate(a.createdAt)}</td>
+                              <td>
+                                {a.actor.name ?? a.actor.username}
+                                <div className="hint">{a.actorRole.replace(/_/g, ' ').toLowerCase()}</div>
+                              </td>
+                              <td>
+                                <code>{a.action}</code>
+                              </td>
+                              <td className="hint">
+                                {a.targetType} #{a.targetId.slice(-6)}
+                              </td>
+                              <td className="hint" style={{ maxWidth: 240 }}>
+                                {a.reason ?? '-'}
+                              </td>
+                            </tr>
                           ))}
-                          <div className="hint" style={{ marginTop: '0.3rem' }}>
-                            {REQUIRED_DOCS.map((r) => (
-                              <span key={r.type} style={{ marginRight: '0.6rem', whiteSpace: 'nowrap' }}>
-                                {p.documents.some((d) => d.type === r.type) ? '✓' : '✗'} {r.label}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="hint">{fmtDate(p.createdAt)}</td>
-                        <td>
-                          <span className="row" style={{ justifyContent: 'flex-end' }}>
-                            <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/providers/${p.id}/verify`)}>
-                              Verify ✓
-                            </button>
-                            <button
-                              className="btn btn-line btn-sm"
-                              onClick={() => {
-                                const note = window.prompt('Reason for rejection (optional) · ውድቅ የሆነበት ምክንያት');
-                                if (note === null) return; // cancelled
-                                act(`/admin/providers/${p.id}/reject`, note.trim() ? { note: note.trim() } : undefined);
-                              }}
-                            >
-                              Reject
-                            </button>
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
-        {/* ── Review moderation ──────────────────────────────────────────── */}
-        {show('reviews') && (
-          <div className="panel">
-            <h2>Review moderation ({reviews.length})</h2>
-            {reviews.length === 0 && <p className="hint">No reviews pending moderation.</p>}
-            {reviews.map((r) => (
-              <div key={r.id} className="booking-row" style={{ cursor: 'default' }}>
-                <span>
-                  <span className="what">{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</span>
-                  <span className="when" style={{ display: 'block' }}>
-                    {r.text ?? '(no text)'} - {fmtDate(r.createdAt)}
-                  </span>
-                </span>
-                <span className="row">
-                  <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/reviews/${r.id}/publish`)}>
-                    Publish
-                  </button>
-                  <button className="btn btn-line btn-sm" onClick={() => act(`/admin/reviews/${r.id}/reject`)}>
-                    Reject
-                  </button>
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Commission ─────────────────────────────────────────────────── */}
-        {show('commission') && (
-          <div className="panel">
-            <h2>Commission rate</h2>
-            <div className="row">
-              <input
-                className="input"
-                style={{ maxWidth: 140 }}
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                inputMode="decimal"
-              />
-              <button
-                className="btn btn-dark btn-sm"
-                onClick={async () => {
-                  setError('');
-                  try {
-                    await api('/admin/config/commission', { method: 'PUT', body: JSON.stringify({ rate: Number(rate) }) });
-                    setNotice(`Commission set to ${(Number(rate) * 100).toFixed(1)}%`);
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
-                }}
-              >
-                Save
-              </button>
-              <span className="hint">fraction of gross, e.g. 0.10 = 10% - applies to new settlements</span>
-            </div>
-          </div>
-        )}
-
-        {/* ── Recent bookings (lookup) ───────────────────────────────────── */}
-        {show('bookings') && (
-          <div className="panel">
-            <h2>Recent bookings ({bookings.length})</h2>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Ref</th>
-                    <th>Service</th>
-                    <th>Customer</th>
-                    <th>Technician</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.slice(0, 12).map((b) => (
-                    <tr key={b.id}>
-                      <td className="hint">
-                        #{b.id.slice(-6).toUpperCase()}
-                        {b.disputedAt && <span title="open ticket"> ⚑</span>}
-                      </td>
-                      <td>{b.category.nameEn}</td>
-                      <td>{b.customer?.name ?? b.customer?.phone ?? '-'}</td>
-                      <td>{b.provider?.user?.name ?? '-'}</td>
-                      <td>{b.payment ? `${b.payment.amountEtb} ETB` : b.finalPriceEtb ? `${b.finalPriceEtb} ETB` : '-'}</td>
-                      <td>
-                        <StatusBadge status={b.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── Staff & role management (Super Admin only, spec section 3) ── */}
-        {show('staff') && (
-          <div className="panel">
-            <h2>Staff accounts ({staff.length})</h2>
-            {staff.map((m) => (
-              <div key={m.id} className="booking-row" style={{ cursor: 'default' }}>
-                <span>
-                  <span className="what">
-                    {m.name ?? m.username} · <code>{m.username}</code>
-                  </span>
-                  <span className="when" style={{ display: 'block' }}>
-                    {m.role.replace(/_/g, ' ').toLowerCase()} · {m.phone} · since {fmtDate(m.createdAt)}
-                  </span>
-                </span>
-              </div>
-            ))}
-            <form
-              onSubmit={createStaff}
-              className="row"
-              style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}
-            >
-              <input
-                className="input"
-                style={{ maxWidth: 160 }}
-                placeholder="Full name"
-                value={newStaff.name}
-                onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
-              />
-              <input
-                className="input"
-                style={{ maxWidth: 140 }}
-                placeholder="09… phone"
-                value={newStaff.phone}
-                onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
-              />
-              <input
-                className="input"
-                style={{ maxWidth: 130 }}
-                placeholder="username"
-                value={newStaff.username}
-                onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
-              />
-              <input
-                className="input"
-                style={{ maxWidth: 140 }}
-                placeholder="password (8+)"
-                type="password"
-                value={newStaff.password}
-                onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
-              />
-              <select
-                className="input"
-                style={{ maxWidth: 190 }}
-                value={newStaff.role}
-                onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-              >
-                <option value="OPS_MANAGER">Operations Manager</option>
-                <option value="VERIFICATION_OFFICER">Verification Officer</option>
-                <option value="SUPPORT_AGENT">Support Agent</option>
-                <option value="ADMIN">Super Admin</option>
-              </select>
-              <button
-                className="btn btn-dark btn-sm"
-                disabled={
-                  newStaff.name.length < 2 ||
-                  newStaff.phone.length < 9 ||
-                  newStaff.username.length < 3 ||
-                  newStaff.password.length < 8
-                }
-              >
-                + Create account
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* ── Audit log (Super Admin only, spec section 8) ───────────────── */}
-        {show('audit') && (
-          <div className="panel">
-            <h2>Audit log</h2>
-            {audit.length === 0 && <p className="hint">No staff overrides recorded yet.</p>}
-            {audit.length > 0 && (
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>When</th>
-                      <th>Who</th>
-                      <th>Action</th>
-                      <th>Target</th>
-                      <th>Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {audit.slice(0, 30).map((a) => (
-                      <tr key={a.id}>
-                        <td className="hint">{fmtDate(a.createdAt)}</td>
-                        <td>
-                          {a.actor.name ?? a.actor.username}
-                          <div className="hint">{a.actorRole.replace(/_/g, ' ').toLowerCase()}</div>
-                        </td>
-                        <td>
-                          <code>{a.action}</code>
-                        </td>
-                        <td className="hint">
-                          {a.targetType} #{a.targetId.slice(-6)}
-                        </td>
-                        <td className="hint" style={{ maxWidth: 240 }}>
-                          {a.reason ?? '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              {view === 'settings' && can('settings') && (
+                <>
+                  <div className="panel">
+                    <h2>Commission rate</h2>
+                    <div className="row">
+                      <input className="input" style={{ maxWidth: 140 }} value={rate}
+                        onChange={(e) => setRate(e.target.value)} inputMode="decimal" />
+                      <button
+                        className="btn btn-dark btn-sm"
+                        onClick={() => act('/admin/config/commission', { rate: Number(rate) }, 'PUT')}
+                      >
+                        Save
+                      </button>
+                      <span className="hint">fraction of gross, e.g. 0.10 = 10% - applies to new settlements</span>
+                    </div>
+                  </div>
+                  <div className="panel">
+                    <h2>Support refund cap</h2>
+                    <div className="row">
+                      <input className="input" style={{ maxWidth: 140 }} value={capInput}
+                        onChange={(e) => setCapInput(e.target.value)} inputMode="numeric" />
+                      <button
+                        className="btn btn-dark btn-sm"
+                        onClick={() => act('/admin/config/refund-cap', { capEtb: Number(capInput) }, 'PUT')}
+                      >
+                        Save
+                      </button>
+                      <span className="hint">
+                        ETB a Support Agent may refund independently - above it routes to Ops/Admin
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
           </div>
         )}
       </div>

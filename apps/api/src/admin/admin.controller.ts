@@ -62,6 +62,22 @@ class CreateStaffDto {
   role: Role;
 }
 
+class CategoryUpdateDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  priceFloorEtb?: number;
+
+  @IsOptional()
+  isActive?: boolean;
+}
+
+class RefundCapDto {
+  @IsNumber()
+  @Min(0)
+  capEtb: number;
+}
+
 class AssignBookingDto {
   @IsString()
   providerId: string;
@@ -502,5 +518,157 @@ export class AdminController {
       where: { key: 'support_refund_cap_etb' },
     });
     return { capEtb: Number(row?.value ?? 500) };
+  }
+
+  // -- Role-scoped dashboard KPIs (spec section 6 stat cards) -----------------
+
+  @Get('overview')
+  async overview() {
+    const now = Date.now();
+    const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const stallBefore = new Date(now - GPS_STALL_MS);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [
+      activeJobs,
+      awaitingDispatch,
+      escalated,
+      techniciansOnline,
+      arrivals,
+      openTickets,
+      activeClaims,
+      resolvedToday,
+      resolvedWeek,
+      pendingApplications,
+      approvedThisWeek,
+      flaggedForReview,
+      enRouteOld,
+    ] = await Promise.all([
+      this.prisma.booking.count({
+        where: { status: { in: ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'] } },
+      }),
+      this.prisma.booking.count({ where: { status: 'REQUESTED' } }),
+      this.prisma.booking.count({ where: { status: 'REQUESTED', escalatedAt: { not: null } } }),
+      this.prisma.providerProfile.count({
+        where: { isAvailable: true, verificationStatus: 'VERIFIED' },
+      }),
+      this.prisma.booking.findMany({
+        where: { arrivedAt: { not: null, gte: weekAgo }, acceptedAt: { not: null } },
+        select: { acceptedAt: true, arrivedAt: true },
+        take: 200,
+      }),
+      this.prisma.supportTicket.count({ where: { status: { in: ['OPEN', 'RE_INSPECTION'] } } }),
+      this.prisma.supportTicket.count({
+        where: { type: 'GUARANTEE_CLAIM', status: { in: ['OPEN', 'RE_INSPECTION'] } },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: { in: ['RESOLVED', 'REJECTED'] }, resolvedAt: { gte: todayStart } },
+      }),
+      this.prisma.supportTicket.findMany({
+        where: { resolvedAt: { not: null, gte: weekAgo } },
+        select: { createdAt: true, resolvedAt: true },
+        take: 200,
+      }),
+      this.prisma.providerProfile.count({ where: { verificationStatus: 'PENDING' } }),
+      this.prisma.providerProfile.count({
+        where: { verificationStatus: 'VERIFIED', updatedAt: { gte: weekAgo } },
+      }),
+      this.prisma.providerProfile.count({ where: { verificationStatus: 'SUSPENDED' } }),
+      this.prisma.booking.count({ where: { status: 'EN_ROUTE', enRouteAt: { lt: stallBefore } } }),
+    ]);
+
+    const avg = (xs: number[]) =>
+      xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null;
+    const avgArrivalMin = avg(
+      arrivals.map((a) => (a.arrivedAt!.getTime() - a.acceptedAt!.getTime()) / 60000),
+    );
+    const avgResolutionMin = avg(
+      resolvedWeek.map((t) => (t.resolvedAt!.getTime() - t.createdAt.getTime()) / 60000),
+    );
+    void dayAgo;
+
+    return {
+      ops: { activeJobs, awaitingDispatch, escalated, stalledEnRoute: enRouteOld, techniciansOnline, avgArrivalMin },
+      support: { openTickets, activeClaims, resolvedToday, avgResolutionMin },
+      verification: { pendingApplications, approvedThisWeek, flaggedForReview },
+    };
+  }
+
+  // -- Technician directory (spec section 6: "Technicians (all)") -------------
+
+  @Get('technicians')
+  @Roles('ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER', 'SUPPORT_AGENT')
+  async technicians() {
+    const rows = await this.prisma.providerProfile.findMany({
+      include: {
+        user: { select: { name: true, phone: true } },
+        category: { select: { nameEn: true, nameAm: true } },
+        _count: { select: { bookings: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 300,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.user.name,
+      phone: r.user.phone,
+      category: r.category,
+      subCity: r.subCity,
+      verificationStatus: r.verificationStatus,
+      isAvailable: r.isAvailable,
+      ratingAvg: r.ratingAvg,
+      ratingCount: r.ratingCount,
+      jobs: r._count.bookings,
+      lat: r.lat,
+      lng: r.lng,
+      locationUpdatedAt: r.locationUpdatedAt,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  // -- Categories & pricing management (spec section 6 sidebar item) ----------
+
+  @Get('categories')
+  @Roles('ADMIN', 'OPS_MANAGER')
+  adminCategories() {
+    return this.prisma.serviceCategory.findMany({ orderBy: { nameEn: 'asc' } });
+  }
+
+  @Put('categories/:id')
+  @Roles('ADMIN', 'OPS_MANAGER')
+  async updateCategory(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: CategoryUpdateDto,
+  ) {
+    const cat = await this.prisma.serviceCategory.findUnique({ where: { id } });
+    if (!cat) throw new NotFoundException('Category not found');
+    this.audit.log(actor, 'CATEGORY_UPDATE', 'ServiceCategory', id, undefined, {
+      priceFloorEtb: dto.priceFloorEtb ?? null,
+      isActive: dto.isActive ?? null,
+    });
+    return this.prisma.serviceCategory.update({
+      where: { id },
+      data: {
+        ...(dto.priceFloorEtb != null ? { priceFloorEtb: dto.priceFloorEtb } : {}),
+        ...(typeof dto.isActive === 'boolean' ? { isActive: dto.isActive } : {}),
+      },
+    });
+  }
+
+  // -- Settings: refund cap is editable by Admin/Ops (spec section 5) ---------
+
+  @Put('config/refund-cap')
+  @Roles('ADMIN', 'OPS_MANAGER')
+  async setRefundCap(@CurrentUser() actor: AuthUser, @Body() dto: RefundCapDto) {
+    this.audit.log(actor, 'REFUND_CAP_SET', 'AppConfig', 'support_refund_cap_etb', String(dto.capEtb));
+    await this.prisma.appConfig.upsert({
+      where: { key: 'support_refund_cap_etb' },
+      update: { value: String(dto.capEtb) },
+      create: { key: 'support_refund_cap_etb', value: String(dto.capEtb) },
+    });
+    return { capEtb: dto.capEtb };
   }
 }

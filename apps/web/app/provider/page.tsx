@@ -208,7 +208,7 @@ export default function ProviderPage() {
     }
   }
 
-  // REQUESTED = an incoming offer awaiting accept/reject (90s window) - surface
+  // REQUESTED = an incoming offer awaiting accept/reject (5-minute window) - surface
   // it above the in-flight jobs so the technician responds in time.
   const offers = jobs.filter((j) => j.status === 'REQUESTED');
   const actionable = jobs.filter((j) =>
@@ -315,12 +315,12 @@ export default function ProviderPage() {
               </div>
             )}
 
-            {/* incoming REQUESTED offers - 90s response window, so show first */}
+            {/* incoming REQUESTED offers - 5-minute response window, so show first */}
             {offers.length > 0 && (
               <div className="panel">
                 <div className="dispatch-note" style={{ marginBottom: '0.9rem' }}>
                   <strong>{offers.length}</strong> new job offer{offers.length > 1 ? 's' : ''} ·
-                  አዲስ የስራ ጥያቄ - respond now (90s window)
+                  አዲስ የስራ ጥያቄ - respond now (5-minute window)
                 </div>
                 {offers.map((j) => (
                   <Link key={j.id} href={`/bookings/${j.id}`} className="booking-row">

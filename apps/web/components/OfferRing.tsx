@@ -4,10 +4,12 @@ const R = 15;
 const CIRC = 2 * Math.PI * R;
 
 /**
- * Circular countdown for the 90s dispatch offer window - the stroke drains
+ * Circular countdown for the dispatch offer window (5 min) - the stroke drains
  * second by second and shifts blue → amber → red as time runs out.
  */
-export function OfferRing({ seconds, total = 90 }: { seconds: number; total?: number }) {
+const fmt = (s: number) => (s > 99 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : String(s));
+
+export function OfferRing({ seconds, total = 300 }: { seconds: number; total?: number }) {
   const frac = Math.max(0, Math.min(1, seconds / total));
   const tone = frac > 0.45 ? 'var(--blue)' : frac > 0.18 ? '#d9912c' : '#cf4444';
   return (
@@ -28,7 +30,7 @@ export function OfferRing({ seconds, total = 90 }: { seconds: number; total?: nu
           style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.5s' }}
         />
       </svg>
-      <b>{seconds}</b>
+      <b>{fmt(seconds)}</b>
     </span>
   );
 }

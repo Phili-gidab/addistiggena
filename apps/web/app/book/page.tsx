@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Stars } from '../../components/Stars';
 import {
   api,
+  authorizedFetch,
   Booking,
   Category,
   fmtDistance,
@@ -43,6 +44,9 @@ function BookWizard() {
   const [neighborhood, setNeighborhood] = useState('');
   const [landmark, setLandmark] = useState('');
   const [description, setDescription] = useState('');
+  const [photoKey, setPhotoKey] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [providers, setProviders] = useState<NearbyProvider[] | null>(null);
   const [providerId, setProviderId] = useState<string | undefined>();
   const [error, setError] = useState('');
@@ -55,6 +59,26 @@ function BookWizard() {
     }
     api<Category[]>('/catalog/categories').then(setCategories).catch(() => {});
   }, [router]);
+
+  async function uploadPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoBusy(true);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await authorizedFetch('/uploads', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error('Upload failed - JPEG, PNG or WebP up to 5MB');
+      const body = (await res.json()) as { objectKey: string };
+      setPhotoKey(body.objectKey);
+      setPhotoPreview(URL.createObjectURL(file));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   const category = categories.find((c) => c.id === categoryId);
   const chosenProvider = providers?.find((p) => p.id === providerId);
@@ -92,6 +116,7 @@ function BookWizard() {
           lng: pos.lng,
           landmarkNote: fullLandmark || undefined,
           description: description || undefined,
+          photoObjectKey: photoKey ?? undefined,
         }),
       });
       router.push(`/bookings/${booking.id}`);
@@ -239,6 +264,37 @@ function BookWizard() {
                     onChange={(e) => setDescription(e.target.value)}
                   />
                 </div>
+                <div className="field">
+                  <label>Photo of the problem (optional) · የችግሩ ፎቶ</label>
+                  {photoPreview ? (
+                    <div className="photo-attach">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photoPreview} alt="Attached problem photo" />
+                      <button
+                        type="button"
+                        className="btn btn-line btn-sm"
+                        onClick={() => {
+                          setPhotoKey(null);
+                          setPhotoPreview(null);
+                        }}
+                      >
+                        Remove photo
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={uploadPhoto}
+                      disabled={photoBusy}
+                    />
+                  )}
+                  <p className="hint">
+                    {photoBusy
+                      ? 'Uploading…'
+                      : 'A photo helps the technician arrive with the right tools and parts.'}
+                  </p>
+                </div>
                 <div className="spread">
                   <button className="btn btn-line btn-sm" onClick={() => setStep(1)}>
                     ← Back
@@ -327,6 +383,12 @@ function BookWizard() {
                     {providerId ? chosenProvider?.name ?? 'Selected technician' : 'First available'}
                   </span>
                 </div>
+                {photoKey && (
+                  <div className="receipt-row">
+                    <span className="k">Photo</span>
+                    <span className="v">Attached ✓</span>
+                  </div>
+                )}
                 <div className="receipt-row">
                   <span className="k">Location</span>
                   <span className="v">

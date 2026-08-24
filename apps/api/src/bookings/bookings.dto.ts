@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsLatitude,
+  Matches,
   IsLongitude,
   IsNotEmpty,
   IsNumber,
@@ -37,6 +38,12 @@ export class CreateBookingDto {
   @IsString()
   @MaxLength(2000)
   description?: string;
+
+  /** objectKey returned by POST /uploads - the optional problem photo. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d+-[0-9a-f]+\.[a-z0-9]+$/i, { message: 'photoObjectKey: not an uploaded object key' })
+  photoObjectKey?: string;
 }
 
 export class CompleteBookingDto {

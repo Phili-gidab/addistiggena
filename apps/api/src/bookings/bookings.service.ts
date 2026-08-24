@@ -20,7 +20,7 @@ import {
   SendMessageDto,
 } from './bookings.dto';
 
-const OFFER_WINDOW_MS = 90_000; // provider has 90 seconds to respond (proposal §4.2)
+const OFFER_WINDOW_MS = 5 * 60_000; // provider has 5 minutes to respond (client decision 2026-08-24)
 
 /** After this many declines/timeouts the job escalates to the Ops queue for manual
  *  assignment instead of walking the whole pool (roles/workflow spec section 5). */
@@ -88,7 +88,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     private readonly payments: PaymentsService,
   ) {}
 
-  /** Background sweep: expire lapsed 90s offers (re-dispatching) and auto-confirm stale COMPLETED jobs. */
+  /** Background sweep: expire lapsed offers (re-dispatching) and auto-confirm stale COMPLETED jobs. */
   onModuleInit() {
     this.sweepTimer = setInterval(() => void this.sweep(), 15_000);
     this.sweepTimer.unref?.();
@@ -121,7 +121,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async sweepOnce() {
-    // 1) offers whose 90s window lapsed → mark EXPIRED, cascade to the next candidate
+    // 1) offers whose accept window lapsed → mark EXPIRED, cascade to the next candidate
     const lapsed = await this.prisma.booking.findMany({
       where: { status: 'REQUESTED', offerExpiresAt: { lt: new Date() } },
       select: { id: true },
@@ -188,6 +188,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         landmarkNote: dto.landmarkNote,
         description: dto.description,
         priceQuoteEtb: category.priceFloorEtb,
+        photoObjectKey: dto.photoObjectKey ?? null,
         offerExpiresAt: dto.providerId ? new Date(Date.now() + OFFER_WINDOW_MS) : null,
       },
     });
@@ -203,7 +204,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       });
       this.notifyProvider(
         dto.providerId,
-        `Addis Tiggena: አዲስ ስራ · new ${category.nameEn} job #${created.id.slice(-6)} - respond within 90s`,
+        `Addis Tiggena: አዲስ ስራ · new ${category.nameEn} job #${created.id.slice(-6)} - respond within 5 minutes`,
       );
       return this.getPublic(created.id);
     }
@@ -315,7 +316,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     });
     this.notifications.notify(
       { phone: next.phone, telegramChatId: next.telegramChatId },
-      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} ~${(next.distanceM / 1000).toFixed(1)}km away - respond within 90s`,
+      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} ~${(next.distanceM / 1000).toFixed(1)}km away - respond within 5 minutes`,
     );
     return this.getPublic(bookingId);
   }
@@ -376,7 +377,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         data: { outcome: 'EXPIRED' },
       });
       await this.offerToNext(id);
-      throw new BadRequestException('Offer expired - the 90-second window has passed');
+      throw new BadRequestException('Offer expired - the 5-minute window has passed');
     }
 
     // A reject is not terminal: record the verdict and cascade to the next technician.
@@ -441,7 +442,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   /**
    * Staff manual override (spec section 3: reassign a live booking): hard-picks a
    * technician, superseding the auto-ranked queue. The technician still gets the
-   * standard 90s accept window; a live job resets to REQUESTED first.
+   * standard 5-minute accept window; a live job resets to REQUESTED first.
    */
   async assign(bookingId: string, providerId: string) {
     const booking = await this.prisma.booking.findUnique({
@@ -482,7 +483,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     ]);
     this.notifications.notify(
       profile.user,
-      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} assigned to you by dispatch - respond within 90s`,
+      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} assigned to you by dispatch - respond within 5 minutes`,
     );
     this.notifications.notify(
       booking.customer,
@@ -551,12 +552,16 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     if (!cancellable.includes(booking.status)) {
       throw new BadRequestException(`Cannot cancel a booking in ${booking.status} state`);
     }
+    // Cancellation policy (spec section 4): free before the technician moves;
+    // once EN_ROUTE/ARRIVED the cancel is recorded as late - a call-out fee may apply.
+    const late = ['EN_ROUTE', 'ARRIVED'].includes(booking.status);
+    const reason = late ? `[LATE CANCEL] ${dto.reason}` : dto.reason;
     // Guarded write: a booking that advanced (e.g. technician started) can't be cancelled
     // by a stale click, and the offer bookkeeping happens atomically with the cancel.
     const { count } = await this.prisma.$transaction(async (tx) => {
       const res = await tx.booking.updateMany({
         where: { id, status: { in: cancellable } },
-        data: { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: dto.reason },
+        data: { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: reason },
       });
       if (res.count > 0) {
         await tx.bookingOffer.updateMany({
@@ -566,6 +571,12 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       }
       return res;
     });
+    if (count > 0 && booking.provider?.user) {
+      this.notifications.notify(
+        { phone: booking.provider.user.phone, telegramChatId: null },
+        `Addis Tiggena: job #${id.slice(-6)} was cancelled by the customer${late ? ' after you set out - a call-out fee may apply, contact support' : ''}.`,
+      );
+    }
     if (count === 0) {
       throw new BadRequestException('Booking state changed - it can no longer be cancelled');
     }

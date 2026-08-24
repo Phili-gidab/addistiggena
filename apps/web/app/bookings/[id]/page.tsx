@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { OfferRing } from '../../../components/OfferRing';
 import { Stars } from '../../../components/Stars';
 import { StatusBadge } from '../../../components/StatusBadge';
-import { api, ApiError, Booking, fmtDistance, getToken, getUser, Ticket } from '../../../lib/api';
+import { api, ApiError, authorizedFetch, Booking, fmtDistance, getToken, getUser, Ticket } from '../../../lib/api';
 
 const TrackMap = dynamic(() => import('../../../components/TrackMap'), { ssr: false });
 
@@ -31,7 +31,7 @@ interface ChatMessage {
 }
 
 const FLOW = [
-  { key: 'REQUESTED', t: 'Requested · ተጠይቋል', s: 'Waiting for the technician (90s window)' },
+  { key: 'REQUESTED', t: 'Requested · ተጠይቋል', s: 'Waiting for the technician (5-minute window)' },
   { key: 'ACCEPTED', t: 'Accepted · ተቀብሏል', s: 'The technician confirmed your job' },
   { key: 'EN_ROUTE', t: 'En route · በመንገድ ላይ', s: 'On the way to your pin' },
   { key: 'ARRIVED', t: 'Arrived · ደርሷል', s: 'At your location' },
@@ -67,6 +67,7 @@ export default function BookingDetailPage() {
   const [track, setTrack] = useState<TrackInfo | null>(null);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [chatText, setChatText] = useState('');
   const chatEnd = useRef<HTMLDivElement>(null);
 
@@ -109,6 +110,26 @@ export default function BookingDetailPage() {
     const t = setInterval(refresh, 4000);
     return () => clearInterval(t);
   }, [id, refresh, router, reassigned]);
+
+  // problem photo: /files is auth-gated, so load it as a blob
+  const photoKey = booking?.photoObjectKey ?? null;
+  useEffect(() => {
+    if (!photoKey) {
+      setPhotoUrl(null);
+      return;
+    }
+    let url: string | null = null;
+    authorizedFetch(`/files/${photoKey}`)
+      .then(async (r) => {
+        if (!r.ok) return;
+        url = URL.createObjectURL(await r.blob());
+        setPhotoUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [photoKey]);
 
   // auto-dispatch: 90s offer window - tick every second while an offer is open.
   // Polling may bring a new offerExpiresAt/provider (cascade re-offer); keying the
@@ -376,6 +397,17 @@ export default function BookingDetailPage() {
             </p>
           )}
           {booking.description && <p className="mt">{booking.description}</p>}
+          {photoUrl && (
+            <div className="booking-photo">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoUrl}
+                alt="Problem photo attached by the customer"
+                onClick={() => window.open(photoUrl, '_blank', 'noopener')}
+              />
+              <span className="hint">Problem photo · የችግሩ ፎቶ (tap to enlarge)</span>
+            </div>
+          )}
           {booking.payment?.status === 'CONFIRMED' && (
             <div className="ok-box mt" style={{ marginBottom: 0 }}>
               Paid {booking.payment.amountEtb} ETB via {booking.payment.gateway}
@@ -718,6 +750,14 @@ export default function BookingDetailPage() {
               className="btn btn-line btn-sm"
               disabled={busy}
               onClick={() => {
+                const late = ['EN_ROUTE', 'ARRIVED'].includes(booking.status);
+                if (
+                  late &&
+                  !window.confirm(
+                    'Your technician is already on the way - a call-out fee may apply for late cancellations. Continue? · ባለሙያው በመንገድ ላይ ነው፤ የጥሪ ክፍያ ሊጠየቅ ይችላል።',
+                  )
+                )
+                  return;
                 const reason = window.prompt('Why are you cancelling? · ለምን ይሰርዛሉ?');
                 if (reason) act(`/bookings/${booking.id}/cancel`, { reason });
               }}
