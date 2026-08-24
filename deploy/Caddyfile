@@ -4,6 +4,12 @@
 
 {$WEB_DOMAIN} {
 	encode gzip
+	# Pre-launch gate: browser-level sign-in so visitors can't browse the site
+	# while it is still in development. Remove this block (and the STAGING_AUTH_*
+	# vars in compose/.env) at public launch.
+	basic_auth {
+		{$STAGING_AUTH_USER} {$STAGING_AUTH_HASH}
+	}
 	reverse_proxy web:4000
 }
 

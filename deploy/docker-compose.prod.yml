@@ -74,6 +74,8 @@ services:
     environment:
       WEB_DOMAIN: ${WEB_DOMAIN:?set WEB_DOMAIN in deploy/.env}
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in deploy/.env}
+      STAGING_AUTH_USER: ${STAGING_AUTH_USER:?set STAGING_AUTH_USER in deploy/.env}
+      STAGING_AUTH_HASH: ${STAGING_AUTH_HASH:?set STAGING_AUTH_HASH in deploy/.env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
