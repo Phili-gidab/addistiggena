@@ -1,13 +1,22 @@
 # Caddy reverse proxy — automatic HTTPS via Let's Encrypt.
 # Domains come from deploy/.env (WEB_DOMAIN / API_DOMAIN); DNS A records for both
-# must point at the ECS elastic IP BEFORE first start, or cert issuance fails.
+# (plus www) must point at the ECS elastic IP BEFORE first start, or cert issuance fails.
 
 {$WEB_DOMAIN} {
 	encode gzip
 	reverse_proxy web:4000
 }
 
+www.{$WEB_DOMAIN} {
+	redir https://{$WEB_DOMAIN}{uri} permanent
+}
+
 {$API_DOMAIN} {
 	encode gzip
 	reverse_proxy api:4001
+}
+
+# Old bookmarks and links that still use the raw elastic IP keep working.
+http://196.189.237.101 {
+	redir https://{$WEB_DOMAIN}{uri} permanent
 }
