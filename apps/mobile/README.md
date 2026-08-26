@@ -1,33 +1,76 @@
-# Addis Tiggena — Android Apps (Customer + Provider)
+# Addis Tiggena — Mobile app (Expo / React Native)
 
-React Native via **Expo** (decision rationale in `docs/02-tech-stack.md`). The mobile workspace is
-initialized in Week 3 by the mobile developer; it is not part of the npm-workspaces install because
-Expo manages its own toolchain.
+Native Android/iOS app for customers **and** technicians, talking to the same production
+API as the web app (`https://api.addistiggena.com`). One login screen; the account's
+role decides the experience:
 
-## Initialize (Week 3, Day 1)
+- **Customer**: home with category grid → 4-step booking wizard (GPS pin, sub-city,
+  problem photo) → live booking tracking (dispatch countdown, ETA, timeline) → cash
+  payment confirm → rating → "Something's wrong" / 5-day guarantee claims.
+- **Technician**: online/offline toggle (with GPS ping for dispatch ranking), incoming
+  job offers on the 5-minute countdown, one-tap lifecycle (accept → en route → arrived
+  → start → complete with final price), earnings wallet + payout requests.
+
+## Stack
+
+- Expo SDK 54 + expo-router (file-based navigation, typed routes)
+- TypeScript, React Native StyleSheet (design tokens in `src/lib/theme.ts` mirror the
+  web design system: Deep Navy `#0b1e3f`, Vibrant Blue `#0072ce`, Montserrat / Inter /
+  Noto Sans Ethiopic)
+- `expo-secure-store` for JWT storage (access + refresh, silent refresh on 401)
+- `expo-location` (booking pin + technician availability ping), `expo-image-picker`
+  (problem photo upload)
+
+## Structure
+
+```
+src/
+  app/                 expo-router routes
+    welcome.tsx        onboarding (role pick)
+    login.tsx          phone-OTP + username/password
+    (customer)/        tabs: home, book, bookings, profile
+    (tech)/            tabs: jobs, wallet, profile
+    booking/[id].tsx   live booking detail (both roles land here from lists)
+  components/ui.tsx    UI kit: Btn, Card, Field, StatusPill, Countdown, …
+  lib/api.ts           fetch wrapper + types (same contract as apps/web/lib/api.ts)
+  lib/theme.ts         design tokens
+  lib/catalog.ts       category icons, sub-cities, status timeline copy
+  store/auth.tsx       AuthProvider (SecureStore-backed session)
+```
+
+## Run it (development)
 
 ```bash
 cd apps/mobile
-npx create-expo-app customer --template blank-typescript
-npx create-expo-app provider --template blank-typescript
+npm install
+npm start          # Expo dev server → scan the QR with the Expo Go app
 ```
 
-## Required Expo modules
+Point at a different API with an env var:
 
-| Need (proposal §5) | Package |
-| --- | --- |
-| GPS pinning & live tracking | `expo-location`, `expo-task-manager` (background), `react-native-maps` |
-| Push notifications | `expo-notifications` (FCM) |
-| Offline cache & queued actions | `expo-sqlite`, `@tanstack/react-query` persistors |
-| OTP autofill | `expo-sms-retriever` (Android SMS Retriever API) |
-| Photo evidence / portfolio upload | `expo-image-picker` + pre-signed OBS URLs |
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.x.x:4001 npm start   # local API on your LAN
+```
 
-## App skeletons
+(Default is the production API, so Expo Go on any phone works out of the box.)
 
-- **customer**: auth (OTP) → category grid → map pin + landmark note → provider list → booking
-  status/tracking screen → payment sheet → rating.
-- **provider**: auth → verification status → availability toggle → job inbox (90s countdown) →
-  navigation hand-off (Google Maps intent) → job lifecycle buttons → earnings dashboard.
+## Build an installable APK / AAB
 
-Both apps consume the REST API defined in `docs/04-architecture.md` and share the Socket.IO
-tracking namespace. Amharic-first: default locale `am`, English toggle (proposal §6.1).
+Uses [EAS Build](https://docs.expo.dev/build/setup/) (free tier is fine):
+
+```bash
+npm i -g eas-cli
+eas login                       # expo.dev account
+eas build -p android --profile preview    # APK for direct install / client demo
+eas build -p android --profile production # AAB for Google Play
+```
+
+`android.package` is `com.amnen.addistiggena`. iOS builds need an Apple Developer
+account (`eas build -p ios`).
+
+## Notes
+
+- Technician document upload (vetting) stays on the web dashboard; the app shows
+  verification status and blocks going online until VERIFIED.
+- Push notifications (FCM) are the next milestone — dispatch offers currently surface
+  via the 6-second job-board poll while the app is open.
