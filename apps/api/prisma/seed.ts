@@ -29,7 +29,7 @@ const categories = [
   { slug: 'painting', nameEn: 'Painting & Finishing', nameAm: 'ቀለም ቅብ', icon: 'paint-roller', priceFloorEtb: 250 },
   { slug: 'general', nameEn: 'General Handyman', nameAm: 'አጠቃላይ ጥገና', icon: 'toolbox', priceFloorEtb: 350 },
   { slug: 'outdoor', nameEn: 'Outdoor & Compound Maintenance', nameAm: 'የግቢ ጥገና', icon: 'fence', priceFloorEtb: 250 },
-  { slug: 'automotive', nameEn: 'Light Automotive Assistance', nameAm: 'ቀላል የመኪና ድጋፍ', icon: 'car', priceFloorEtb: 250 },
+  { slug: 'automotive', nameEn: 'Light Automotive Assistance', nameAm: 'ቀላል የመኪና ጥገና', icon: 'car', priceFloorEtb: 250 },
 ];
 
 // Superseded pre-launch categories folded into the official catalog

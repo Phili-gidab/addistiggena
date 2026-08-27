@@ -136,7 +136,7 @@ export default function ProviderPage() {
         method: 'POST',
         body: JSON.stringify({ type: docType, objectKey: body.objectKey }),
       });
-      setNotice('Document uploaded - our team reviews it within 3–5 days.');
+      setNotice('Document uploaded - our team reviews it within 3-5 days.');
       load();
     } catch (err) {
       setError((err as Error).message);

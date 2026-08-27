@@ -17,7 +17,7 @@ export function Services({ categories }: { categories: Category[] }) {
               <span className="sec-kicker">Services · አገልግሎቶች</span>
               <h2 className="sec-title">
                 All categories
-                <span className="am">ምን ይጠገን? የሚፈልጉትን ይምረጡ</span>
+                <span className="am">ምን እንጠግንልዎ? የሚፈልጉትን ይምረጡ</span>
               </h2>
             </div>
             <Link href="/pricing" className="see-all">
@@ -43,13 +43,13 @@ export function Services({ categories }: { categories: Category[] }) {
                 <span className="ic" aria-hidden>
                   {iconFor(c.slug)}
                 </span>
-                <span>
+                <span className="mid">
                   <span className="en" style={{ display: 'block' }}>
                     {c.nameEn}
                   </span>
                   <span className="am">{c.nameAm}</span>
+                  {c.priceFloorEtb && <span className="from">from ETB {c.priceFloorEtb}</span>}
                 </span>
-                {c.priceFloorEtb && <span className="from">from ETB {c.priceFloorEtb}</span>}
               </Link>
             </Reveal>
           ))}

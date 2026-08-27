@@ -1,20 +1,27 @@
-/** Category icon + Addis sub-cities - mirrors the web lib. */
+/** Category icons + Addis sub-cities - mirrors the web lib. */
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-const ICONS: Record<string, string> = {
-  electrical: '⚡',
-  plumbing: '🚰',
-  electronics: '📺',
-  'it-office': '🖥️',
-  appliances: '🧊',
-  'gas-heating': '🔥',
-  carpentry: '🪚',
-  painting: '🎨',
-  general: '🧰',
-  outdoor: '🌿',
-  automotive: '🚗',
+export type MCIName = keyof typeof MaterialCommunityIcons.glyphMap;
+
+/**
+ * Vector icons per category slug (MaterialCommunityIcons) - emoji rendered
+ * inconsistently on older Android devices, so the app draws real glyphs.
+ */
+const ICONS: Record<string, MCIName> = {
+  electrical: 'lightning-bolt',
+  plumbing: 'pipe-wrench',
+  electronics: 'television-classic',
+  'it-office': 'laptop',
+  appliances: 'fridge-outline',
+  'gas-heating': 'fire',
+  carpentry: 'hand-saw',
+  painting: 'format-paint',
+  general: 'toolbox-outline',
+  outdoor: 'tree-outline',
+  automotive: 'car-wrench',
 };
 
-export const iconFor = (slug: string): string => ICONS[slug] ?? '🔧';
+export const iconFor = (slug: string): MCIName => ICONS[slug] ?? 'wrench';
 
 export const SUB_CITIES = [
   'Addis Ketema',

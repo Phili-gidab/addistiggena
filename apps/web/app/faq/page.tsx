@@ -37,7 +37,7 @@ export default function FaqPage() {
 
         <div className="panel mt" style={{ textAlign: 'center' }}>
           <p style={{ color: 'var(--muted)', marginBottom: '1rem' }}>
-            Still have a question? We are open 6:00 AM – 8:00 PM, every day.
+            Still have a question? We are open 6:00 AM - 8:00 PM, every day.
           </p>
           <Link href="/book" className="btn btn-primary">
             Book a service

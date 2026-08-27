@@ -46,7 +46,7 @@ export default function TechProfile() {
           <Card style={{ marginTop: S.md }}>
             <Row style={{ justifyContent: 'space-around' }}>
               <View style={st.stat}>
-                <Text style={st.statV}>{profile.ratingCount ? profile.ratingAvg.toFixed(1) : '—'}</Text>
+                <Text style={st.statV}>{profile.ratingCount ? profile.ratingAvg.toFixed(1) : '-'}</Text>
                 <Hint>★ rating</Hint>
               </View>
               <View style={st.stat}>

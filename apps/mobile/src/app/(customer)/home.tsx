@@ -2,9 +2,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Card, Hint, Row, StatusPill } from '../../components/ui';
+import { Am, Card, CatIcon, Hint, Row, StatusPill } from '../../components/ui';
 import { api, Booking, Category } from '../../lib/api';
-import { iconFor } from '../../lib/catalog';
 import { C, F, R, S, SHADOW } from '../../lib/theme';
 import { useAuth } from '../../store/auth';
 
@@ -62,7 +61,7 @@ export default function Home() {
             {active && (
               <Pressable onPress={() => router.push(`/booking/${active.id}`)}>
                 <View style={st.activeCard}>
-                  <Text style={st.activeGlyph}>{iconFor(active.category.slug)}</Text>
+                  <CatIcon slug={active.category.slug} size={42} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.activeTitle}>{active.category.nameEn}</Text>
                     <Text style={st.activeSub}>
@@ -85,7 +84,9 @@ export default function Home() {
             style={({ pressed }) => [st.tile, pressed && { transform: [{ scale: 0.97 }] }]}
             onPress={() => router.push({ pathname: '/(customer)/book', params: { category: item.id } })}
           >
-            <Text style={st.tileIcon}>{iconFor(item.slug)}</Text>
+            <View style={{ marginBottom: 8 }}>
+              <CatIcon slug={item.slug} size={42} />
+            </View>
             <Text style={st.tileName} numberOfLines={1}>
               {item.nameEn.split(' & ')[0]}
             </Text>
@@ -99,9 +100,9 @@ export default function Home() {
           <Card style={{ marginTop: S.xl, backgroundColor: C.navy, borderColor: C.navySoft }}>
             <Row style={{ justifyContent: 'space-between' }}>
               {[
-                ['15–30′', 'avg. arrival'],
+                ['15-30′', 'avg. arrival'],
                 ['5-day', 'guarantee'],
-                ['10/10', 'sub-cities'],
+                ['11/11', 'sub-cities'],
               ].map(([v, k]) => (
                 <View key={k} style={{ alignItems: 'center', flex: 1 }}>
                   <Text style={st.statV}>{v}</Text>
@@ -140,7 +141,6 @@ const st = StyleSheet.create({
     marginTop: S.lg,
     ...SHADOW.card,
   },
-  activeGlyph: { fontSize: 24 },
   activeTitle: { fontFamily: F.displayBold, fontSize: 14.5, color: C.navy },
   activeSub: { fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 2 },
   tile: {
@@ -154,7 +154,6 @@ const st = StyleSheet.create({
     alignItems: 'center',
     marginBottom: S.sm,
   },
-  tileIcon: { fontSize: 24, marginBottom: 6 },
   tileName: { fontFamily: F.bodySemi, fontSize: 12, color: C.ink },
   statV: { fontFamily: F.display, fontSize: 18, color: '#fff' },
   statK: { fontFamily: F.body, fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 },

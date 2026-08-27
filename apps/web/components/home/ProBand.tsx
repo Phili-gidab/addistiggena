@@ -22,11 +22,11 @@ export function ProBand() {
           </div>
           <div>
             <span className="sec-kicker" style={{ color: '#7db8e8' }}>
-              For professionals · ለባለሙያዎች
+              For Professionals &amp; Technicians · ለባለሙያዎች እና ቴክኒሽያኖች
             </span>
             <h2>
               Skill and trust over certification.
-              <span className="am">ብቃትዎ ገቢዎ ይሁን - ዲግሪ አያስፈልግም።</span>
+              <span className="am">ችሎታዎና ታማኝነትዎ ብቻ በቂ ነው - ዲግሪ አያስፈልግም</span>
             </h2>
             <p>
               No BA, MA or TVET diploma required - whether you learned your craft in school or

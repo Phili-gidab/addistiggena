@@ -2,9 +2,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Btn, H1, Hint, StatusPill } from '../../components/ui';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Btn, CatIcon, H1, Hint, StatusPill } from '../../components/ui';
 import { api, Booking, fmtDate } from '../../lib/api';
-import { iconFor } from '../../lib/catalog';
 import { C, F, R, S } from '../../lib/theme';
 
 export default function Bookings() {
@@ -41,7 +41,7 @@ export default function Bookings() {
         ListEmptyComponent={
           items === null ? null : (
             <View style={st.empty}>
-              <Text style={{ fontSize: 40 }}>🛠️</Text>
+              <MaterialCommunityIcons name="toolbox-outline" size={44} color={C.muted} />
               <Text style={st.emptyTitle}>No bookings yet</Text>
               <Hint style={{ textAlign: 'center', marginBottom: S.lg }}>
                 Your first fix is a minute away - pick a service and the nearest verified technician
@@ -53,7 +53,7 @@ export default function Bookings() {
         }
         renderItem={({ item: b }) => (
           <Pressable style={({ pressed }) => [st.row, pressed && { opacity: 0.85 }]} onPress={() => router.push(`/booking/${b.id}`)}>
-            <Text style={{ fontSize: 22 }}>{iconFor(b.category.slug)}</Text>
+            <CatIcon slug={b.category.slug} size={40} />
             <View style={{ flex: 1 }}>
               <Text style={st.title}>{b.category.nameEn}</Text>
               <Hint>

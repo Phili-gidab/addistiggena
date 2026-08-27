@@ -2,9 +2,8 @@ import * as Location from 'expo-location';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Btn, Card, Countdown, ErrorBox, H1, Hint, OkBox, Row, StatusPill } from '../../components/ui';
+import { Am, Btn, Card, CatIcon, Countdown, ErrorBox, H1, Hint, OkBox, Row, StatusPill } from '../../components/ui';
 import { api, Booking, fmtDate, ProviderProfile } from '../../lib/api';
-import { iconFor } from '../../lib/catalog';
 import { C, F, S } from '../../lib/theme';
 
 /**
@@ -92,11 +91,11 @@ export default function Jobs() {
   const nextAction = (j: Booking): { label: string; action: string } | null => {
     switch (j.status) {
       case 'ACCEPTED':
-        return { label: '🚗 En route · ተነሳሁ', action: 'enroute' };
+        return { label: 'En route · ተነሳሁ', action: 'enroute' };
       case 'EN_ROUTE':
-        return { label: '📍 Arrived · ደርሻለሁ', action: 'arrive' };
+        return { label: 'Arrived · ደርሻለሁ', action: 'arrive' };
       case 'ARRIVED':
-        return { label: '🔧 Start work · ጀምር', action: 'start' };
+        return { label: 'Start work · ጀምር', action: 'start' };
       default:
         return null;
     }
@@ -113,13 +112,25 @@ export default function Jobs() {
         <Card style={{ marginTop: S.lg }}>
           <Row style={{ justifyContent: 'space-between' }}>
             <View style={{ flex: 1 }}>
-              <Text style={st.availTitle}>
-                {verified
-                  ? profile?.isAvailable
-                    ? '🟢 Online - receiving jobs'
-                    : '⚪ Offline'
-                  : `Verification: ${profile?.verificationStatus ?? 'no profile yet'}`}
-              </Text>
+              <Row style={{ gap: 7 }}>
+                {verified && (
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: profile?.isAvailable ? C.green : C.line,
+                    }}
+                  />
+                )}
+                <Text style={st.availTitle}>
+                  {verified
+                    ? profile?.isAvailable
+                      ? 'Online - receiving jobs'
+                      : 'Offline'
+                    : `Verification: ${profile?.verificationStatus ?? 'no profile yet'}`}
+                </Text>
+              </Row>
               <Hint>
                 {verified
                   ? 'Going online shares your position so nearby jobs reach you first.'
@@ -151,7 +162,7 @@ export default function Jobs() {
               return (
                 <Card key={j.id} style={{ marginBottom: S.md, borderColor: C.amber, borderWidth: 1.5 }}>
                   <Row style={{ gap: 10 }}>
-                    <Text style={{ fontSize: 24 }}>{iconFor(j.category.slug)}</Text>
+                    <CatIcon slug={j.category.slug} size={40} />
                     <View style={{ flex: 1 }}>
                       <Text style={st.jobTitle}>{j.category.nameEn}</Text>
                       <Hint>
@@ -176,7 +187,7 @@ export default function Jobs() {
                     />
                     <View style={{ flex: 1 }} />
                     <Btn
-                      title="✓ Accept job · ተቀበል"
+                      title="Accept job · ተቀበል"
                       small
                       busy={busy === j.id + 'accept'}
                       onPress={() => transition(j.id, 'accept')}
@@ -201,14 +212,14 @@ export default function Jobs() {
             <Card key={j.id} style={{ marginBottom: S.md }}>
               <Row style={{ justifyContent: 'space-between' }}>
                 <Row style={{ gap: 8, flex: 1 }}>
-                  <Text style={{ fontSize: 20 }}>{iconFor(j.category.slug)}</Text>
+                  <CatIcon slug={j.category.slug} size={32} />
                   <Text style={st.jobTitle}>{j.category.nameEn}</Text>
                 </Row>
                 <StatusPill status={j.status} />
               </Row>
               <Hint style={{ marginTop: 6 }}>
                 {j.customer?.name ?? 'Customer'} · {j.customer?.phone?.replace('+251', '0')}
-                {j.landmarkNote ? `\n📍 ${j.landmarkNote}` : ''}
+                {j.landmarkNote ? `\nLandmark: ${j.landmarkNote}` : ''}
               </Hint>
               {j.description ? <Hint style={{ marginTop: 4 }}>“{j.description}”</Hint> : null}
               <Row style={{ marginTop: 12, flexWrap: 'wrap' }}>
@@ -229,7 +240,7 @@ export default function Jobs() {
             <Text style={st.section}>Recent</Text>
             {recent.map((j) => (
               <Row key={j.id} style={st.histRow}>
-                <Text style={{ fontSize: 16 }}>{iconFor(j.category.slug)}</Text>
+                <CatIcon slug={j.category.slug} size={30} />
                 <View style={{ flex: 1 }}>
                   <Text style={st.histTitle}>{j.category.nameEn}</Text>
                   <Hint>
@@ -251,7 +262,7 @@ export default function Jobs() {
 function CompleteButton({ busy, onComplete }: { busy: boolean; onComplete: (price?: number) => void }) {
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState('');
-  if (!open) return <Btn title="✅ Complete · ጨርስ" kind="dark" small onPress={() => setOpen(true)} />;
+  if (!open) return <Btn title="Complete · ጨርስ" kind="dark" small onPress={() => setOpen(true)} />;
   return (
     <Row style={{ flex: 1, gap: 8 }}>
       <View style={{ flex: 1 }}>

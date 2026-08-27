@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +24,7 @@ export default function Welcome() {
             A verified technician,{'\n'}
             <Text style={{ color: '#7cc0ff' }}>at your door in minutes.</Text>
           </Text>
-          <Text style={st.am}>የተረጋገጠ ባለሙያ - በደቂቃዎች ውስጥ በርዎ ላይ።</Text>
+          <Text style={st.am}>ማንነቱ የተረጋገጠ የጥገና ባለሙያ በደቂቃ ውስጥ በርዎ ላይ</Text>
 
           <View style={st.badges}>
             {['✓ Woreda-cleared', '✓ CoC-certified', '★ Rated & reviewed'].map((b) => (
@@ -36,7 +37,7 @@ export default function Welcome() {
           <View style={{ flex: 1 }} />
 
           <Pressable style={({ pressed }) => [st.roleCard, pressed && st.pressed]} onPress={() => router.push('/login')}>
-            <Text style={st.roleIcon}>🏠</Text>
+            <MaterialCommunityIcons name="home-variant" size={28} color={C.blue} />
             <View style={{ flex: 1 }}>
               <Text style={st.roleTitle}>I need a repair</Text>
               <Text style={st.roleAm}>አገልግሎት እፈልጋለሁ · book trusted technicians</Text>
@@ -48,7 +49,7 @@ export default function Welcome() {
             style={({ pressed }) => [st.roleCard, st.roleCardAlt, pressed && st.pressed]}
             onPress={() => router.push('/login')}
           >
-            <Text style={st.roleIcon}>🛠️</Text>
+            <MaterialCommunityIcons name="hammer-wrench" size={28} color={C.navy} />
             <View style={{ flex: 1 }}>
               <Text style={st.roleTitle}>I am a technician</Text>
               <Text style={st.roleAm}>ባለሙያ ነኝ · receive jobs, earn money</Text>
@@ -56,7 +57,7 @@ export default function Welcome() {
             <Text style={st.chev}>›</Text>
           </Pressable>
 
-          <Text style={st.foot}>Addis Ababa · አዲስ አበባ — Connect · Fix · Care</Text>
+          <Text style={st.foot}>Addis Ababa · አዲስ አበባ - Connect · Fix · Care</Text>
         </View>
       </SafeAreaView>
     </View>
@@ -107,7 +108,6 @@ const st = StyleSheet.create({
   },
   roleCardAlt: { backgroundColor: 'rgba(232,241,251,0.96)' },
   pressed: { transform: [{ scale: 0.985 }] },
-  roleIcon: { fontSize: 26 },
   roleTitle: { fontFamily: F.displayBold, fontSize: 16, color: C.navy },
   roleAm: { fontFamily: F.am, fontSize: 12, color: C.muted, marginTop: 2 },
   chev: { fontSize: 26, color: C.blue, fontFamily: F.displayBold },

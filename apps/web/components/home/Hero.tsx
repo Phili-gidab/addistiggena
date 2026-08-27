@@ -218,7 +218,7 @@ export function Hero({ categories }: { categories: Category[] }) {
             </span>
             <span className="hl-mask">
               <span className="hl-line am" data-hl>
-                የተረጋገጠ ባለሙያ - በደቂቃዎች ውስጥ በርዎ ላይ።
+                ማንነቱ የተረጋገጠ የጥገና ባለሙያ በደቂቃ ውስጥ በርዎ ላይ
               </span>
             </span>
           </h1>
@@ -273,7 +273,7 @@ export function Hero({ categories }: { categories: Category[] }) {
             <span className="hs">
               <span className="n">
                 <span data-cnt="15">15</span>
-                <em>–</em>
+                <em>-</em>
                 <span data-cnt="30">30</span>
                 <em>′</em>
               </span>
@@ -291,12 +291,12 @@ export function Hero({ categories }: { categories: Category[] }) {
                 <span data-cnt="14">14</span>
                 <em>h</em>
               </span>
-              <span className="l">Open daily · 6am–8pm</span>
+              <span className="l">Open daily · 6am-8pm</span>
             </span>
             <span className="hs">
               <span className="n">
-                <span data-cnt="10">10</span>
-                <em>/10</em>
+                <span data-cnt="11">11</span>
+                <em>/11</em>
               </span>
               <span className="l">Sub-cities covered</span>
             </span>

@@ -418,7 +418,7 @@ function BookWizard() {
                   mobile banking) at the standard platform rate, and every repair carries a{' '}
                   {GUARANTEE_DAYS}-day guarantee. Cancelling is free until the technician starts
                   traveling; if they arrive and you choose not to proceed, a diagnostic fee of{' '}
-                  {DIAGNOSTIC_FEE.min}–{DIAGNOSTIC_FEE.max} ETB applies.
+                  {DIAGNOSTIC_FEE.min}-{DIAGNOSTIC_FEE.max} ETB applies.
                 </p>
                 <div className="spread">
                   <button className="btn btn-line btn-sm" onClick={() => setStep(3)}>

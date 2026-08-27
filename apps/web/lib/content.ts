@@ -21,12 +21,12 @@ export const HOURS = {
   open: '6:00 AM',
   close: '8:00 PM',
   perDay: 14,
-  display: '6:00 AM – 8:00 PM · every day',
+  display: '6:00 AM - 8:00 PM · every day',
   displayAm: 'ከጠዋቱ 12:00 እስከ ምሽቱ 2:00 (የኢት. ሰዓት)',
 };
 
 /** Average technician arrival window (FAQ doc). */
-export const ARRIVAL = '15–30 min';
+export const ARRIVAL = '15-30 min';
 /** Labor guarantee (FAQ + Terms docs). */
 export const GUARANTEE_DAYS = 5;
 /** Diagnostic / on-site inspection fee when the client chooses not to proceed. */
@@ -63,9 +63,9 @@ export const TESTIMONIALS = [
 /** The Mitad origin story - from the official company profile. */
 export const STORY = {
   title: 'It all started with a broken Mitad.',
-  titleAm: 'ሁሉም የተጀመረው በተሰበረ ምጣድ ነው።',
+  titleAm: 'ሁሉም የተጀመረው በተሰበረ ምጣድ ነው',
   paragraphs: [
-    'It all started on an ordinary afternoon with a very familiar household staple: the Mitad (ምጣድ) - the traditional Injera baking plate. It broke down mid-bake, and what should have been a quick fix turned into a days-long headache. No reliable technician could be found, and the family ended up buying a brand-new one.',
+    'It all started on an ordinary afternoon with a very familiar household staple: the Mitad (ምጣድ) - the traditional Injera baking plate. It broke down mid-bake, and what should have been a quick fix turned into a days-long headache. No reliable technician could be found, and the family ended up buying injera from local shops for almost a week before finally giving up and purchasing a brand-new one.',
     "A simple thought struck: why should finding a trustworthy technician be so difficult? If we need transportation, we open an app and a vehicle arrives in minutes. Why couldn't home and business maintenance work with the very same convenience?",
     'That moment of frustration became a vision. Backed by the corporate and promotional strength of Amnen Marketing & Promotion, Addis Tiggena has grown into a reliable, technology-driven platform connecting skilled field technicians directly with clients across Addis Ababa - with a target of onboarding up to 30,000 professionals across every maintenance discipline.',
   ],

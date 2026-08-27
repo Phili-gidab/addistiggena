@@ -7,9 +7,9 @@ export function Testimonials() {
       <div className="container">
         <div className="section-head">
           <div>
-            <span className="sec-kicker">Testimonies · ምስክርነቶች</span>
+            <span className="sec-kicker">Customers feedback · የደንበኞች አስተያየት</span>
             <h2 className="sec-title">
-              What customers say
+              What do our customers say?
               <span className="am">ደንበኞቻችን ምን ይላሉ?</span>
             </h2>
           </div>

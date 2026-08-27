@@ -1,14 +1,19 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F } from '../../lib/theme';
 
 const icon =
-  (glyph: string) =>
-  ({ focused }: { focused: boolean }) => (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>{glyph}</Text>
+  (glyph: keyof typeof MaterialCommunityIcons.glyphMap) =>
+  ({ color }: { color: ColorValue }) => (
+    <MaterialCommunityIcons name={glyph} size={23} color={color as string} />
   );
 
 export default function TechTabs() {
+  // Android runs edge-to-edge: without the bottom inset the system navigation
+  // bar covers the tab bar entirely (seen on Samsung M10-class devices).
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -16,12 +21,18 @@ export default function TechTabs() {
         tabBarActiveTintColor: C.blue,
         tabBarInactiveTintColor: C.muted,
         tabBarLabelStyle: { fontFamily: F.bodySemi, fontSize: 11 },
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: C.line, height: 60, paddingBottom: 6, paddingTop: 6 },
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: C.line,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom + 6,
+          paddingTop: 6,
+        },
       }}
     >
-      <Tabs.Screen name="jobs" options={{ title: 'Jobs', tabBarIcon: icon('🛠️') }} />
-      <Tabs.Screen name="wallet" options={{ title: 'Earnings', tabBarIcon: icon('💰') }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('👤') }} />
+      <Tabs.Screen name="jobs" options={{ title: 'Jobs', tabBarIcon: icon('hammer-wrench') }} />
+      <Tabs.Screen name="wallet" options={{ title: 'Earnings', tabBarIcon: icon('wallet-outline') }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('account-circle-outline') }} />
     </Tabs>
   );
 }

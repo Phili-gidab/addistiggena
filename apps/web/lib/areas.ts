@@ -1,7 +1,8 @@
 /**
- * Geographic coverage - the 10 sub-cities of Addis Ababa and their
+ * Geographic coverage - the 11 sub-cities of Addis Ababa and their
  * neighbourhood mapping, from the official "Geographic Coverage" document
- * (for app design and call-center data).
+ * (for app design and call-center data). Lemi Kura added per client
+ * first-round review (Aug 2026).
  */
 
 export interface SubCity {
@@ -136,6 +137,18 @@ export const SUB_CITIES: SubCity[] = [
       'Haile Garment',
       'Gofa',
       'Mebrathail',
+    ],
+  },
+  {
+    name: 'Lemi Kura',
+    nameAm: 'ለሚ ኩራ',
+    neighborhoods: [
+      'Bole Arabsa',
+      'Yeka Abado condominiums',
+      'Tafo',
+      'Meri',
+      'Ayat Zone 8',
+      'Alem Bank direction',
     ],
   },
   {

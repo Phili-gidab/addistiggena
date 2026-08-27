@@ -2,9 +2,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Btn, Card, Countdown, ErrorBox, Field, Hint, OkBox, Row, StatusPill } from '../../components/ui';
+import { Am, Btn, Card, CatIcon, Countdown, ErrorBox, Field, Hint, OkBox, Row, StatusPill } from '../../components/ui';
 import { api, authedImageSource, Booking, fmtDate, Ticket } from '../../lib/api';
-import { iconFor, STATUS_FLOW } from '../../lib/catalog';
+import { STATUS_FLOW } from '../../lib/catalog';
 import { C, F, R, S } from '../../lib/theme';
 
 const ACTIVE = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
@@ -87,7 +87,7 @@ export default function BookingDetail() {
   const openTicket = tickets.find((t) => t.status === 'OPEN' || t.status === 'RE_INSPECTION');
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={st.wrap}>
         <Row style={{ justifyContent: 'space-between' }}>
           <Pressable onPress={() => router.back()}>
@@ -97,7 +97,7 @@ export default function BookingDetail() {
         </Row>
 
         <Row style={{ marginTop: S.md, gap: 10 }}>
-          <Text style={{ fontSize: 28 }}>{iconFor(booking.category.slug)}</Text>
+          <CatIcon slug={booking.category.slug} size={44} />
           <View style={{ flex: 1 }}>
             <Text style={st.title}>{booking.category.nameEn}</Text>
             <Am>{booking.category.nameAm} · #{booking.id.slice(-6).toUpperCase()}</Am>
@@ -182,7 +182,7 @@ export default function BookingDetail() {
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Details</Text>
           <Hint style={{ marginTop: 6 }}>
-            📍 {booking.landmarkNote ?? `${booking.lat.toFixed(4)}, ${booking.lng.toFixed(4)}`}
+            Location: {booking.landmarkNote ?? `${booking.lat.toFixed(4)}, ${booking.lng.toFixed(4)}`}
           </Hint>
           {booking.description ? <Text style={st.desc}>{booking.description}</Text> : null}
           {booking.photoObjectKey && (
@@ -208,7 +208,7 @@ export default function BookingDetail() {
               receipt and 5-day guarantee activate.
             </Hint>
             <Btn
-              title={`I paid ETB ${Number(booking.finalPriceEtb ?? booking.priceQuoteEtb ?? 0)} in cash ✓`}
+              title={`I paid ETB ${Number(booking.finalPriceEtb ?? booking.priceQuoteEtb ?? 0)} in cash`}
               busy={busy === 'pay'}
               onPress={() =>
                 Alert.alert('Confirm payment', 'Did you hand the payment to the technician?', [
@@ -304,10 +304,10 @@ export default function BookingDetail() {
           ) : (
             <Row style={{ marginTop: 10, flexWrap: 'wrap' }}>
               {ACTIVE.includes(booking.status) || booking.status === 'COMPLETED' ? (
-                <Btn title="⚑ Something's wrong" kind="ghost" small onPress={() => setHelpOpen('DISPUTE')} />
+                <Btn title="Something's wrong · ችግር አለ" kind="ghost" small onPress={() => setHelpOpen('DISPUTE')} />
               ) : null}
               {guaranteeOpen && (
-                <Btn title="🛡 Guarantee claim (5-day)" kind="ghost" small onPress={() => setHelpOpen('GUARANTEE_CLAIM')} />
+                <Btn title="Guarantee claim (5-day) · ዋስትና" kind="ghost" small onPress={() => setHelpOpen('GUARANTEE_CLAIM')} />
               )}
               {!ACTIVE.includes(booking.status) && booking.status !== 'COMPLETED' && !guaranteeOpen && (
                 <Hint>All good here. The 5-day guarantee window opens after payment.</Hint>

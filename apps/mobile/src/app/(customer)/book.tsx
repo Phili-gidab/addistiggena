@@ -4,9 +4,10 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Btn, Card, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Am, Btn, Card, CatIcon, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
 import { api, Booking, Category, fmtDistance, NearbyProvider, uploadImage } from '../../lib/api';
-import { iconFor, SUB_CITIES } from '../../lib/catalog';
+import { SUB_CITIES } from '../../lib/catalog';
 import { C, F, R, S } from '../../lib/theme';
 
 /** Meskel Square - the landmark every Addis resident knows. */
@@ -163,8 +164,8 @@ export default function Book() {
                   setStep(2);
                 }}
               >
-                <Text style={{ fontSize: 22 }}>{iconFor(c.slug)}</Text>
-                <Text style={st.catName}>{c.nameEn}</Text>
+                <CatIcon slug={c.slug} size={36} />
+                <Text style={[st.catName, { marginTop: 6 }]}>{c.nameEn}</Text>
                 <Am style={{ fontSize: 11 }}>{c.nameAm}</Am>
                 {c.priceFloorEtb && <Hint style={{ fontSize: 10.5 }}>from ETB {Number(c.priceFloorEtb)}</Hint>}
               </Pressable>
@@ -177,11 +178,15 @@ export default function Book() {
           <Card>
             <Row style={{ justifyContent: 'space-between', marginBottom: S.md }}>
               <Text style={st.stepTitle}>ቦታዎ · Your location</Text>
-              {category && <Text style={{ fontSize: 18 }}>{iconFor(category.slug)}</Text>}
+              {category && <CatIcon slug={category.slug} size={32} />}
             </Row>
 
             <Pressable style={[st.gpsBox, gpsState === 'locked' && st.gpsBoxOk]} onPress={locate}>
-              <Text style={{ fontSize: 20 }}>{gpsState === 'locked' ? '✅' : '📍'}</Text>
+              <MaterialCommunityIcons
+                name={gpsState === 'locked' ? 'check-circle' : 'crosshairs-gps'}
+                size={24}
+                color={gpsState === 'locked' ? C.green : C.blue}
+              />
               <View style={{ flex: 1 }}>
                 <Text style={st.gpsTitle}>
                   {gpsState === 'locked'
@@ -242,7 +247,7 @@ export default function Book() {
               </Row>
             ) : (
               <Btn
-                title={photoBusy ? 'Uploading…' : '📷 Attach a photo'}
+                title={photoBusy ? 'Uploading…' : 'Attach a photo · ፎቶ ያያይዙ'}
                 kind="ghost"
                 busy={photoBusy}
                 style={{ marginBottom: S.lg }}
@@ -270,7 +275,7 @@ export default function Book() {
                 </Hint>
               )}
               <Pressable style={[st.provRow, !providerId && st.provRowOn]} onPress={() => setProviderId(undefined)}>
-                <Text style={{ fontSize: 18 }}>⚡</Text>
+                <MaterialCommunityIcons name="flash" size={20} color={C.blue} />
                 <View style={{ flex: 1 }}>
                   <Text style={st.provName}>First available · የመጀመሪያው ነጻ ባለሙያ</Text>
                   <Hint>Broadcast the job - fastest response</Hint>
@@ -279,7 +284,7 @@ export default function Book() {
               </Pressable>
               {providers?.map((p) => (
                 <Pressable key={p.id} style={[st.provRow, providerId === p.id && st.provRowOn]} onPress={() => setProviderId(p.id)}>
-                  <Text style={{ fontSize: 18 }}>👷</Text>
+                  <MaterialCommunityIcons name="account-hard-hat" size={20} color={C.navy} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.provName}>{p.name ?? 'Technician'}</Text>
                     <Hint>

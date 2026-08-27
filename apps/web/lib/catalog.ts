@@ -7,6 +7,8 @@
 export interface CatalogEntry {
   slug: string;
   icon: string;
+  nameEn: string;
+  nameAm: string;
   scope: string;
   services: string[];
 }
@@ -15,6 +17,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'electrical',
     icon: '⚡',
+    nameEn: 'Electrical',
+    nameAm: 'ኤሌክትሪክ',
     scope: 'Installation, repair, and maintenance of electrical systems and appliances.',
     services: [
       'House wiring installation and repair',
@@ -28,6 +32,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'plumbing',
     icon: '🚰',
+    nameEn: 'Plumbing & Sanitary',
+    nameAm: 'ቧንቧ እና ሳኒተሪ',
     scope: 'Water systems, sanitation, and drainage.',
     services: [
       'Installation and repair of water pipes',
@@ -41,6 +47,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'electronics',
     icon: '📺',
+    nameEn: 'Electronics & Entertainment',
+    nameAm: 'ኤሌክትሮኒክስ እና መዝናኛ',
     scope: 'Home electronics and signal systems.',
     services: [
       'TV installation and repair',
@@ -53,6 +61,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'it-office',
     icon: '💻',
+    nameEn: 'IT & Office Equipment',
+    nameAm: 'አይቲ እና የቢሮ መሣሪያ',
     scope: 'Home office and digital infrastructure.',
     services: [
       'Computer (desktop/laptop) repair',
@@ -64,6 +74,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'appliances',
     icon: '🍳',
+    nameEn: 'Kitchen & Domestic Appliances',
+    nameAm: 'የወጥ ቤት እና የቤት እቃዎች',
     scope: 'Installation and servicing of household appliances.',
     services: [
       'Refrigerator servicing',
@@ -76,6 +88,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'gas-heating',
     icon: '🔥',
+    nameEn: 'Gas & Heating Systems',
+    nameAm: 'ጋዝ እና ማሞቂያ',
     scope: 'Safe handling and maintenance of gas-based systems.',
     services: [
       'Gas stove installation and repair',
@@ -86,6 +100,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'carpentry',
     icon: '🪚',
+    nameEn: 'Carpentry & Fixtures',
+    nameAm: 'አናጢነት',
     scope: 'Structural and furniture-related repairs.',
     services: [
       'Door and lock repair',
@@ -97,6 +113,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'painting',
     icon: '🎨',
+    nameEn: 'Painting & Finishing',
+    nameAm: 'ቀለም ቅብ',
     scope: 'Aesthetic and surface maintenance.',
     services: [
       'Interior and exterior painting',
@@ -108,6 +126,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'general',
     icon: '🧰',
+    nameEn: 'General Handyman',
+    nameAm: 'አጠቃላይ ጥገና',
     scope: 'Small but essential household tasks.',
     services: [
       'TV mounting and wall installations',
@@ -120,6 +140,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'outdoor',
     icon: '🏡',
+    nameEn: 'Outdoor & Compound Maintenance',
+    nameAm: 'የግቢ ጥገና',
     scope: 'External household environment.',
     services: [
       'Water tank cleaning',
@@ -131,6 +153,8 @@ export const CATALOG: CatalogEntry[] = [
   {
     slug: 'automotive',
     icon: '🚗',
+    nameEn: 'Light Automotive Assistance',
+    nameAm: 'ቀላል የመኪና ጥገና',
     scope: 'Basic household vehicle support.',
     services: ['Tyre air pumping', 'Battery jump-start', 'Basic vehicle checks'],
   },
@@ -145,10 +169,12 @@ export const iconFor = (slug: string): string => catalogBySlug(slug)?.icon ?? '�
 export const PACKAGES = [
   {
     name: 'Basic Service',
+    nameAm: 'መደበኛ አገልግሎት',
     points: ['On-demand maintenance', 'Standard response time', 'Pay-per-service model'],
   },
   {
     name: 'Premium Service',
+    nameAm: 'ፕሪሚየም አገልግሎት',
     points: [
       'Priority response',
       'Scheduled maintenance visits',
@@ -158,6 +184,7 @@ export const PACKAGES = [
   },
   {
     name: 'Annual Maintenance Package (AMP)',
+    nameAm: 'ዓመታዊ የጥገና ፓኬጅ',
     points: [
       'Regular home inspection',
       'Preventive maintenance',
@@ -167,6 +194,7 @@ export const PACKAGES = [
   },
   {
     name: 'Emergency Service',
+    nameAm: 'የአስቸኳይ ጊዜ አገልግሎት',
     points: ['Rapid response for urgent cases', 'Premium pricing applies'],
   },
 ];

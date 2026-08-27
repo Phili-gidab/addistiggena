@@ -1,4 +1,5 @@
 /** Addis Tiggena mobile UI kit - buttons, cards, fields, pills, timeline dots. */
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { forwardRef } from 'react';
 import {
   ActivityIndicator,
@@ -11,6 +12,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { iconFor } from '../lib/catalog';
 import { C, F, R, S, SHADOW } from '../lib/theme';
 
 // ── typography ───────────────────────────────────────────────────────────────
@@ -31,6 +33,25 @@ export const Hint = ({ children, style, ...rest }: TextProps & { style?: object 
 export const Am = ({ children, style, ...rest }: TextProps & { style?: object }) => (
   <Text {...rest} style={[st.am, style]}>{children}</Text>
 );
+
+// ── category icon - rounded soft-blue plate with a crisp vector glyph ────────
+
+export function CatIcon({ slug, size = 40 }: { slug: string; size?: number }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.3,
+        backgroundColor: C.blueSoft,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <MaterialCommunityIcons name={iconFor(slug)} size={size * 0.55} color={C.blue} />
+    </View>
+  );
+}
 
 // ── surfaces ─────────────────────────────────────────────────────────────────
 
