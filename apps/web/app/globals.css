@@ -1059,6 +1059,7 @@ body.scroll-locked .site-header { transform: none; }
   display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700;
   background: linear-gradient(135deg, var(--blue), var(--navy));
 }
+.avatar-img { object-fit: cover; border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--line); }
 .tech-card .meta { flex: 1; min-width: 0; }
 .tech-card .name { font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .tech-card .sub { color: var(--muted); font-size: 0.85rem; margin-top: 0.15rem; }

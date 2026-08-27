@@ -37,6 +37,23 @@ export const SUB_CITIES = [
   'Yeka',
 ];
 
+/** Popular repairs with the official standard rate ranges (mirrors
+ *  apps/web/lib/pricing.ts) - home-screen booking shortcuts. */
+export const POPULAR: {
+  slug: string;
+  name: string;
+  nameAm: string;
+  min: number;
+  max: number;
+}[] = [
+  { slug: 'electrical', name: 'Electric Mitad Repair', nameAm: 'የኤሌክትሪክ ምጣድ ጥገና', min: 500, max: 800 },
+  { slug: 'plumbing', name: 'Faucet / Tap Repair', nameAm: 'የቧንቧ ራስ ጥገና', min: 550, max: 750 },
+  { slug: 'electrical', name: 'Socket & Switch Fix', nameAm: 'የሶኬትና ማብሪያ ጥገና', min: 250, max: 450 },
+  { slug: 'it-office', name: 'Wi-Fi Router Fix', nameAm: 'የዋይ-ፋይ ራውተር ጥገና', min: 400, max: 600 },
+  { slug: 'carpentry', name: 'Door Lock Repair', nameAm: 'የበር ቁልፍ ጥገና', min: 400, max: 800 },
+  { slug: 'plumbing', name: 'Toilet & Sink Unclogging', nameAm: 'የሽንት ቤትና ገንዳ መክፈት', min: 950, max: 1100 },
+];
+
 /** Booking flow copy - bilingual, matching the web. */
 export const STATUS_FLOW: { key: string; t: string; s: string }[] = [
   { key: 'REQUESTED', t: 'Requested · ተጠይቋል', s: 'Waiting for the technician (5-minute window)' },

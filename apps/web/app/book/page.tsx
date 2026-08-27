@@ -324,7 +324,12 @@ function BookWizard() {
                       className={`tech-card${providerId === p.id ? ' selected' : ''}`}
                       onClick={() => setProviderId(p.id)}
                     >
-                      <span className="avatar">{(p.name ?? 'T').slice(0, 1)}</span>
+                      {p.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="avatar avatar-img" src={p.avatarUrl} alt="" />
+                      ) : (
+                        <span className="avatar">{(p.name ?? 'T').slice(0, 1)}</span>
+                      )}
                       <span className="meta">
                         <span className="name">
                           {p.name ?? 'Technician'}

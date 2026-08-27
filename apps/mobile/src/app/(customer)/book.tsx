@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Am, Btn, Card, CatIcon, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
+import { Am, Avatar, Btn, Card, CatIcon, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
 import { api, Booking, Category, fmtDistance, NearbyProvider, uploadImage } from '../../lib/api';
 import { SUB_CITIES } from '../../lib/catalog';
 import { C, F, R, S } from '../../lib/theme';
@@ -18,7 +18,7 @@ const ADDIS = { lat: 9.0108, lng: 38.7613 };
  * details + photo → technician → confirm. Mirrors the web /book flow.
  */
 export default function Book() {
-  const params = useLocalSearchParams<{ category?: string }>();
+  const params = useLocalSearchParams<{ category?: string; desc?: string }>();
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState(params.category ?? '');
@@ -27,6 +27,7 @@ export default function Book() {
   const [subCity, setSubCity] = useState('');
   const [landmark, setLandmark] = useState('');
   const [description, setDescription] = useState('');
+  const [subService, setSubService] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoKey, setPhotoKey] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -39,14 +40,16 @@ export default function Book() {
     api<Category[]>('/catalog/categories').then(setCategories).catch(() => {});
   }, []);
 
-  // a tap on a home tile pre-selects the category
+  // a tap on a home tile pre-selects the category; popular repairs also
+  // pre-fill the description with the service name
   useFocusEffect(
     useCallback(() => {
       if (params.category) {
         setCategoryId(params.category);
         setStep((s) => (s === 1 ? 2 : s));
       }
-    }, [params.category]),
+      if (params.desc) setDescription((d) => d || String(params.desc));
+    }, [params.category, params.desc]),
   );
 
   const category = categories.find((c) => c.id === categoryId);
@@ -108,6 +111,7 @@ export default function Book() {
     setError('');
     try {
       const fullLandmark = [subCity, landmark.trim()].filter(Boolean).join(' - ');
+      const fullDescription = [subService, description.trim()].filter(Boolean).join(' - ');
       const booking = await api<Booking>('/bookings', {
         method: 'POST',
         body: JSON.stringify({
@@ -116,12 +120,13 @@ export default function Book() {
           lat: pos.lat,
           lng: pos.lng,
           landmarkNote: fullLandmark || undefined,
-          description: description.trim() || undefined,
+          description: fullDescription || undefined,
           photoObjectKey: photoKey ?? undefined,
         }),
       });
       setStep(1);
       setDescription('');
+      setSubService('');
       setLandmark('');
       setPhotoKey(null);
       setPhotoUri(null);
@@ -232,6 +237,21 @@ export default function Book() {
         {step === 3 && (
           <Card>
             <Text style={st.stepTitle}>ዝርዝር · Describe the problem</Text>
+            {(category?.subServices?.length ?? 0) > 0 && (
+              <>
+                <Text style={[st.label, { marginTop: S.md }]}>What exactly? · ምን አይነት ስራ?</Text>
+                <View style={st.chips}>
+                  {category!.subServices!.map((sv) => {
+                    const on = subService === sv;
+                    return (
+                      <Pressable key={sv} style={[st.chip, on && st.chipOn]} onPress={() => setSubService(on ? '' : sv)}>
+                        <Text style={[st.chipText, on && { color: '#fff' }]}>{sv}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
             <Field
               placeholder="Kitchen sink is leaking under the cabinet…"
               value={description}
@@ -284,13 +304,17 @@ export default function Book() {
               </Pressable>
               {providers?.map((p) => (
                 <Pressable key={p.id} style={[st.provRow, providerId === p.id && st.provRowOn]} onPress={() => setProviderId(p.id)}>
-                  <MaterialCommunityIcons name="account-hard-hat" size={20} color={C.navy} />
+                  <Avatar name={p.name} url={p.avatarUrl} size={40} />
                   <View style={{ flex: 1 }}>
-                    <Text style={st.provName}>{p.name ?? 'Technician'}</Text>
+                    <Row style={{ gap: 5 }}>
+                      <Text style={st.provName}>{p.name ?? 'Technician'}</Text>
+                      <MaterialCommunityIcons name="check-decagram" size={13} color={C.green} />
+                    </Row>
                     <Hint>
                       {p.ratingCount ? `★ ${p.ratingAvg.toFixed(1)} (${p.ratingCount}) · ` : ''}
                       {fmtDistance(p.distanceM)}
-                      {p.etaMinutes ? ` · ~${p.etaMinutes} min away` : ''}
+                      {p.subCity ? ` · ${p.subCity}` : ''}
+                      {p.jobsCompleted ? ` · ${p.jobsCompleted} jobs` : ''}
                     </Hint>
                   </View>
                   <View style={[st.radio, providerId === p.id && st.radioOn]} />

@@ -7,6 +7,7 @@ export interface NearbyProvider {
   id: string;
   name: string | null;
   bio: string | null;
+  avatarUrl: string | null;
   subCity: string | null;
   woreda: string | null;
   yearsExperience: number | null;
@@ -116,6 +117,7 @@ export class ProvidersService {
       SELECT p."id",
              u."name",
              p."bio",
+             p."avatarUrl",
              p."subCity",
              p."woreda",
              p."yearsExperience",

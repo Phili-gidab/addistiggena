@@ -1,8 +1,9 @@
 /** Addis Tiggena mobile UI kit - buttons, cards, fields, pills, timeline dots. */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -49,6 +50,63 @@ export function CatIcon({ slug, size = 40 }: { slug: string; size?: number }) {
       }}
     >
       <MaterialCommunityIcons name={iconFor(slug)} size={size * 0.55} color={C.blue} />
+    </View>
+  );
+}
+
+// ── avatar - profile photo with initial fallback + optional online dot ───────
+
+export function Avatar({
+  name,
+  url,
+  size = 42,
+  online,
+}: {
+  name?: string | null;
+  url?: string | null;
+  size?: number;
+  online?: boolean;
+}) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <View style={{ width: size, height: size }}>
+      {url && !broken ? (
+        <Image
+          source={{ uri: url }}
+          style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: C.blueSoft }}
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <View
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: C.navy,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontFamily: F.display, fontSize: size * 0.38, color: '#fff' }}>
+            {(name ?? 'T').slice(0, 1).toUpperCase()}
+          </Text>
+        </View>
+      )}
+      {online && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            width: Math.max(10, size * 0.26),
+            height: Math.max(10, size * 0.26),
+            borderRadius: size * 0.13,
+            backgroundColor: C.green,
+            borderWidth: 2,
+            borderColor: '#fff',
+          }}
+        />
+      )}
     </View>
   );
 }

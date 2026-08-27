@@ -146,6 +146,8 @@ model ProviderProfile {
   categoryId         String
   category           ServiceCategory                       @relation(fields: [categoryId], references: [id])
   bio                String?
+  /// Public profile photo (absolute URL; demo fleet uses stock portraits)
+  avatarUrl          String?
   /// Vetting protocol fields (official onboarding document)
   subCity            String?
   woreda             String?

@@ -32,9 +32,26 @@ export interface Category {
   subServices?: string[];
 }
 
+/** GET /catalog/featured - top verified technicians for the home screen. */
+export interface FeaturedProvider {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
+  ratingAvg: number;
+  ratingCount: number;
+  jobsCompleted: number;
+  isAvailable: boolean;
+  subCity: string | null;
+  yearsExperience: number | null;
+  category: Category;
+}
+
 export interface NearbyProvider {
   id: string;
   name: string | null;
+  avatarUrl?: string | null;
+  subCity?: string | null;
+  jobsCompleted?: number;
   ratingAvg: number;
   ratingCount: number;
   distanceM: number;

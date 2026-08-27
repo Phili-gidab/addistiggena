@@ -25,6 +25,7 @@ export interface NearbyProvider {
   id: string;
   name: string | null;
   bio: string | null;
+  avatarUrl: string | null;
   subCity: string | null;
   woreda: string | null;
   yearsExperience: number | null;
