@@ -128,7 +128,7 @@ async function main() {
     update: {
       verificationStatus: 'VERIFIED',
       isAvailable: true,
-      avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
+      avatarUrl: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?q=75&w=240&h=240&auto=format&fit=crop&crop=faces',
       subCity: 'Kirkos',
       yearsExperience: 8,
       ratingAvg: 4.8,
@@ -139,7 +139,7 @@ async function main() {
       userId: providerUser.id,
       categoryId: plumbing.id,
       bio: 'Experienced plumber - demo account',
-      avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
+      avatarUrl: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?q=75&w=240&h=240&auto=format&fit=crop&crop=faces',
       subCity: 'Kirkos',
       yearsExperience: 8,
       ratingAvg: 4.8,
@@ -161,13 +161,14 @@ async function main() {
 
   // ── Demo technician fleet ─────────────────────────────────────────────────
   // Multiple VERIFIED, available technicians per category, spread across real
-  // Addis Ababa neighbourhoods so vicinity ranking demos properly. Stock
-  // portraits from randomuser.me; ratings/jobs varied so featured + dispatch
-  // ordering looks alive. Idempotent (upsert by phone).
+  // Addis Ababa neighbourhoods so vicinity ranking demos properly. Portraits
+  // are visually-verified Ethiopian/Black faces from Unsplash (free license);
+  // ratings/jobs varied so featured + dispatch ordering looks alive.
+  // Idempotent (upsert by phone).
   const FLEET: {
     phone: string;
     name: string;
-    img: string; // randomuser portrait path, e.g. men/45
+    img: string; // Unsplash portrait asset id (visually verified Ethiopian/Black faces)
     slug: string;
     bio: string;
     subCity: string;
@@ -179,40 +180,40 @@ async function main() {
     lng: number;
   }[] = [
     // electrical (3)
-    { phone: '+251911000101', name: 'Yonas Bekele', img: 'men/45', slug: 'electrical', bio: 'House wiring, breaker panels and Mitad repairs - 10 years on the tools.', subCity: 'Bole', years: 10, rating: 4.9, ratings: 87, jobs: 214, lat: 9.0092, lng: 38.786 },
-    { phone: '+251911000102', name: 'Hanna Girma', img: 'women/44', slug: 'electrical', bio: 'CoC-certified electrician - lighting, sockets and appliance circuits.', subCity: 'Yeka', years: 6, rating: 4.7, ratings: 52, jobs: 131, lat: 9.033, lng: 38.848 },
-    { phone: '+251911000103', name: 'Fitsum Negash', img: 'men/67', slug: 'electrical', bio: 'Fast diagnosis of trips and shorts; condominium wiring specialist.', subCity: 'Nifas Silk-Lafto', years: 7, rating: 4.6, ratings: 38, jobs: 96, lat: 8.956, lng: 38.71 },
+    { phone: '+251911000101', name: 'Yonas Bekele', img: 'photo-1616805765352-beedbad46b2a', slug: 'electrical', bio: 'House wiring, breaker panels and Mitad repairs - 10 years on the tools.', subCity: 'Bole', years: 10, rating: 4.9, ratings: 87, jobs: 214, lat: 9.0092, lng: 38.786 },
+    { phone: '+251911000102', name: 'Hanna Girma', img: 'photo-1598554563873-55ef9dd8428b', slug: 'electrical', bio: 'CoC-certified electrician - lighting, sockets and appliance circuits.', subCity: 'Yeka', years: 6, rating: 4.7, ratings: 52, jobs: 131, lat: 9.033, lng: 38.848 },
+    { phone: '+251911000103', name: 'Fitsum Negash', img: 'photo-1612214070475-1e73f478188c', slug: 'electrical', bio: 'Fast diagnosis of trips and shorts; condominium wiring specialist.', subCity: 'Nifas Silk-Lafto', years: 7, rating: 4.6, ratings: 38, jobs: 96, lat: 8.956, lng: 38.71 },
     // plumbing (3, + Abebe above)
-    { phone: '+251911000104', name: 'Dawit Lemma', img: 'men/22', slug: 'plumbing', bio: 'Pipes, tanks and pumps - clean work, guaranteed seals.', subCity: 'Kolfe Keranio', years: 9, rating: 4.8, ratings: 64, jobs: 172, lat: 8.99, lng: 38.693 },
-    { phone: '+251911000105', name: 'Meseret Alemu', img: 'women/68', slug: 'plumbing', bio: 'Bathroom and kitchen plumbing; unclogging without the mess.', subCity: 'Gullele', years: 5, rating: 4.6, ratings: 29, jobs: 74, lat: 9.064, lng: 38.752 },
-    { phone: '+251911000106', name: 'Samuel Tadesse', img: 'men/78', slug: 'plumbing', bio: 'Water heaters and pressure systems - same-day fixes.', subCity: 'Akaky Kaliti', years: 11, rating: 4.9, ratings: 71, jobs: 198, lat: 8.91, lng: 38.745 },
+    { phone: '+251911000104', name: 'Dawit Lemma', img: 'photo-1506277886164-e25aa3f4ef7f', slug: 'plumbing', bio: 'Pipes, tanks and pumps - clean work, guaranteed seals.', subCity: 'Kolfe Keranio', years: 9, rating: 4.8, ratings: 64, jobs: 172, lat: 8.99, lng: 38.693 },
+    { phone: '+251911000105', name: 'Meseret Alemu', img: 'photo-1743871698163-a2e470d8eac7', slug: 'plumbing', bio: 'Bathroom and kitchen plumbing; unclogging without the mess.', subCity: 'Gullele', years: 5, rating: 4.6, ratings: 29, jobs: 74, lat: 9.064, lng: 38.752 },
+    { phone: '+251911000106', name: 'Samuel Tadesse', img: 'photo-1531384441138-2736e62e0919', slug: 'plumbing', bio: 'Water heaters and pressure systems - same-day fixes.', subCity: 'Akaky Kaliti', years: 11, rating: 4.9, ratings: 71, jobs: 198, lat: 8.91, lng: 38.745 },
     // electronics (2)
-    { phone: '+251911000107', name: 'Kalkidan Assefa', img: 'women/32', slug: 'electronics', bio: 'TV, decoder and audio setups - calibration included.', subCity: 'Bole', years: 4, rating: 4.7, ratings: 33, jobs: 81, lat: 9.0155, lng: 38.818 },
-    { phone: '+251911000108', name: 'Binyam Worku', img: 'men/51', slug: 'electronics', bio: 'Satellite dish alignment and home cinema installs.', subCity: 'Arada', years: 8, rating: 4.5, ratings: 26, jobs: 67, lat: 9.0356, lng: 38.75 },
+    { phone: '+251911000107', name: 'Kalkidan Assefa', img: 'photo-1531123897727-8f129e1688ce', slug: 'electronics', bio: 'TV, decoder and audio setups - calibration included.', subCity: 'Bole', years: 4, rating: 4.7, ratings: 33, jobs: 81, lat: 9.0155, lng: 38.818 },
+    { phone: '+251911000108', name: 'Binyam Worku', img: 'photo-1612213993024-b0ed04dfb248', slug: 'electronics', bio: 'Satellite dish alignment and home cinema installs.', subCity: 'Arada', years: 8, rating: 4.5, ratings: 26, jobs: 67, lat: 9.0356, lng: 38.75 },
     // it-office (2)
-    { phone: '+251911000109', name: 'Natnael Fikru', img: 'men/36', slug: 'it-office', bio: 'Wi-Fi networks, printers and workstation power - office-ready.', subCity: 'Kirkos', years: 6, rating: 4.8, ratings: 44, jobs: 109, lat: 9.018, lng: 38.769 },
-    { phone: '+251911000110', name: 'Sara Mekonnen', img: 'women/65', slug: 'it-office', bio: 'Laptop/desktop repair and software troubleshooting for creators.', subCity: 'Lemi Kura', years: 5, rating: 4.6, ratings: 31, jobs: 77, lat: 9.025, lng: 38.89 },
+    { phone: '+251911000109', name: 'Natnael Fikru', img: 'photo-1566492031773-4f4e44671857', slug: 'it-office', bio: 'Wi-Fi networks, printers and workstation power - office-ready.', subCity: 'Kirkos', years: 6, rating: 4.8, ratings: 44, jobs: 109, lat: 9.018, lng: 38.769 },
+    { phone: '+251911000110', name: 'Sara Mekonnen', img: 'photo-1674553095795-c4a2dc2b4436', slug: 'it-office', bio: 'Laptop/desktop repair and software troubleshooting for creators.', subCity: 'Lemi Kura', years: 5, rating: 4.6, ratings: 31, jobs: 77, lat: 9.025, lng: 38.89 },
     // appliances (2)
-    { phone: '+251911000111', name: 'Getahun Abera', img: 'men/85', slug: 'appliances', bio: 'Fridges, ovens and washing machines - genuine-part repairs.', subCity: 'Addis Ketema', years: 12, rating: 4.8, ratings: 58, jobs: 167, lat: 9.037, lng: 38.74 },
-    { phone: '+251911000112', name: 'Lidya Tesfaye', img: 'women/26', slug: 'appliances', bio: 'Small appliance clinic - blenders, kettles, coffee machines.', subCity: 'Bole', years: 3, rating: 4.5, ratings: 19, jobs: 48, lat: 9.005, lng: 38.788 },
+    { phone: '+251911000111', name: 'Getahun Abera', img: 'photo-1605980776566-0486c3ac7617', slug: 'appliances', bio: 'Fridges, ovens and washing machines - genuine-part repairs.', subCity: 'Addis Ketema', years: 12, rating: 4.8, ratings: 58, jobs: 167, lat: 9.037, lng: 38.74 },
+    { phone: '+251911000112', name: 'Lidya Tesfaye', img: 'photo-1628682819415-afbd0eb5f93a', slug: 'appliances', bio: 'Small appliance clinic - blenders, kettles, coffee machines.', subCity: 'Bole', years: 3, rating: 4.5, ratings: 19, jobs: 48, lat: 9.005, lng: 38.788 },
     // gas-heating (2)
-    { phone: '+251911000113', name: 'Mulugeta Kassa', img: 'men/29', slug: 'gas-heating', bio: 'Gas stove installs and leak safety checks - certified handling.', subCity: 'Lideta', years: 9, rating: 4.7, ratings: 36, jobs: 92, lat: 9.011, lng: 38.742 },
-    { phone: '+251911000114', name: 'Eyob Shiferaw', img: 'men/61', slug: 'gas-heating', bio: 'Cylinder and regulator setups done right the first time.', subCity: 'Nifas Silk-Lafto', years: 6, rating: 4.6, ratings: 22, jobs: 59, lat: 8.97, lng: 38.76 },
+    { phone: '+251911000113', name: 'Mulugeta Kassa', img: 'photo-1546456073-92b9f0a8d413', slug: 'gas-heating', bio: 'Gas stove installs and leak safety checks - certified handling.', subCity: 'Lideta', years: 9, rating: 4.7, ratings: 36, jobs: 92, lat: 9.011, lng: 38.742 },
+    { phone: '+251911000114', name: 'Eyob Shiferaw', img: 'photo-1612214070442-3c806a722f0b', slug: 'gas-heating', bio: 'Cylinder and regulator setups done right the first time.', subCity: 'Nifas Silk-Lafto', years: 6, rating: 4.6, ratings: 22, jobs: 59, lat: 8.97, lng: 38.76 },
     // carpentry (2)
-    { phone: '+251911000115', name: 'Bereket Alemayehu', img: 'men/41', slug: 'carpentry', bio: 'Doors, locks and cabinets - precise joinery and adjustments.', subCity: 'Yeka', years: 10, rating: 4.9, ratings: 61, jobs: 148, lat: 9.03, lng: 38.85 },
-    { phone: '+251911000116', name: 'Tigist Haile', img: 'women/50', slug: 'carpentry', bio: 'Furniture repair and wardrobe fittings with a fine finish.', subCity: 'Kirkos', years: 7, rating: 4.6, ratings: 27, jobs: 70, lat: 9.015, lng: 38.765 },
+    { phone: '+251911000115', name: 'Bereket Alemayehu', img: 'photo-1509305717900-84f40e786d82', slug: 'carpentry', bio: 'Doors, locks and cabinets - precise joinery and adjustments.', subCity: 'Yeka', years: 10, rating: 4.9, ratings: 61, jobs: 148, lat: 9.03, lng: 38.85 },
+    { phone: '+251911000116', name: 'Tigist Haile', img: 'photo-1523824921871-d6f1a15151f1', slug: 'carpentry', bio: 'Furniture repair and wardrobe fittings with a fine finish.', subCity: 'Kirkos', years: 7, rating: 4.6, ratings: 27, jobs: 70, lat: 9.015, lng: 38.765 },
     // painting (2)
-    { phone: '+251911000117', name: 'Henok Desta', img: 'men/72', slug: 'painting', bio: 'Interior/exterior painting, crack repair and clean edges.', subCity: 'Bole', years: 8, rating: 4.7, ratings: 41, jobs: 118, lat: 9.02, lng: 38.83 },
-    { phone: '+251911000118', name: 'Rahel Solomon', img: 'women/79', slug: 'painting', bio: 'Feature walls and ceiling refresh - dust-free process.', subCity: 'Arada', years: 4, rating: 4.5, ratings: 17, jobs: 43, lat: 9.033, lng: 38.763 },
+    { phone: '+251911000117', name: 'Henok Desta', img: 'photo-1601576084861-5de423553c0f', slug: 'painting', bio: 'Interior/exterior painting, crack repair and clean edges.', subCity: 'Bole', years: 8, rating: 4.7, ratings: 41, jobs: 118, lat: 9.02, lng: 38.83 },
+    { phone: '+251911000118', name: 'Rahel Solomon', img: 'photo-1589317621382-0cbef7ffcc4c', slug: 'painting', bio: 'Feature walls and ceiling refresh - dust-free process.', subCity: 'Arada', years: 4, rating: 4.5, ratings: 17, jobs: 43, lat: 9.033, lng: 38.763 },
     // general (2)
-    { phone: '+251911000119', name: 'Robel Kebede', img: 'men/57', slug: 'general', bio: 'TV mounting, curtains, drilling - the everything handyman.', subCity: 'Lemi Kura', years: 5, rating: 4.8, ratings: 49, jobs: 126, lat: 9.033, lng: 38.872 },
-    { phone: '+251911000120', name: 'Selam Abraha', img: 'women/57', slug: 'general', bio: 'Furniture assembly and mirror/frame fixing - careful and quick.', subCity: 'Kolfe Keranio', years: 3, rating: 4.6, ratings: 21, jobs: 55, lat: 8.982, lng: 38.71 },
+    { phone: '+251911000119', name: 'Robel Kebede', img: 'photo-1615813967515-e1838c1c5116', slug: 'general', bio: 'TV mounting, curtains, drilling - the everything handyman.', subCity: 'Lemi Kura', years: 5, rating: 4.8, ratings: 49, jobs: 126, lat: 9.033, lng: 38.872 },
+    { phone: '+251911000120', name: 'Selam Abraha', img: 'photo-1611432579699-484f7990b127', slug: 'general', bio: 'Furniture assembly and mirror/frame fixing - careful and quick.', subCity: 'Kolfe Keranio', years: 3, rating: 4.6, ratings: 21, jobs: 55, lat: 8.982, lng: 38.71 },
     // outdoor (2)
-    { phone: '+251911000121', name: 'Tesfahun Molla', img: 'men/91', slug: 'outdoor', bio: 'Water tank cleaning, gates and compound lighting.', subCity: 'Akaky Kaliti', years: 7, rating: 4.6, ratings: 24, jobs: 63, lat: 8.9, lng: 38.75 },
-    { phone: '+251911000122', name: 'Marta Yohannes', img: 'women/90', slug: 'outdoor', bio: 'Drainage clearing and fence repair - rainy-season ready.', subCity: 'Gullele', years: 4, rating: 4.5, ratings: 15, jobs: 39, lat: 9.055, lng: 38.74 },
+    { phone: '+251911000121', name: 'Tesfahun Molla', img: 'photo-1779469392752-c53bbf07eb66', slug: 'outdoor', bio: 'Water tank cleaning, gates and compound lighting.', subCity: 'Akaky Kaliti', years: 7, rating: 4.6, ratings: 24, jobs: 63, lat: 8.9, lng: 38.75 },
+    { phone: '+251911000122', name: 'Marta Yohannes', img: 'photo-1598122666068-59b41e0a3193', slug: 'outdoor', bio: 'Drainage clearing and fence repair - rainy-season ready.', subCity: 'Gullele', years: 4, rating: 4.5, ratings: 15, jobs: 39, lat: 9.055, lng: 38.74 },
     // automotive (2)
-    { phone: '+251911000123', name: 'Kirubel Demissie', img: 'men/14', slug: 'automotive', bio: 'Jump-starts, tyre service and basic checks at your gate.', subCity: 'Bole', years: 6, rating: 4.7, ratings: 34, jobs: 88, lat: 9.008, lng: 38.8 },
-    { phone: '+251911000124', name: 'Helen Tsegaye', img: 'women/12', slug: 'automotive', bio: 'Battery and light vehicle support - quick roadside help.', subCity: 'Lideta', years: 5, rating: 4.5, ratings: 18, jobs: 47, lat: 9.005, lng: 38.735 },
+    { phone: '+251911000123', name: 'Kirubel Demissie', img: 'photo-1595211877493-41a4e5f236b3', slug: 'automotive', bio: 'Jump-starts, tyre service and basic checks at your gate.', subCity: 'Bole', years: 6, rating: 4.7, ratings: 34, jobs: 88, lat: 9.008, lng: 38.8 },
+    { phone: '+251911000124', name: 'Helen Tsegaye', img: 'photo-1613876215075-276fd62c89a4', slug: 'automotive', bio: 'Battery and light vehicle support - quick roadside help.', subCity: 'Lideta', years: 5, rating: 4.5, ratings: 18, jobs: 47, lat: 9.005, lng: 38.735 },
   ];
 
   const catBySlug = new Map(
@@ -221,7 +222,7 @@ async function main() {
   for (const t of FLEET) {
     const categoryId = catBySlug.get(t.slug);
     if (!categoryId) continue;
-    const avatarUrl = `https://randomuser.me/api/portraits/${t.img}.jpg`;
+    const avatarUrl = `https://images.unsplash.com/${t.img}?q=75&w=240&h=240&auto=format&fit=crop&crop=faces`;
     const u = await prisma.user.upsert({
       where: { phone: t.phone },
       update: { role: 'PROVIDER', name: t.name },

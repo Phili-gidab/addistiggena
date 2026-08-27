@@ -2,6 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
+  ImageBackground,
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -18,14 +20,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Avatar, CatIcon, Hint, Row, StatusPill } from '../../components/ui';
 import { api, Booking, Category, FeaturedProvider } from '../../lib/api';
 import { POPULAR } from '../../lib/catalog';
+import {
+  BAND_IMG,
+  SLIDE_GUARANTEE_IMG,
+  SLIDE_PRO_IMG,
+  SLIDE_VERIFIED_IMG,
+  tradeImg,
+} from '../../lib/images';
 import { C, F, R, S, SHADOW } from '../../lib/theme';
 import { useAuth } from '../../store/auth';
 
-/** Promo slides - the brand story, rotated like the big marketplace apps. */
+/** Promo slides - full-bleed photography under a navy wash, like the big
+ *  marketplace apps' hero banners. */
 const SLIDES = [
   {
     key: 'verified',
     bg: C.navy,
+    img: SLIDE_VERIFIED_IMG,
     icon: 'shield-check' as const,
     title: 'ማንነቱ የተረጋገጠ ባለሙያ',
     sub: 'Woreda-cleared, CoC-certified, Fayda-verified - every single technician.',
@@ -34,7 +45,8 @@ const SLIDES = [
   },
   {
     key: 'guarantee',
-    bg: C.blue,
+    bg: C.blueDeep,
+    img: SLIDE_GUARANTEE_IMG,
     icon: 'shield-star' as const,
     title: 'የ5 ቀናት ዋስትና',
     sub: 'If the exact issue returns within 5 days, we fix it again at no service cost.',
@@ -44,6 +56,7 @@ const SLIDES = [
   {
     key: 'pro',
     bg: '#123058',
+    img: SLIDE_PRO_IMG,
     icon: 'hammer-wrench' as const,
     title: 'ብቃትዎ ገቢዎ ይሁን',
     sub: 'Become a technician - no degree required. Skill and trust are enough.',
@@ -204,15 +217,20 @@ export default function Home() {
         >
           {SLIDES.map((s) => (
             <Pressable key={s.key} style={[st.slide, { width: slideW, backgroundColor: s.bg }]} onPress={s.action}>
-              <View style={st.slideIcon}>
-                <MaterialCommunityIcons name={s.icon} size={26} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={st.slideTitle}>{s.title}</Text>
-                <Text style={st.slideSub}>{s.sub}</Text>
-                <View style={st.slideCta}>
-                  <Text style={st.slideCtaText}>{s.cta}</Text>
-                  <MaterialCommunityIcons name="arrow-right" size={14} color={C.navy} />
+              <Image source={{ uri: s.img }} style={st.fill} resizeMode="cover" />
+              {/* navy wash keeps the photo on-brand and the copy legible */}
+              <View style={st.slideWash} />
+              <View style={st.slideBody}>
+                <View style={st.slideIcon}>
+                  <MaterialCommunityIcons name={s.icon} size={26} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.slideTitle}>{s.title}</Text>
+                  <Text style={st.slideSub}>{s.sub}</Text>
+                  <View style={st.slideCta}>
+                    <Text style={st.slideCtaText}>{s.cta}</Text>
+                    <MaterialCommunityIcons name="arrow-right" size={14} color={C.navy} />
+                  </View>
                 </View>
               </View>
             </Pressable>
@@ -258,21 +276,29 @@ export default function Home() {
               style={({ pressed }) => [st.catCard, pressed && { transform: [{ scale: 0.97 }] }]}
               onPress={() => goBook(c.id)}
             >
-              <CatIcon slug={c.slug} size={46} />
-              <Text style={st.catName} numberOfLines={1}>
-                {c.nameEn.split(' & ')[0]}
-              </Text>
-              <Am style={{ fontSize: 10 }} numberOfLines={1}>
-                {c.nameAm}
-              </Am>
-              <View style={st.countChip}>
-                <Text style={st.countText}>
-                  {c.subServices?.length
-                    ? `${c.subServices.length} services`
-                    : c.priceFloorEtb
-                      ? `from ${Number(c.priceFloorEtb)} ETB`
-                      : 'view'}
+              <View style={st.catPhotoWrap}>
+                <Image source={{ uri: tradeImg(c.slug) }} style={st.catPhoto} resizeMode="cover" />
+                <View style={st.catPhotoWash} />
+                <View style={st.catIconFloat}>
+                  <CatIcon slug={c.slug} size={30} />
+                </View>
+              </View>
+              <View style={{ padding: S.md, paddingTop: 20 }}>
+                <Text style={st.catName} numberOfLines={1}>
+                  {c.nameEn.split(' & ')[0]}
                 </Text>
+                <Am style={{ fontSize: 10 }} numberOfLines={1}>
+                  {c.nameAm}
+                </Am>
+                <View style={st.countChip}>
+                  <Text style={st.countText} numberOfLines={1}>
+                    {c.subServices?.length
+                      ? `${c.subServices.length} services`
+                      : c.priceFloorEtb
+                        ? `from ${Number(c.priceFloorEtb)} ETB`
+                        : 'view'}
+                  </Text>
+                </View>
               </View>
             </Pressable>
           ))}
@@ -307,15 +333,17 @@ export default function Home() {
                     {p.subCity ? ` · ${p.subCity}` : ''}
                   </Text>
                   <Row style={{ justifyContent: 'space-between', marginTop: 8 }}>
-                    <Row style={{ gap: 4 }}>
+                    <Row style={{ gap: 4, flexShrink: 1 }}>
                       <MaterialCommunityIcons name="star" size={14} color="#f5a623" />
-                      <Text style={st.proRating}>
+                      <Text style={st.proRating} numberOfLines={1}>
                         {p.ratingCount ? `${p.ratingAvg.toFixed(1)} (${p.ratingCount})` : 'New'}
+                        {p.jobsCompleted > 0 ? ` · ${p.jobsCompleted} jobs` : ''}
                       </Text>
-                      {p.jobsCompleted > 0 && <Hint style={{ fontSize: 11 }}>· {p.jobsCompleted} jobs</Hint>}
                     </Row>
                     {p.category.priceFloorEtb && (
-                      <Text style={st.proPrice}>from {Number(p.category.priceFloorEtb)} ETB</Text>
+                      <Text style={st.proPrice} numberOfLines={1}>
+                        from {Number(p.category.priceFloorEtb)} ETB
+                      </Text>
                     )}
                   </Row>
                 </Pressable>
@@ -340,14 +368,16 @@ export default function Home() {
                 style={({ pressed }) => [st.popRow, pressed && { opacity: 0.85 }]}
                 onPress={() => goBook(cat?.id, s.name)}
               >
-                <CatIcon slug={s.slug} size={38} />
-                <View style={{ flex: 1 }}>
-                  <Text style={st.popName}>{s.name}</Text>
-                  <Am style={{ fontSize: 11 }}>{s.nameAm}</Am>
-                </View>
-                <View style={st.priceChip}>
-                  <Text style={st.priceChipText}>
-                    {s.min.toLocaleString()}-{s.max.toLocaleString()} ETB
+                <Image source={{ uri: tradeImg(s.slug) }} style={st.popThumb} resizeMode="cover" />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={st.popName} numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  <Am style={{ fontSize: 11 }} numberOfLines={1}>
+                    {s.nameAm}
+                  </Am>
+                  <Text style={st.popPrice} numberOfLines={1}>
+                    {s.min.toLocaleString()} - {s.max.toLocaleString()} ETB
                   </Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={20} color={C.muted} />
@@ -357,7 +387,11 @@ export default function Home() {
         </View>
 
         {/* ── trust band ─────────────────────────────────────────────────── */}
-        <View style={st.trustBand}>
+        <ImageBackground
+          source={{ uri: BAND_IMG }}
+          style={st.trustBand}
+          imageStyle={{ borderRadius: R.lg, opacity: 0.35 }}
+        >
           <Row style={{ justifyContent: 'space-between' }}>
             {[
               ['15-30′', 'avg. arrival'],
@@ -383,7 +417,7 @@ export default function Home() {
               <Text style={st.trustLine}>{label}</Text>
             </Row>
           ))}
-        </View>
+        </ImageBackground>
 
         <Hint style={{ textAlign: 'center', marginTop: S.lg, paddingHorizontal: S.lg }}>
           Addis Tiggena · a project of Amnen Marketing & Promotion
@@ -452,18 +486,30 @@ const st = StyleSheet.create({
   searchName: { fontFamily: F.bodySemi, fontSize: 13, color: C.ink },
 
   slide: {
+    borderRadius: R.lg,
+    overflow: 'hidden',
+    ...SHADOW.navy,
+  },
+  fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  slideWash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(9, 24, 48, 0.82)',
+  },
+  slideBody: {
     flexDirection: 'row',
     gap: 14,
-    borderRadius: R.lg,
     padding: S.lg,
     alignItems: 'flex-start',
-    ...SHADOW.navy,
   },
   slideIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -513,22 +559,41 @@ const st = StyleSheet.create({
   rail: { paddingHorizontal: S.lg, gap: S.sm },
 
   catCard: {
-    width: 108,
+    width: 136,
     backgroundColor: '#fff',
     borderRadius: R.md,
     borderWidth: 1,
     borderColor: C.line,
-    padding: S.md,
-    alignItems: 'center',
-    gap: 3,
+    overflow: 'hidden',
   },
-  catName: { fontFamily: F.bodySemi, fontSize: 12, color: C.ink, marginTop: 5 },
+  catPhotoWrap: { height: 72 },
+  catPhoto: { width: '100%', height: '100%' },
+  catPhotoWash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(11, 30, 63, 0.28)',
+  },
+  catIconFloat: {
+    position: 'absolute',
+    left: S.md,
+    bottom: -15,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#fff',
+    backgroundColor: C.blueSoft,
+  },
+  catName: { fontFamily: F.bodySemi, fontSize: 12, color: C.ink },
   countChip: {
     backgroundColor: C.blueSoft,
     borderRadius: R.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginTop: 5,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   countText: { fontFamily: F.bodySemi, fontSize: 9.5, color: C.blueDeep },
 
@@ -545,27 +610,23 @@ const st = StyleSheet.create({
   verified: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   verifiedText: { fontFamily: F.bodyMedium, fontSize: 10, color: C.green },
   proCat: { fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 8 },
-  proRating: { fontFamily: F.bodySemi, fontSize: 12, color: C.ink },
-  proPrice: { fontFamily: F.bodySemi, fontSize: 11.5, color: C.blueDeep },
+  proRating: { fontFamily: F.bodySemi, fontSize: 12, color: C.ink, flexShrink: 1 },
+  proPrice: { fontFamily: F.bodySemi, fontSize: 11.5, color: C.blueDeep, flexShrink: 0, marginLeft: 6 },
 
   popRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     backgroundColor: '#fff',
     borderRadius: R.md,
     borderWidth: 1,
     borderColor: C.line,
-    padding: S.md,
+    padding: S.sm,
+    paddingRight: S.md,
   },
+  popThumb: { width: 56, height: 56, borderRadius: R.sm, backgroundColor: C.blueSoft },
   popName: { fontFamily: F.bodySemi, fontSize: 13, color: C.ink },
-  priceChip: {
-    backgroundColor: C.navy,
-    borderRadius: R.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  priceChipText: { fontFamily: F.bodySemi, fontSize: 10, color: '#fff' },
+  popPrice: { fontFamily: F.bodySemi, fontSize: 11.5, color: C.blueDeep, marginTop: 3 },
 
   trustBand: {
     marginHorizontal: S.lg,
