@@ -210,15 +210,21 @@ export default function Book() {
               </View>
             </Pressable>
 
-            <Text style={[st.label, { marginTop: S.lg }]}>Sub-city · ክፍለ ከተማ</Text>
-            <View style={st.chips}>
-              {SUB_CITIES.map((sc) => (
-                <Pressable key={sc} style={[st.chip, subCity === sc && st.chipOn]} onPress={() => setSubCity(sc)}>
-                  <Text style={[st.chipText, subCity === sc && { color: '#fff' }]}>{sc}</Text>
-                </Pressable>
-              ))}
-            </View>
+            {/* the GPS pin is exact - only ask for the sub-city when there is no pin */}
+            {gpsState !== 'locked' && (
+              <>
+                <Text style={[st.label, { marginTop: S.lg }]}>Sub-city · ክፍለ ከተማ</Text>
+                <View style={st.chips}>
+                  {SUB_CITIES.map((sc) => (
+                    <Pressable key={sc} style={[st.chip, subCity === sc && st.chipOn]} onPress={() => setSubCity(sc)}>
+                      <Text style={[st.chipText, subCity === sc && { color: '#fff' }]}>{sc}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
 
+            {gpsState === 'locked' && <View style={{ height: S.lg }} />}
             <Field
               label="Landmark note · ምልክት"
               placeholder="e.g. Blue gate behind Edna Mall, 3rd floor"

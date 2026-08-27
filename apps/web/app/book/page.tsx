@@ -40,6 +40,7 @@ function BookWizard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState(params.get('category') ?? '');
   const [pos, setPos] = useState(ADDIS);
+  const [geoLocked, setGeoLocked] = useState(false);
   const [subCity, setSubCity] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [landmark, setLandmark] = useState('');
@@ -202,9 +203,10 @@ function BookWizard() {
                   <button
                     className="btn btn-line btn-sm"
                     onClick={() =>
-                      navigator.geolocation?.getCurrentPosition((p) =>
-                        setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
-                      )
+                      navigator.geolocation?.getCurrentPosition((p) => {
+                        setPos({ lat: p.coords.latitude, lng: p.coords.longitude });
+                        setGeoLocked(true);
+                      })
                     }
                   >
                     ⌖ Use my location
@@ -213,40 +215,48 @@ function BookWizard() {
                     {pos.lat.toFixed(5)}, {pos.lng.toFixed(5)}
                   </span>
                 </div>
-                <div className="row" style={{ alignItems: 'stretch' }}>
-                  <div className="field" style={{ flex: 1, minWidth: 180 }}>
-                    <label>Sub-city · ክፍለ ከተማ</label>
-                    <select
-                      value={subCity}
-                      onChange={(e) => {
-                        setSubCity(e.target.value);
-                        setNeighborhood('');
-                      }}
-                    >
-                      <option value="">Choose…</option>
-                      {SUB_CITIES.map((s) => (
-                        <option key={s.name} value={s.name}>
-                          {s.name} · {s.nameAm}
-                        </option>
-                      ))}
-                    </select>
+                {/* a GPS fix is exact - the sub-city question is only for manual pins */}
+                {geoLocked ? (
+                  <p className="hint mb" style={{ color: 'var(--ok-fg)' }}>
+                    ✓ Your GPS location is set - no need to pick a sub-city. Add a landmark note so
+                    the technician finds your gate faster.
+                  </p>
+                ) : (
+                  <div className="row" style={{ alignItems: 'stretch' }}>
+                    <div className="field" style={{ flex: 1, minWidth: 180 }}>
+                      <label>Sub-city · ክፍለ ከተማ</label>
+                      <select
+                        value={subCity}
+                        onChange={(e) => {
+                          setSubCity(e.target.value);
+                          setNeighborhood('');
+                        }}
+                      >
+                        <option value="">Choose…</option>
+                        {SUB_CITIES.map((s) => (
+                          <option key={s.name} value={s.name}>
+                            {s.name} · {s.nameAm}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field" style={{ flex: 1, minWidth: 180 }}>
+                      <label>Neighborhood · ሰፈር</label>
+                      <select
+                        value={neighborhood}
+                        onChange={(e) => setNeighborhood(e.target.value)}
+                        disabled={!subCity}
+                      >
+                        <option value="">{subCity ? 'Choose…' : 'Pick a sub-city first'}</option>
+                        {SUB_CITIES.find((s) => s.name === subCity)?.neighborhoods.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div className="field" style={{ flex: 1, minWidth: 180 }}>
-                    <label>Neighborhood · ሰፈር</label>
-                    <select
-                      value={neighborhood}
-                      onChange={(e) => setNeighborhood(e.target.value)}
-                      disabled={!subCity}
-                    >
-                      <option value="">{subCity ? 'Choose…' : 'Pick a sub-city first'}</option>
-                      {SUB_CITIES.find((s) => s.name === subCity)?.neighborhoods.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                )}
                 <div className="field">
                   <label>Landmark note · ምልክት</label>
                   <input
