@@ -137,7 +137,7 @@ export class ProvidersService {
               p."location",
               ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
               p."serviceRadiusKm" * 1000)
-      ORDER BY p."ratingAvg" DESC, "distanceM" ASC
+      ORDER BY "distanceM" ASC, p."ratingAvg" DESC
       LIMIT 10`);
   }
 
