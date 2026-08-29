@@ -132,6 +132,8 @@ export default function Home() {
       .slice(0, 5);
   }, [q, categories]);
 
+  /** Browse a trade first - booking is always an explicit choice from there. */
+  const goCategory = (categoryId: string) => router.push(`/category/${categoryId}`);
   const goBook = (categoryId?: string, desc?: string) =>
     router.push({ pathname: '/(customer)/book', params: { category: categoryId, desc } });
 
@@ -190,7 +192,7 @@ export default function Home() {
           {matches.length > 0 && (
             <View style={st.searchPop}>
               {matches.map((c) => (
-                <Pressable key={c.id} style={st.searchRow} onPress={() => { setQ(''); goBook(c.id); }}>
+                <Pressable key={c.id} style={st.searchRow} onPress={() => { setQ(''); goCategory(c.id); }}>
                   <CatIcon slug={c.slug} size={30} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.searchName}>{c.nameEn}</Text>
@@ -265,7 +267,7 @@ export default function Home() {
             <Text style={st.section}>Services</Text>
             <Am style={{ fontSize: 11.5 }}>አገልግሎቶች</Am>
           </View>
-          <Pressable onPress={() => router.push('/(customer)/book')}>
+          <Pressable onPress={() => router.push('/categories')}>
             <Text style={st.seeAll}>See all →</Text>
           </Pressable>
         </Row>
@@ -274,7 +276,7 @@ export default function Home() {
             <Pressable
               key={c.id}
               style={({ pressed }) => [st.catCard, pressed && { transform: [{ scale: 0.97 }] }]}
-              onPress={() => goBook(c.id)}
+              onPress={() => goCategory(c.id)}
             >
               <View style={st.catPhotoWrap}>
                 <Image source={{ uri: tradeImg(c.slug) }} style={st.catPhoto} resizeMode="cover" />
@@ -315,7 +317,7 @@ export default function Home() {
             </Row>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.rail}>
               {featured.map((p) => (
-                <Pressable key={p.id} style={st.proCard} onPress={() => goBook(p.category.id)}>
+                <Pressable key={p.id} style={st.proCard} onPress={() => goCategory(p.category.id)}>
                   <Row style={{ gap: 10 }}>
                     <Avatar name={p.name} url={p.avatarUrl} size={44} online={p.isAvailable} />
                     <View style={{ flex: 1 }}>

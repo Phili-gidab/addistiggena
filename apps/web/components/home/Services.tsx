@@ -28,7 +28,7 @@ export function Services({ categories }: { categories: Category[] }) {
         <div className="cat-tiles">
           {categories.map((c, i) => (
             <Reveal key={c.id} delay={Math.min(i * 0.05, 0.35)}>
-              <Link href={`/book?category=${c.id}`} className="cat-tile" style={{ display: 'flex', height: '100%' }}>
+              <Link href={`/services/${c.slug}`} className="cat-tile" style={{ display: 'flex', height: '100%' }}>
                 <span className="cat-img" aria-hidden>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

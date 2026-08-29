@@ -163,6 +163,24 @@ export const PRICE_GROUPS: PriceGroup[] = [
   },
 ];
 
+/** Which published rate table belongs to which service category (by slug).
+ *  Trades with no published table yet quote on inspection at the category
+ *  base rate. */
+export const RATE_GROUP_BY_SLUG: Record<string, number> = {
+  electrical: 0,
+  appliances: 0,
+  plumbing: 1,
+  'it-office': 2,
+  electronics: 2,
+  carpentry: 3,
+  general: 3,
+};
+
+export const rateGroupFor = (slug: string): PriceGroup | null => {
+  const i = RATE_GROUP_BY_SLUG[slug];
+  return i === undefined ? null : PRICE_GROUPS[i];
+};
+
 /** Applies only if the technician arrives and diagnoses, but the client
  *  chooses not to proceed with the repair at that time. */
 export const DIAGNOSTIC = {

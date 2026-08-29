@@ -189,8 +189,9 @@ export function Hero({ categories }: { categories: Category[] }) {
       .slice(0, 6);
   }, [q, categories]);
 
-  const go = (id?: string) =>
-    router.push(id ? `/book?category=${id}` : '/book');
+  /** A search hit opens the service page (browse first); with no match at all
+   *  we fall back to the booking wizard's own category picker. */
+  const go = (slug?: string) => router.push(slug ? `/services/${slug}` : '/book');
 
   return (
     <section className="hero" ref={root}>
@@ -233,7 +234,7 @@ export function Hero({ categories }: { categories: Category[] }) {
               className="search-bar"
               onSubmit={(e) => {
                 e.preventDefault();
-                go(matches[0]?.id);
+                go(matches[0]?.slug);
               }}
             >
               <span className="ic" aria-hidden>
@@ -257,7 +258,7 @@ export function Hero({ categories }: { categories: Category[] }) {
             {focused && matches.length > 0 && (
               <div className="search-pop">
                 {matches.map((c) => (
-                  <button key={c.id} type="button" onMouseDown={() => go(c.id)}>
+                  <button key={c.id} type="button" onMouseDown={() => go(c.slug)}>
                     <span className="em">{iconFor(c.slug)}</span>
                     <span>
                       {c.nameEn} · <span style={{ fontFamily: 'var(--font-am)' }}>{c.nameAm}</span>
