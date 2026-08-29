@@ -142,8 +142,9 @@ export class ProvidersService {
   }
 
   /**
-   * Ranked dispatch candidates for the offer cascade (proposal §3 "Real-Time Discovery"):
-   * same filter as nearby(), minus technicians the booking was already offered to.
+   * Dispatch candidates, closest first (client decision 2026-08-29: proximity
+   * alone decides who is offered a job - no rating weighting). Same filter as
+   * nearby(), minus technicians the booking was already offered to.
    */
   candidates(
     lat: number,
@@ -172,7 +173,7 @@ export class ProvidersService {
               ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
               p."serviceRadiusKm" * 1000)
         ${exclusion}
-      ORDER BY p."ratingAvg" DESC, "distanceM" ASC
+      ORDER BY "distanceM" ASC
       LIMIT 5`);
   }
 }

@@ -49,7 +49,6 @@ function BookWizard() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [providers, setProviders] = useState<NearbyProvider[] | null>(null);
-  const [providerId, setProviderId] = useState<string | undefined>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -82,7 +81,8 @@ function BookWizard() {
   }
 
   const category = categories.find((c) => c.id === categoryId);
-  const chosenProvider = providers?.find((p) => p.id === providerId);
+  /** /providers/nearby is ordered closest-first - the head is who gets the job. */
+  const nearest = providers?.[0] ?? null;
   const areaLabel = [subCity, neighborhood].filter(Boolean).join(' · ');
   // the API stores one landmark note - prefix it with the mapped service area
   const fullLandmark = [areaLabel, landmark].filter(Boolean).join(' - ');
@@ -95,7 +95,6 @@ function BookWizard() {
         `/providers/nearby?lat=${pos.lat}&lng=${pos.lng}&categoryId=${categoryId}`,
       );
       setProviders(list);
-      setProviderId(list[0]?.id);
       setStep(3);
     } catch (err) {
       setError((err as Error).message);
@@ -110,9 +109,9 @@ function BookWizard() {
     try {
       const booking = await api<Booking>('/bookings', {
         method: 'POST',
+        // no providerId: the server dispatches the closest available technician
         body: JSON.stringify({
           categoryId,
-          providerId,
           lat: pos.lat,
           lng: pos.lng,
           landmarkNote: fullLandmark || undefined,
@@ -319,58 +318,49 @@ function BookWizard() {
             {/* step 3 - technician */}
             {step === 3 && (
               <div className="panel">
-                <h2>Choose your technician · ባለሙያ ይምረጡ</h2>
-                {providers && providers.length === 0 && (
-                  <div className="ok-box">
-                    No verified {category?.nameEn.toLowerCase()} technician is online in this area
-                    right now - you can still post the request and the first available professional
-                    will take it.
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-                  {providers?.map((p) => (
-                    <button
-                      key={p.id}
-                      className={`tech-card${providerId === p.id ? ' selected' : ''}`}
-                      onClick={() => setProviderId(p.id)}
-                    >
-                      {p.avatarUrl ? (
+                <h2>Your technician · ባለሙያዎ</h2>
+                {/* No picker: the job always goes to the CLOSEST available verified
+                    technician; this only shows the customer who that is. */}
+                {nearest ? (
+                  <>
+                    <div className="tech-card" style={{ cursor: 'default' }}>
+                      {nearest.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="avatar avatar-img" src={p.avatarUrl} alt="" />
+                        <img className="avatar avatar-img" src={nearest.avatarUrl} alt="" />
                       ) : (
-                        <span className="avatar">{(p.name ?? 'T').slice(0, 1)}</span>
+                        <span className="avatar">{(nearest.name ?? 'T').slice(0, 1)}</span>
                       )}
                       <span className="meta">
                         <span className="name">
-                          {p.name ?? 'Technician'}
+                          {nearest.name ?? 'Technician'}
                           <span className="verified">✔ verified</span>
                         </span>
                         <span className="sub">
-                          <Stars value={p.ratingAvg} small />{' '}
-                          {p.ratingCount > 0 ? `${p.ratingAvg.toFixed(1)} (${p.ratingCount})` : 'New'}{' '}
-                          · {p.jobsCompleted} jobs
-                          {p.subCity ? ` · ${p.woreda ? `Woreda ${p.woreda}, ` : ''}${p.subCity}` : ''}
-                          {p.yearsExperience ? ` · ${p.yearsExperience}+ yrs` : ''}
+                          <Stars value={nearest.ratingAvg} small />{' '}
+                          {nearest.ratingCount > 0
+                            ? `${nearest.ratingAvg.toFixed(1)} (${nearest.ratingCount})`
+                            : 'New'}{' '}
+                          · {nearest.jobsCompleted} jobs
+                          {nearest.subCity ? ` · ${nearest.subCity}` : ''}
+                          {nearest.yearsExperience ? ` · ${nearest.yearsExperience}+ yrs` : ''}
                         </span>
                       </span>
-                      <span className="dist-chip">{fmtDistance(p.distanceM)}</span>
-                    </button>
-                  ))}
-                  {providers && providers.length > 0 && (
-                    <button
-                      className={`tech-card${providerId === undefined ? ' selected' : ''}`}
-                      onClick={() => setProviderId(undefined)}
-                    >
-                      <span className="avatar" style={{ background: 'var(--muted)' }}>
-                        ✦
-                      </span>
-                      <span className="meta">
-                        <span className="name">First available technician</span>
-                        <span className="sub">Broadcast the job - fastest response</span>
-                      </span>
-                    </button>
-                  )}
-                </div>
+                      <span className="dist-chip">{fmtDistance(nearest.distanceM)}</span>
+                    </div>
+                    <p className="hint mt">
+                      This is the closest verified {category?.nameEn.toLowerCase()} technician to
+                      your pin. They have <strong style={{ color: 'var(--navy)' }}>5 minutes</strong>{' '}
+                      to accept - if they do not respond, our dispatch team assigns another
+                      technician for you right away.
+                    </p>
+                  </>
+                ) : (
+                  <div className="ok-box">
+                    No verified {category?.nameEn.toLowerCase()} technician is online in this area
+                    right now - you can still post the request and our dispatch team assigns the
+                    nearest professional as soon as one is available.
+                  </div>
+                )}
                 <div className="spread mt">
                   <button className="btn btn-line btn-sm" onClick={() => setStep(2)}>
                     ← Back
@@ -395,7 +385,7 @@ function BookWizard() {
                 <div className="receipt-row">
                   <span className="k">Technician</span>
                   <span className="v">
-                    {providerId ? chosenProvider?.name ?? 'Selected technician' : 'First available'}
+                    {nearest ? `${nearest.name ?? 'Technician'} (closest)` : 'Nearest available'}
                   </span>
                 </div>
                 {photoKey && (
@@ -469,7 +459,7 @@ function BookWizard() {
             <div className="sum-row">
               <span className="k">Technician</span>
               <span className={`v${step > 2 ? '' : ' empty'}`}>
-                {step > 2 ? (providerId ? chosenProvider?.name ?? 'Selected' : 'First available') : '-'}
+                {step > 2 ? (nearest ? `${nearest.name ?? 'Technician'} (closest)` : 'Nearest available') : '-'}
               </span>
             </div>
             <p className="sum-note">

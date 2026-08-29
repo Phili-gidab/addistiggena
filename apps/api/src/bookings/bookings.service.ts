@@ -22,9 +22,14 @@ import {
 
 const OFFER_WINDOW_MS = 5 * 60_000; // provider has 5 minutes to respond (client decision 2026-08-24)
 
-/** After this many declines/timeouts the job escalates to the Ops queue for manual
- *  assignment instead of walking the whole pool (roles/workflow spec section 5). */
-const ESCALATE_AFTER_ATTEMPTS = 3;
+/**
+ * After this many declines/timeouts the job escalates to the Ops queue for
+ * manual assignment instead of walking the pool (roles/workflow spec section 5).
+ * Client decision 2026-08-29: ONE attempt - the closest technician gets the job
+ * offer, and if they do not respond inside the 5-minute window a human assigns
+ * the next one rather than the system cascading on its own.
+ */
+const ESCALATE_AFTER_ATTEMPTS = 1;
 
 /** Average urban travel speed used for the ETA estimate - Addis traffic, mixed transport. */
 const AVG_SPEED_KMH = 18;
@@ -209,8 +214,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       return this.getPublic(created.id);
     }
 
-    // "First available" - dispatch to the best-ranked nearby technician (proposal §4.1 step 04).
-    // Never fail the request after the row exists: the sweeper rescues stranded bookings.
+    // Dispatch to the CLOSEST available technician in this trade (proposal §4.1
+    // step 04). Never fail the request after the row exists: the sweeper rescues
+    // stranded bookings.
     try {
       return await this.offerToNext(created.id);
     } catch (err) {
@@ -260,7 +266,8 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
 
     const exclude = booking.offers.map((o) => o.providerId);
 
-    // 3 declines/timeouts -> hold for manual assignment by Ops (spec section 5)
+    // the offered technician declined or let the window lapse -> hold for
+    // manual assignment by Ops instead of auto-offering the next one
     if (exclude.length >= ESCALATE_AFTER_ATTEMPTS && !booking.escalatedAt) {
       const { count } = await this.prisma.booking.updateMany({
         where: claim,

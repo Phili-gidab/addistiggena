@@ -32,7 +32,6 @@ export default function Book() {
   const [photoKey, setPhotoKey] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [providers, setProviders] = useState<NearbyProvider[] | null>(null);
-  const [providerId, setProviderId] = useState<string | undefined>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -53,6 +52,8 @@ export default function Book() {
   );
 
   const category = categories.find((c) => c.id === categoryId);
+  /** /providers/nearby is ordered closest-first - the head is who gets the job. */
+  const nearest = providers?.[0] ?? null;
 
   async function locate() {
     setGpsState('locating');
@@ -114,9 +115,9 @@ export default function Book() {
       const fullDescription = [subService, description.trim()].filter(Boolean).join(' - ');
       const booking = await api<Booking>('/bookings', {
         method: 'POST',
+        // no providerId: the server dispatches the closest available technician
         body: JSON.stringify({
           categoryId,
-          providerId,
           lat: pos.lat,
           lng: pos.lng,
           landmarkNote: fullLandmark || undefined,
@@ -130,7 +131,6 @@ export default function Book() {
       setLandmark('');
       setPhotoKey(null);
       setPhotoUri(null);
-      setProviderId(undefined);
       router.push(`/booking/${booking.id}`);
     } catch (e) {
       setError((e as Error).message);
@@ -292,40 +292,41 @@ export default function Book() {
         {/* step 4 - technician + confirm */}
         {step === 4 && (
           <>
+            {/* No picker: the job always goes to the CLOSEST available verified
+                technician. This card just shows the customer who that is. */}
             <Card style={{ marginBottom: S.md }}>
-              <Text style={st.stepTitle}>ባለሙያ · Technician</Text>
-              {providers?.length === 0 && (
+              <Text style={st.stepTitle}>ባለሙያ · Your technician</Text>
+              {nearest ? (
+                <>
+                  <Row style={{ gap: 12, marginTop: S.md }}>
+                    <Avatar name={nearest.name} url={nearest.avatarUrl} size={48} online />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Row style={{ gap: 5 }}>
+                        <Text style={st.provName} numberOfLines={1}>
+                          {nearest.name ?? 'Technician'}
+                        </Text>
+                        <MaterialCommunityIcons name="check-decagram" size={14} color={C.green} />
+                      </Row>
+                      <Hint numberOfLines={1}>
+                        Closest to you · {fmtDistance(nearest.distanceM)}
+                        {nearest.etaMinutes ? ` · ~${nearest.etaMinutes} min away` : ''}
+                      </Hint>
+                    </View>
+                  </Row>
+                  <Hint style={{ marginTop: S.md }}>
+                    They have 5 minutes to accept. If they do not respond, our dispatch team
+                    assigns another technician for you right away.
+                  </Hint>
+                  <Am style={{ marginTop: 6 }}>
+                    በ5 ደቂቃ ውስጥ ካልመለሱ የእኛ ቡድን ሌላ ባለሙያ ይመድብልዎታል
+                  </Am>
+                </>
+              ) : (
                 <Hint style={{ marginTop: 8 }}>
-                  No one is online in this area right now - post the request anyway and the first
-                  available professional takes it.
+                  No technician is online in this area right now - post the request anyway and our
+                  dispatch team assigns the nearest professional as soon as one is available.
                 </Hint>
               )}
-              <Pressable style={[st.provRow, !providerId && st.provRowOn]} onPress={() => setProviderId(undefined)}>
-                <MaterialCommunityIcons name="flash" size={20} color={C.blue} />
-                <View style={{ flex: 1 }}>
-                  <Text style={st.provName}>First available · የመጀመሪያው ነጻ ባለሙያ</Text>
-                  <Hint>Broadcast the job - fastest response</Hint>
-                </View>
-                <View style={[st.radio, !providerId && st.radioOn]} />
-              </Pressable>
-              {providers?.map((p) => (
-                <Pressable key={p.id} style={[st.provRow, providerId === p.id && st.provRowOn]} onPress={() => setProviderId(p.id)}>
-                  <Avatar name={p.name} url={p.avatarUrl} size={40} />
-                  <View style={{ flex: 1 }}>
-                    <Row style={{ gap: 5 }}>
-                      <Text style={st.provName}>{p.name ?? 'Technician'}</Text>
-                      <MaterialCommunityIcons name="check-decagram" size={13} color={C.green} />
-                    </Row>
-                    <Hint>
-                      {p.ratingCount ? `★ ${p.ratingAvg.toFixed(1)} (${p.ratingCount}) · ` : ''}
-                      {fmtDistance(p.distanceM)}
-                      {p.subCity ? ` · ${p.subCity}` : ''}
-                      {p.jobsCompleted ? ` · ${p.jobsCompleted} jobs` : ''}
-                    </Hint>
-                  </View>
-                  <View style={[st.radio, providerId === p.id && st.radioOn]} />
-                </Pressable>
-              ))}
             </Card>
 
             <Card>
