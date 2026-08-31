@@ -5,8 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Am, Avatar, Btn, Card, CatIcon, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
-import { api, Booking, Category, fmtDistance, NearbyProvider, uploadImage } from '../../lib/api';
+import { Am, Btn, Card, CatIcon, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
+import { api, Booking, CategoryAvailability, Category, uploadImage } from '../../lib/api';
 import { SUB_CITIES } from '../../lib/catalog';
 import { C, F, R, S } from '../../lib/theme';
 
@@ -18,7 +18,7 @@ const ADDIS = { lat: 9.0108, lng: 38.7613 };
  * details + photo → technician → confirm. Mirrors the web /book flow.
  */
 export default function Book() {
-  const params = useLocalSearchParams<{ category?: string; desc?: string }>();
+  const params = useLocalSearchParams<{ category?: string; service?: string }>();
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState(params.category ?? '');
@@ -31,7 +31,7 @@ export default function Book() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoKey, setPhotoKey] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [providers, setProviders] = useState<NearbyProvider[] | null>(null);
+  const [avail, setAvail] = useState<CategoryAvailability | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -39,21 +39,25 @@ export default function Book() {
     api<Category[]>('/catalog/categories').then(setCategories).catch(() => {});
   }, []);
 
-  // a tap on a home tile pre-selects the category; popular repairs also
-  // pre-fill the description with the service name
+  // arriving from a category page: that trade + the exact service chosen there
   useFocusEffect(
     useCallback(() => {
       if (params.category) {
-        setCategoryId(params.category);
+        setCategoryId((prev) => {
+          // switching trade must not carry the previous trade's service over
+          if (prev && prev !== params.category) {
+            setSubService('');
+            setDescription('');
+          }
+          return params.category!;
+        });
         setStep((s) => (s === 1 ? 2 : s));
       }
-      if (params.desc) setDescription((d) => d || String(params.desc));
-    }, [params.category, params.desc]),
+      if (params.service) setSubService(String(params.service));
+    }, [params.category, params.service]),
   );
 
   const category = categories.find((c) => c.id === categoryId);
-  /** /providers/nearby is ordered closest-first - the head is who gets the job. */
-  const nearest = providers?.[0] ?? null;
 
   async function locate() {
     setGpsState('locating');
@@ -91,14 +95,15 @@ export default function Book() {
     }
   }
 
-  async function loadNearby() {
+  async function loadAvailability() {
     setBusy(true);
     setError('');
     try {
-      const list = await api<NearbyProvider[]>(
-        `/providers/nearby?categoryId=${categoryId}&lat=${pos.lat}&lng=${pos.lng}`,
+      setAvail(
+        await api<CategoryAvailability>(
+          `/providers/availability?categoryId=${categoryId}&lat=${pos.lat}&lng=${pos.lng}`,
+        ),
       );
-      setProviders(list);
       setStep(4);
     } catch (e) {
       setError((e as Error).message);
@@ -284,7 +289,7 @@ export default function Book() {
             <Row>
               <Btn title="← Back" kind="line" small onPress={() => setStep(2)} />
               <View style={{ flex: 1 }} />
-              <Btn title="Find technicians →" busy={busy} onPress={loadNearby} />
+              <Btn title="Find technicians →" busy={busy} onPress={loadAvailability} />
             </Row>
           </Card>
         )}
@@ -292,33 +297,27 @@ export default function Book() {
         {/* step 4 - technician + confirm */}
         {step === 4 && (
           <>
-            {/* No picker: the job always goes to the CLOSEST available verified
-                technician. This card just shows the customer who that is. */}
+            {/* Identity-free by design: the customer meets their technician only
+                after that technician accepts (client rule 2026-08-29). */}
             <Card style={{ marginBottom: S.md }}>
-              <Text style={st.stepTitle}>ባለሙያ · Your technician</Text>
-              {nearest ? (
+              <Text style={st.stepTitle}>ባለሙያ · Technician</Text>
+              {avail && avail.available > 0 ? (
                 <>
-                  <Row style={{ gap: 12, marginTop: S.md }}>
-                    <Avatar name={nearest.name} url={nearest.avatarUrl} size={48} online />
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Row style={{ gap: 5 }}>
-                        <Text style={st.provName} numberOfLines={1}>
-                          {nearest.name ?? 'Technician'}
-                        </Text>
-                        <MaterialCommunityIcons name="check-decagram" size={14} color={C.green} />
-                      </Row>
-                      <Hint numberOfLines={1}>
-                        Closest to you · {fmtDistance(nearest.distanceM)}
-                        {nearest.etaMinutes ? ` · ~${nearest.etaMinutes} min away` : ''}
-                      </Hint>
-                    </View>
+                  <Row style={{ gap: 10, marginTop: S.md }}>
+                    <MaterialCommunityIcons name="account-check" size={22} color={C.green} />
+                    <Text style={st.availTitle}>
+                      {avail.available} verified {avail.available === 1 ? 'technician' : 'technicians'} near you
+                    </Text>
                   </Row>
-                  <Hint style={{ marginTop: S.md }}>
-                    They have 5 minutes to accept. If they do not respond, our dispatch team
-                    assigns another technician for you right away.
+                  <Hint style={{ marginTop: 6 }}>
+                    The closest one gets your request first
+                    {avail.nearestEtaMinutes ? ` - roughly ${avail.nearestEtaMinutes} minutes away` : ''}.
+                    They have 5 minutes to accept; if they do not respond, our dispatch team
+                    assigns another technician for you. You see their name and photo as soon as
+                    the job is accepted.
                   </Hint>
                   <Am style={{ marginTop: 6 }}>
-                    በ5 ደቂቃ ውስጥ ካልመለሱ የእኛ ቡድን ሌላ ባለሙያ ይመድብልዎታል
+                    ባለሙያው ስራውን ሲቀበል ስሙና ፎቶው ይታይዎታል
                   </Am>
                 </>
               ) : (
@@ -332,7 +331,7 @@ export default function Book() {
             <Card>
               <Text style={st.stepTitle}>ያረጋግጡ · Confirm</Text>
               {[
-                ['Service', category ? `${category.nameAm} - ${category.nameEn}` : '-'],
+                ['Service', subService || (category ? `${category.nameEn}` : '-')],
                 ['Location', subCity || `${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}`],
                 ['Landmark', landmark || '-'],
                 ['Photo', photoKey ? 'Attached ✓' : '-'],
@@ -386,6 +385,7 @@ const st = StyleSheet.create({
   catTileOn: { borderColor: C.blue, backgroundColor: C.blueSoft },
   catName: { fontFamily: F.bodySemi, fontSize: 13, color: C.ink },
   stepTitle: { fontFamily: F.displayBold, fontSize: 15.5, color: C.navy },
+  availTitle: { fontFamily: F.bodySemi, fontSize: 14, color: C.navy, flexShrink: 1 },
   label: { fontFamily: F.bodySemi, fontSize: 13, color: C.navy, marginBottom: 6 },
   gpsBox: {
     flexDirection: 'row',
@@ -411,18 +411,6 @@ const st = StyleSheet.create({
   chipOn: { backgroundColor: C.navy, borderColor: C.navy },
   chipText: { fontFamily: F.bodyMedium, fontSize: 12, color: C.ink },
   photo: { width: 84, height: 84, borderRadius: R.md, borderWidth: 1, borderColor: C.line },
-  provRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.line,
-  },
-  provRowOn: { backgroundColor: C.blueSoft, borderRadius: R.sm, paddingHorizontal: 8 },
-  provName: { fontFamily: F.bodySemi, fontSize: 13.5, color: C.ink },
-  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: C.line },
-  radioOn: { borderColor: C.blue, backgroundColor: C.blue },
   receiptRow: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: C.line },
   receiptV: { fontFamily: F.bodyMedium, fontSize: 13, color: C.ink, flex: 1 },
 });

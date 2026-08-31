@@ -3,20 +3,19 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDocumentDto, UpsertProfileDto } from './providers.dto';
 
-export interface NearbyProvider {
-  id: string;
-  name: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-  subCity: string | null;
-  woreda: string | null;
-  yearsExperience: number | null;
-  ratingAvg: number;
-  ratingCount: number;
-  jobsCompleted: number;
-  lat: number | null;
-  lng: number | null;
-  distanceM: number;
+/** Average urban travel speed for the ETA estimate - Addis traffic (mirrors bookings.service). */
+const AVG_SPEED_KMH = 18;
+
+/**
+ * Identity-free availability answer for the booking flow. Client rule
+ * 2026-08-29: a customer must not see WHO the technician is until that
+ * technician accepts the job (or Ops assigns one), so the booking screen only
+ * learns whether anyone is in range and how far the closest one is.
+ */
+export interface CategoryAvailability {
+  available: number;
+  nearestDistanceM: number | null;
+  nearestEtaMinutes: number | null;
 }
 
 /** A dispatchable technician, with the contact fields the notifier needs. */
@@ -111,24 +110,13 @@ export class ProvidersService {
     });
   }
 
-  /** Ranked verified+available providers whose service radius covers the given point. */
-  nearby(lat: number, lng: number, categoryId: string): Promise<NearbyProvider[]> {
-    return this.prisma.$queryRaw<NearbyProvider[]>(Prisma.sql`
-      SELECT p."id",
-             u."name",
-             p."bio",
-             p."avatarUrl",
-             p."subCity",
-             p."woreda",
-             p."yearsExperience",
-             p."ratingAvg",
-             p."ratingCount",
-             p."jobsCompleted",
-             p."lat",
-             p."lng",
-             ST_Distance(p."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography) AS "distanceM"
+  /** How many verified, available technicians of this trade are in range,
+   *  and how far the closest one is - no names, photos or ids. */
+  async availability(lat: number, lng: number, categoryId: string): Promise<CategoryAvailability> {
+    const rows = await this.prisma.$queryRaw<{ n: bigint; nearest: number | null }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS "n",
+             MIN(ST_Distance(p."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography)) AS "nearest"
       FROM "ProviderProfile" p
-      JOIN "User" u ON u."id" = p."userId"
       WHERE p."verificationStatus" = 'VERIFIED'
         AND p."isAvailable" = true
         AND p."categoryId" = ${categoryId}
@@ -136,15 +124,21 @@ export class ProvidersService {
         AND ST_DWithin(
               p."location",
               ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
-              p."serviceRadiusKm" * 1000)
-      ORDER BY "distanceM" ASC, p."ratingAvg" DESC
-      LIMIT 10`);
+              p."serviceRadiusKm" * 1000)`);
+    const row = rows[0];
+    const nearest = row?.nearest ?? null;
+    return {
+      available: Number(row?.n ?? 0),
+      nearestDistanceM: nearest,
+      nearestEtaMinutes:
+        nearest === null ? null : Math.max(5, Math.round((nearest / 1000 / AVG_SPEED_KMH) * 60)),
+    };
   }
 
   /**
    * Dispatch candidates, closest first (client decision 2026-08-29: proximity
-   * alone decides who is offered a job - no rating weighting). Same filter as
-   * nearby(), minus technicians the booking was already offered to.
+   * alone decides who is offered a job - no rating weighting). Verified, available,
+   * in-radius, minus technicians the booking was already offered to.
    */
   candidates(
     lat: number,

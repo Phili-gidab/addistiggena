@@ -14,9 +14,18 @@ import { ProvidersService } from './providers.service';
 export class ProvidersController {
   constructor(private readonly providers: ProvidersService) {}
 
+  /** Identity-free: how many technicians of this trade cover this point.
+   *  Customers must not learn WHO before that technician accepts (client rule). */
+  @Get('availability')
+  categoryAvailability(@Query() query: NearbyQueryDto) {
+    return this.providers.availability(query.lat, query.lng, query.categoryId);
+  }
+
+  /** Deprecated alias kept so already-installed app builds degrade gracefully
+   *  instead of erroring - returns the same identity-free payload. */
   @Get('nearby')
   nearby(@Query() query: NearbyQueryDto) {
-    return this.providers.nearby(query.lat, query.lng, query.categoryId);
+    return this.providers.availability(query.lat, query.lng, query.categoryId);
   }
 
   @Get('me')

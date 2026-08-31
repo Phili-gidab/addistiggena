@@ -3,15 +3,13 @@
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { Stars } from '../../components/Stars';
 import {
   api,
   authorizedFetch,
   Booking,
   Category,
-  fmtDistance,
   getToken,
-  NearbyProvider,
+  CategoryAvailability,
 } from '../../lib/api';
 import { SUB_CITIES } from '../../lib/areas';
 import { iconFor } from '../../lib/catalog';
@@ -28,7 +26,7 @@ const ADDIS = { lat: 9.0108, lng: 38.7613 };
 const WIZ_STEPS = [
   { n: 1, t: 'Service', am: 'አገልግሎት' },
   { n: 2, t: 'Location', am: 'ቦታ' },
-  { n: 3, t: 'Technician', am: 'ባለሙያ' },
+  { n: 3, t: 'Dispatch', am: 'ላኪ' },
   { n: 4, t: 'Confirm', am: 'ማረጋገጫ' },
 ];
 
@@ -39,6 +37,8 @@ function BookWizard() {
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState(params.get('category') ?? '');
+  /** the exact service picked on the category page - booked as-is */
+  const [service] = useState(params.get('service') ?? '');
   const [pos, setPos] = useState(ADDIS);
   const [geoLocked, setGeoLocked] = useState(false);
   const [subCity, setSubCity] = useState('');
@@ -48,7 +48,7 @@ function BookWizard() {
   const [photoKey, setPhotoKey] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [providers, setProviders] = useState<NearbyProvider[] | null>(null);
+  const [avail, setAvail] = useState<CategoryAvailability | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -81,20 +81,19 @@ function BookWizard() {
   }
 
   const category = categories.find((c) => c.id === categoryId);
-  /** /providers/nearby is ordered closest-first - the head is who gets the job. */
-  const nearest = providers?.[0] ?? null;
   const areaLabel = [subCity, neighborhood].filter(Boolean).join(' · ');
   // the API stores one landmark note - prefix it with the mapped service area
   const fullLandmark = [areaLabel, landmark].filter(Boolean).join(' - ');
 
-  async function loadNearby() {
+  async function loadAvailability() {
     setBusy(true);
     setError('');
     try {
-      const list = await api<NearbyProvider[]>(
-        `/providers/nearby?lat=${pos.lat}&lng=${pos.lng}&categoryId=${categoryId}`,
+      setAvail(
+        await api<CategoryAvailability>(
+          `/providers/availability?lat=${pos.lat}&lng=${pos.lng}&categoryId=${categoryId}`,
+        ),
       );
-      setProviders(list);
       setStep(3);
     } catch (err) {
       setError((err as Error).message);
@@ -115,7 +114,7 @@ function BookWizard() {
           lat: pos.lat,
           lng: pos.lng,
           landmarkNote: fullLandmark || undefined,
-          description: description || undefined,
+          description: [service, description].filter(Boolean).join(' - ') || undefined,
           photoObjectKey: photoKey ?? undefined,
         }),
       });
@@ -308,7 +307,7 @@ function BookWizard() {
                   <button className="btn btn-line btn-sm" onClick={() => setStep(1)}>
                     ← Back
                   </button>
-                  <button className="btn btn-primary" disabled={busy} onClick={loadNearby}>
+                  <button className="btn btn-primary" disabled={busy} onClick={loadAvailability}>
                     {busy ? 'Searching…' : 'Find technicians →'}
                   </button>
                 </div>
@@ -318,40 +317,26 @@ function BookWizard() {
             {/* step 3 - technician */}
             {step === 3 && (
               <div className="panel">
-                <h2>Your technician · ባለሙያዎ</h2>
-                {/* No picker: the job always goes to the CLOSEST available verified
-                    technician; this only shows the customer who that is. */}
-                {nearest ? (
+                <h2>Dispatch · ላኪ</h2>
+                {/* Identity-free by design: the customer meets their technician only
+                    after that technician accepts (client rule 2026-08-29). */}
+                {avail && avail.available > 0 ? (
                   <>
-                    <div className="tech-card" style={{ cursor: 'default' }}>
-                      {nearest.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="avatar avatar-img" src={nearest.avatarUrl} alt="" />
-                      ) : (
-                        <span className="avatar">{(nearest.name ?? 'T').slice(0, 1)}</span>
-                      )}
-                      <span className="meta">
-                        <span className="name">
-                          {nearest.name ?? 'Technician'}
-                          <span className="verified">✔ verified</span>
-                        </span>
-                        <span className="sub">
-                          <Stars value={nearest.ratingAvg} small />{' '}
-                          {nearest.ratingCount > 0
-                            ? `${nearest.ratingAvg.toFixed(1)} (${nearest.ratingCount})`
-                            : 'New'}{' '}
-                          · {nearest.jobsCompleted} jobs
-                          {nearest.subCity ? ` · ${nearest.subCity}` : ''}
-                          {nearest.yearsExperience ? ` · ${nearest.yearsExperience}+ yrs` : ''}
-                        </span>
-                      </span>
-                      <span className="dist-chip">{fmtDistance(nearest.distanceM)}</span>
+                    <div className="ok-box">
+                      <strong>
+                        {avail.available} verified{' '}
+                        {category?.nameEn.toLowerCase()} technician
+                        {avail.available === 1 ? '' : 's'} cover your pin
+                      </strong>
+                      {avail.nearestEtaMinutes
+                        ? ` - the closest is roughly ${avail.nearestEtaMinutes} minutes away.`
+                        : '.'}
                     </div>
                     <p className="hint mt">
-                      This is the closest verified {category?.nameEn.toLowerCase()} technician to
-                      your pin. They have <strong style={{ color: 'var(--navy)' }}>5 minutes</strong>{' '}
-                      to accept - if they do not respond, our dispatch team assigns another
-                      technician for you right away.
+                      Your request goes to the <strong style={{ color: 'var(--navy)' }}>closest</strong>{' '}
+                      one first. They have <strong style={{ color: 'var(--navy)' }}>5 minutes</strong> to
+                      accept; if they do not respond, our dispatch team assigns another technician for
+                      you. You see their name, photo and rating as soon as the job is accepted.
                     </p>
                   </>
                 ) : (
@@ -378,15 +363,11 @@ function BookWizard() {
                 <h2>Confirm · ያረጋግጡ</h2>
                 <div className="receipt-row">
                   <span className="k">Service</span>
-                  <span className="v">
-                    {category?.nameAm} - {category?.nameEn}
-                  </span>
+                  <span className="v">{service || `${category?.nameAm} - ${category?.nameEn}`}</span>
                 </div>
                 <div className="receipt-row">
                   <span className="k">Technician</span>
-                  <span className="v">
-                    {nearest ? `${nearest.name ?? 'Technician'} (closest)` : 'Nearest available'}
-                  </span>
+                  <span className="v">Closest available - assigned on acceptance</span>
                 </div>
                 {photoKey && (
                   <div className="receipt-row">
@@ -459,7 +440,7 @@ function BookWizard() {
             <div className="sum-row">
               <span className="k">Technician</span>
               <span className={`v${step > 2 ? '' : ' empty'}`}>
-                {step > 2 ? (nearest ? `${nearest.name ?? 'Technician'} (closest)` : 'Nearest available') : '-'}
+                {step > 2 ? 'Closest available' : '-'}
               </span>
             </div>
             <p className="sum-note">

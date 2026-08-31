@@ -12,7 +12,7 @@ export class RootController {
       endpoints: [
         'GET  /health',
         'GET  /catalog/categories',
-        'GET  /providers/nearby?lat&lng&categoryId',
+        'GET  /providers/availability?lat&lng&categoryId',
         'POST /auth/otp/request',
         'POST /auth/otp/verify',
         'POST /bookings (auth)',

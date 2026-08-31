@@ -1,40 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Stars } from '../../../components/Stars';
 import { API_URL, Category } from '../../../lib/api';
 import { catalogBySlug, iconFor } from '../../../lib/catalog';
 import { tradeImg } from '../../../lib/images';
 import { DIAGNOSTIC, fmtRange, rateGroupFor } from '../../../lib/pricing';
-
-interface FeaturedProvider {
-  id: string;
-  name: string | null;
-  avatarUrl: string | null;
-  ratingAvg: number;
-  ratingCount: number;
-  jobsCompleted: number;
-  isAvailable: boolean;
-  subCity: string | null;
-  yearsExperience: number | null;
-  category: { id: string; slug: string };
-}
 
 async function getCategories(): Promise<Category[]> {
   try {
     const res = await fetch(`${API_URL}/catalog/categories`, { next: { revalidate: 120 } });
     if (!res.ok) return [];
     return (await res.json()) as Category[];
-  } catch {
-    return [];
-  }
-}
-
-async function getFeatured(): Promise<FeaturedProvider[]> {
-  try {
-    const res = await fetch(`${API_URL}/catalog/featured`, { next: { revalidate: 120 } });
-    if (!res.ok) return [];
-    return (await res.json()) as FeaturedProvider[];
   } catch {
     return [];
   }
@@ -50,19 +26,19 @@ export async function generateMetadata({
   if (!c) return { title: 'Service - Addis Tiggena' };
   return {
     title: `${c.nameEn} · ${c.nameAm} - Addis Tiggena`,
-    description: `${catalogBySlug(c.slug)?.scope ?? c.nameEn} Verified technicians across all 11 sub-cities of Addis Ababa, standard published rates and a 5-day guarantee.`,
+    description: `${catalogBySlug(c.slug)?.scope ?? c.nameEn} Verified technicians across all 11 sub-cities of Addis Ababa, standard published rates and a 5-day guarantee.`.trim(),
   };
 }
 
-/** Category page - browse what the trade covers, the rates and the verified
- *  technicians. Booking is an explicit click from here, never automatic. */
+/** Category page - browse what the trade covers and what it costs. Technicians
+ *  are deliberately not listed: a customer meets one only after that technician
+ *  accepts the job. Booking is an explicit click on ONE service. */
 export default async function ServicePage({ params }: { params: { slug: string } }) {
-  const [categories, featured] = await Promise.all([getCategories(), getFeatured()]);
+  const categories = await getCategories();
   const category = categories.find((c) => c.slug === params.slug);
   if (!category) notFound();
 
   const entry = catalogBySlug(category.slug);
-  const pros = featured.filter((p) => p.category.slug === category.slug);
   const services = [...(category.subServices ?? []), ...(entry?.services ?? [])].filter(
     (s, i, arr) => arr.indexOf(s) === i,
   );
@@ -90,8 +66,8 @@ export default async function ServicePage({ params }: { params: { slug: string }
           </h1>
           {entry?.scope && <p className="svc-hero-lede">{entry.scope}</p>}
           <div className="svc-hero-cta">
-            <Link href={`/book?category=${category.id}`} className="btn btn-primary btn-lg">
-              Book this service · ይህን አገልግሎት ይዘዙ
+            <Link href={services.length > 0 ? '#pick' : `/book?category=${category.id}`} className="btn btn-primary btn-lg">
+              {services.length > 0 ? 'Choose a service · አገልግሎት ይምረጡ' : 'Book this service · ይዘዙ'}
             </Link>
             {category.priceFloorEtb && (
               <span className="svc-from">from ETB {category.priceFloorEtb}</span>
@@ -104,11 +80,19 @@ export default async function ServicePage({ params }: { params: { slug: string }
         <div>
           {/* what we fix */}
           {services.length > 0 && (
-            <section className="panel mb">
+            <section className="panel mb" id="pick">
               <h2>What we fix · የምንሰራቸው ስራዎች</h2>
-              <ul className="svc-list">
+              <p className="hint" style={{ marginBottom: '0.7rem' }}>
+                Pick the exact job you need - the booking is made for that service.
+              </p>
+              <ul className="svc-list pick">
                 {services.map((s) => (
-                  <li key={s}>{s}</li>
+                  <li key={s}>
+                    <Link href={`/book?category=${category.id}&service=${encodeURIComponent(s)}`}>
+                      <span>{s}</span>
+                      <span className="pick-cta">Book →</span>
+                    </Link>
+                  </li>
                 ))}
               </ul>
             </section>
@@ -125,6 +109,7 @@ export default async function ServicePage({ params }: { params: { slug: string }
                       <th>Service item</th>
                       <th>Description / scope</th>
                       <th>Price range</th>
+                      <th aria-label="Book" />
                     </tr>
                   </thead>
                   <tbody>
@@ -139,6 +124,14 @@ export default async function ServicePage({ params }: { params: { slug: string }
                           <span className="am-cell">{i.scopeAm}</span>
                         </td>
                         <td className="range">{fmtRange(i)}</td>
+                        <td className="range">
+                          <Link
+                            href={`/book?category=${category.id}&service=${encodeURIComponent(i.name)}`}
+                            className="btn btn-primary btn-sm"
+                          >
+                            Book
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -173,42 +166,6 @@ export default async function ServicePage({ params }: { params: { slug: string }
             </section>
           )}
 
-          {/* technicians */}
-          <section className="panel">
-            <h2>Verified technicians · የተረጋገጡ ባለሙያዎች</h2>
-            {pros.length === 0 ? (
-              <p className="hint">
-                No technician is featured in this trade yet - book anyway and the nearest available
-                professional is dispatched to you.
-              </p>
-            ) : (
-              <div className="svc-pros">
-                {pros.map((p) => (
-                  <div key={p.id} className="tech-card" style={{ cursor: 'default' }}>
-                    {p.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className="avatar avatar-img" src={p.avatarUrl} alt="" />
-                    ) : (
-                      <span className="avatar">{(p.name ?? 'T').slice(0, 1)}</span>
-                    )}
-                    <span className="meta">
-                      <span className="name">
-                        {p.name ?? 'Technician'}
-                        <span className="verified">✔ verified</span>
-                      </span>
-                      <span className="sub">
-                        <Stars value={p.ratingAvg} small />{' '}
-                        {p.ratingCount > 0 ? `${p.ratingAvg.toFixed(1)} (${p.ratingCount})` : 'New'}{' '}
-                        · {p.jobsCompleted} jobs
-                        {p.subCity ? ` · ${p.subCity}` : ''}
-                        {p.yearsExperience ? ` · ${p.yearsExperience}+ yrs` : ''}
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
         </div>
 
         {/* sticky booking rail */}
@@ -220,11 +177,11 @@ export default async function ServicePage({ params }: { params: { slug: string }
               is dispatched - average arrival 15-30 minutes, with a 5-day guarantee on every repair.
             </p>
             <Link
-              href={`/book?category=${category.id}`}
+              href={services.length > 0 ? '#pick' : `/book?category=${category.id}`}
               className="btn btn-primary"
               style={{ width: '100%' }}
             >
-              Book this service →
+              {services.length > 0 ? 'Choose a service →' : 'Book this service →'}
             </Link>
             <Link
               href="/#services"

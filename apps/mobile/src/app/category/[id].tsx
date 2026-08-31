@@ -3,31 +3,28 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Avatar, Btn, Card, CatIcon, Hint, Row } from '../../components/ui';
-import { api, Category, FeaturedProvider } from '../../lib/api';
+import { Am, Btn, Card, CatIcon, Hint } from '../../components/ui';
+import { api, Category } from '../../lib/api';
 import { POPULAR } from '../../lib/catalog';
 import { tradeImg } from '../../lib/images';
 import { C, F, R, S, SHADOW } from '../../lib/theme';
 
 /**
- * Category page - browse before booking: what the trade covers, the standard
- * rates, and the verified technicians who do it. Booking starts only when the
- * customer taps a book button.
+ * Category page - browse before booking: what the trade covers and what it
+ * costs. Technicians are deliberately NOT listed: a customer only meets one
+ * after that technician accepts the job (or Ops assigns one). Booking starts
+ * only when the customer picks a specific service and taps the book bar.
  */
 export default function CategoryPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, service } = useLocalSearchParams<{ id: string; service?: string }>();
   const [category, setCategory] = useState<Category | null>(null);
-  const [pros, setPros] = useState<FeaturedProvider[]>([]);
+  const [picked, setPicked] = useState<string>('');
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [cats, featured] = await Promise.all([
-        api<Category[]>('/catalog/categories'),
-        api<FeaturedProvider[]>('/catalog/featured').catch(() => [] as FeaturedProvider[]),
-      ]);
+      const cats = await api<Category[]>('/catalog/categories');
       setCategory(cats.find((c) => c.id === id) ?? null);
-      setPros(featured.filter((p) => p.category.id === id));
     } catch {
       /* offline - keep what we have */
     }
@@ -37,8 +34,13 @@ export default function CategoryPage() {
     load();
   }, [load]);
 
-  const book = (desc?: string) =>
-    router.push({ pathname: '/(customer)/book', params: { category: id, desc } });
+  // arriving from a "popular repair" tap preselects that exact service
+  useEffect(() => {
+    if (service) setPicked(String(service));
+  }, [service]);
+
+  const book = (desc: string) =>
+    router.push({ pathname: '/(customer)/book', params: { category: id, service: desc } });
 
   if (!category) {
     return (
@@ -51,6 +53,9 @@ export default function CategoryPage() {
   }
 
   const rates = POPULAR.filter((p) => p.slug === category.slug);
+  /** every bookable service on this page - if there are none, a general
+   *  request for the trade is allowed */
+  const choices = [...(category.subServices ?? []), ...rates.map((r) => r.name)];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['bottom']}>
@@ -87,11 +92,16 @@ export default function CategoryPage() {
                   <Pressable
                     key={sv}
                     style={[st.svRow, i === category.subServices!.length - 1 && { borderBottomWidth: 0 }]}
-                    onPress={() => book(sv)}
+                    onPress={() => setPicked(picked === sv ? '' : sv)}
                   >
-                    <MaterialCommunityIcons name="check-circle-outline" size={18} color={C.blue} />
-                    <Text style={st.svText}>{sv}</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={18} color={C.muted} />
+                    <MaterialCommunityIcons
+                      name={picked === sv ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                      size={18}
+                      color={picked === sv ? C.blue : C.line}
+                    />
+                    <Text style={[st.svText, picked === sv && { color: C.navy, fontFamily: F.bodySemi }]}>
+                      {sv}
+                    </Text>
                   </Pressable>
                 ))}
               </Card>
@@ -104,7 +114,11 @@ export default function CategoryPage() {
               <Text style={st.section}>Standard rates</Text>
               <Am style={{ fontSize: 11.5, marginBottom: S.md }}>ግልፅ የዋጋ ተመን</Am>
               {rates.map((r) => (
-                <Pressable key={r.name} style={st.rateRow} onPress={() => book(r.name)}>
+                <Pressable
+                  key={r.name}
+                  style={[st.rateRow, picked === r.name && st.rateRowOn]}
+                  onPress={() => setPicked(picked === r.name ? '' : r.name)}
+                >
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={st.rateName} numberOfLines={1}>
                       {r.name}
@@ -121,49 +135,28 @@ export default function CategoryPage() {
             </View>
           )}
 
-          {/* technicians in this trade */}
-          <View>
-            <Text style={st.section}>Verified technicians</Text>
-            <Am style={{ fontSize: 11.5, marginBottom: S.md }}>የተረጋገጡ ባለሙያዎች</Am>
-            {pros.length === 0 && (
-              <Hint>
-                No technician is featured here yet - book anyway and the nearest available
-                professional in this trade is dispatched to you.
-              </Hint>
-            )}
-            {pros.map((p) => (
-              <Card key={p.id} style={{ marginBottom: S.sm }}>
-                <Row style={{ gap: 12 }}>
-                  <Avatar name={p.name} url={p.avatarUrl} size={48} online={p.isAvailable} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Row style={{ gap: 5 }}>
-                      <Text style={st.proName} numberOfLines={1}>
-                        {p.name ?? 'Technician'}
-                      </Text>
-                      <MaterialCommunityIcons name="check-decagram" size={14} color={C.green} />
-                    </Row>
-                    <Hint numberOfLines={1}>
-                      {p.subCity ?? 'Addis Ababa'}
-                      {p.yearsExperience ? ` · ${p.yearsExperience} yrs` : ''}
-                    </Hint>
-                    <Row style={{ gap: 4, marginTop: 3 }}>
-                      <MaterialCommunityIcons name="star" size={13} color="#f5a623" />
-                      <Text style={st.proRating} numberOfLines={1}>
-                        {p.ratingCount ? `${p.ratingAvg.toFixed(1)} (${p.ratingCount})` : 'New'}
-                        {p.jobsCompleted ? ` · ${p.jobsCompleted} jobs` : ''}
-                      </Text>
-                    </Row>
-                  </View>
-                </Row>
-              </Card>
-            ))}
-          </View>
         </View>
       </ScrollView>
 
-      {/* the only route into booking from this screen */}
+      {/* the only route into booking from this screen - always for ONE service */}
       <View style={st.bar}>
-        <Btn title="Book this service · ይህን አገልግሎት ይዘዙ" onPress={() => book()} style={{ width: '100%' }} />
+        {picked ? (
+          <Text style={st.barPick} numberOfLines={1}>
+            {picked}
+          </Text>
+        ) : (
+          <Text style={st.barHint} numberOfLines={1}>
+            {choices.length > 0
+              ? 'Choose a service above · አገልግሎት ይምረጡ'
+              : `${category.nameEn} - general request`}
+          </Text>
+        )}
+        <Btn
+          title={picked ? 'Book this service · ይህን ይዘዙ' : 'Book · ይዘዙ'}
+          disabled={choices.length > 0 && !picked}
+          onPress={() => book(picked || category.nameEn)}
+          style={{ width: '100%' }}
+        />
       </View>
     </SafeAreaView>
   );
@@ -224,10 +217,23 @@ const st = StyleSheet.create({
     padding: S.md,
     marginBottom: S.sm,
   },
+  rateRowOn: { borderColor: C.blue, backgroundColor: C.blueSoft },
   rateName: { fontFamily: F.bodySemi, fontSize: 13, color: C.ink },
   ratePrice: { fontFamily: F.bodySemi, fontSize: 11.5, color: C.blueDeep, flexShrink: 0 },
-  proName: { fontFamily: F.bodySemi, fontSize: 14, color: C.ink, flexShrink: 1 },
-  proRating: { fontFamily: F.bodyMedium, fontSize: 12, color: C.muted },
+  barPick: {
+    fontFamily: F.bodySemi,
+    fontSize: 13,
+    color: C.navy,
+    marginBottom: S.sm,
+    textAlign: 'center',
+  },
+  barHint: {
+    fontFamily: F.body,
+    fontSize: 12.5,
+    color: C.muted,
+    marginBottom: S.sm,
+    textAlign: 'center',
+  },
   bar: {
     padding: S.lg,
     paddingTop: S.md,

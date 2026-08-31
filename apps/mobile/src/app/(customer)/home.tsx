@@ -17,8 +17,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Avatar, CatIcon, Hint, Row, StatusPill } from '../../components/ui';
-import { api, Booking, Category, FeaturedProvider } from '../../lib/api';
+import { Am, CatIcon, Hint, Row, StatusPill } from '../../components/ui';
+import { api, Booking, Category } from '../../lib/api';
 import { POPULAR } from '../../lib/catalog';
 import {
   BAND_IMG,
@@ -65,15 +65,15 @@ const SLIDES = [
   },
 ];
 
-/** Customer home - search, promo carousel, live booking, categories,
- *  featured technicians, popular repairs and the trust band. */
+/** Customer home - search, promo carousel, live booking, categories, popular
+ *  repairs and the trust band. Technicians are never shown here: a customer
+ *  only meets one once that technician accepts their job (client rule). */
 export default function Home() {
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   const slideW = width - S.lg * 2;
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [featured, setFeatured] = useState<FeaturedProvider[]>([]);
   const [active, setActive] = useState<Booking | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [q, setQ] = useState('');
@@ -82,13 +82,11 @@ export default function Home() {
 
   const load = useCallback(async () => {
     try {
-      const [cats, pros, mine] = await Promise.all([
+      const [cats, mine] = await Promise.all([
         api<Category[]>('/catalog/categories'),
-        api<FeaturedProvider[]>('/catalog/featured').catch(() => [] as FeaturedProvider[]),
         api<Booking[]>('/bookings/mine').catch(() => [] as Booking[]),
       ]);
       setCategories(cats);
-      setFeatured(pros);
       setActive(
         mine.find((b) =>
           ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(b.status),
@@ -132,10 +130,10 @@ export default function Home() {
       .slice(0, 5);
   }, [q, categories]);
 
-  /** Browse a trade first - booking is always an explicit choice from there. */
-  const goCategory = (categoryId: string) => router.push(`/category/${categoryId}`);
-  const goBook = (categoryId?: string, desc?: string) =>
-    router.push({ pathname: '/(customer)/book', params: { category: categoryId, desc } });
+  /** Browsing only - booking always starts from an explicit action on the
+   *  category page (client rule), optionally with a service preselected. */
+  const goCategory = (categoryId: string, service?: string) =>
+    router.push({ pathname: '/category/[id]', params: { id: categoryId, service } });
 
   const firstName = user?.name?.split(' ')[0];
 
@@ -181,7 +179,7 @@ export default function Home() {
               value={q}
               onChangeText={setQ}
               returnKeyType="search"
-              onSubmitEditing={() => matches[0] && goBook(matches[0].id)}
+              onSubmitEditing={() => matches[0] && goCategory(matches[0].id)}
             />
             {q.length > 0 && (
               <Pressable onPress={() => setQ('')}>
@@ -306,54 +304,6 @@ export default function Home() {
           ))}
         </ScrollView>
 
-        {/* ── featured technicians ───────────────────────────────────────── */}
-        {featured.length > 0 && (
-          <>
-            <Row style={st.sectionHead}>
-              <View>
-                <Text style={st.section}>Top technicians</Text>
-                <Am style={{ fontSize: 11.5 }}>ምርጥ ባለሙያዎች</Am>
-              </View>
-            </Row>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.rail}>
-              {featured.map((p) => (
-                <Pressable key={p.id} style={st.proCard} onPress={() => goCategory(p.category.id)}>
-                  <Row style={{ gap: 10 }}>
-                    <Avatar name={p.name} url={p.avatarUrl} size={44} online={p.isAvailable} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={st.proName} numberOfLines={1}>
-                        {p.name ?? 'Technician'}
-                      </Text>
-                      <View style={st.verified}>
-                        <MaterialCommunityIcons name="check-decagram" size={12} color={C.green} />
-                        <Text style={st.verifiedText}>Verified · የተረጋገጠ</Text>
-                      </View>
-                    </View>
-                  </Row>
-                  <Text style={st.proCat} numberOfLines={1}>
-                    {p.category.nameEn}
-                    {p.subCity ? ` · ${p.subCity}` : ''}
-                  </Text>
-                  <Row style={{ justifyContent: 'space-between', marginTop: 8 }}>
-                    <Row style={{ gap: 4, flexShrink: 1 }}>
-                      <MaterialCommunityIcons name="star" size={14} color="#f5a623" />
-                      <Text style={st.proRating} numberOfLines={1}>
-                        {p.ratingCount ? `${p.ratingAvg.toFixed(1)} (${p.ratingCount})` : 'New'}
-                        {p.jobsCompleted > 0 ? ` · ${p.jobsCompleted} jobs` : ''}
-                      </Text>
-                    </Row>
-                    {p.category.priceFloorEtb && (
-                      <Text style={st.proPrice} numberOfLines={1}>
-                        from {Number(p.category.priceFloorEtb)} ETB
-                      </Text>
-                    )}
-                  </Row>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </>
-        )}
-
         {/* ── popular repairs ────────────────────────────────────────────── */}
         <Row style={st.sectionHead}>
           <View>
@@ -368,7 +318,7 @@ export default function Home() {
               <Pressable
                 key={s.name}
                 style={({ pressed }) => [st.popRow, pressed && { opacity: 0.85 }]}
-                onPress={() => goBook(cat?.id, s.name)}
+                onPress={() => cat && goCategory(cat.id, s.name)}
               >
                 <Image source={{ uri: tradeImg(s.slug) }} style={st.popThumb} resizeMode="cover" />
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -599,21 +549,6 @@ const st = StyleSheet.create({
   },
   countText: { fontFamily: F.bodySemi, fontSize: 9.5, color: C.blueDeep },
 
-  proCard: {
-    width: 230,
-    backgroundColor: '#fff',
-    borderRadius: R.lg,
-    borderWidth: 1,
-    borderColor: C.line,
-    padding: S.md,
-    ...SHADOW.card,
-  },
-  proName: { fontFamily: F.bodySemi, fontSize: 13.5, color: C.ink },
-  verified: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  verifiedText: { fontFamily: F.bodyMedium, fontSize: 10, color: C.green },
-  proCat: { fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 8 },
-  proRating: { fontFamily: F.bodySemi, fontSize: 12, color: C.ink, flexShrink: 1 },
-  proPrice: { fontFamily: F.bodySemi, fontSize: 11.5, color: C.blueDeep, flexShrink: 0, marginLeft: 6 },
 
   popRow: {
     flexDirection: 'row',

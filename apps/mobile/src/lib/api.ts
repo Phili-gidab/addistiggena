@@ -32,31 +32,14 @@ export interface Category {
   subServices?: string[];
 }
 
-/** GET /catalog/featured - top verified technicians for the home screen. */
-export interface FeaturedProvider {
-  id: string;
-  name: string | null;
-  avatarUrl: string | null;
-  ratingAvg: number;
-  ratingCount: number;
-  jobsCompleted: number;
-  isAvailable: boolean;
-  subCity: string | null;
-  yearsExperience: number | null;
-  category: Category;
-}
-
-export interface NearbyProvider {
-  id: string;
-  name: string | null;
-  avatarUrl?: string | null;
-  subCity?: string | null;
-  jobsCompleted?: number;
-  ratingAvg: number;
-  ratingCount: number;
-  distanceM: number;
-  etaMinutes: number | null;
-  bio?: string | null;
+/**
+ * GET /providers/availability - identity-free. Client rule 2026-08-29: the
+ * customer never sees WHO the technician is until they accept the job.
+ */
+export interface CategoryAvailability {
+  available: number;
+  nearestDistanceM: number | null;
+  nearestEtaMinutes: number | null;
 }
 
 export type BookingStatus =
