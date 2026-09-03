@@ -17,6 +17,7 @@ export interface NotifyTarget {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly botToken: string;
+  private readonly smsNotifications: boolean;
 
   constructor(
     private readonly sms: SmsService,
@@ -24,10 +25,14 @@ export class NotificationsService {
     config: ConfigService,
   ) {
     this.botToken = config.get<string>('BOT_TOKEN', '');
+    // Every notify() below is a paid SMS once a gateway is live. Set
+    // SMS_NOTIFICATIONS=off to keep the credit for login OTPs only (auth sends
+    // those directly, so they are unaffected); Telegram pushes still go out.
+    this.smsNotifications = config.get<string>('SMS_NOTIFICATIONS', 'on') !== 'off';
   }
 
   notify(target: NotifyTarget, text: string): void {
-    if (target.phone) {
+    if (target.phone && this.smsNotifications) {
       this.sms.send(target.phone, text).catch((err) => {
         this.logger.warn(`SMS to ${target.phone} failed: ${(err as Error).message}`);
       });
