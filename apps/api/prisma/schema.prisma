@@ -105,6 +105,8 @@ model User {
   passwordHash    String?
   /// Sub-city a SUBCITY_COORDINATOR is responsible for
   subCity         String?
+  /// Expo push token for the mobile app (one device, last registration wins)
+  pushToken       String?
   role            Role             @default(CUSTOMER)
   language        Language         @default(AM)
   telegramChatId  String?          @unique

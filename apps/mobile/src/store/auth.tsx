@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   api,
   clearSession,
+  getToken,
   loadSession,
   normalizeEtPhone,
   saveSession,
@@ -16,6 +17,8 @@ interface AuthState {
   requestOtp: (phone: string) => Promise<{ devCode?: string }>;
   verifyOtp: (phone: string, code: string) => Promise<User>;
   updateName: (name: string) => Promise<void>;
+  /** Re-read the account (e.g. after becoming a technician changes the role). */
+  refreshUser: () => Promise<User | null>;
   signOut: () => Promise<void>;
 }
 
@@ -65,14 +68,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => (prev ? { ...prev, name: updated.name } : prev));
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const fresh = await api<User>('/users/me');
+      setUser(fresh);
+      const token = getToken();
+      if (token) await saveSession(token, fresh);
+      return fresh;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await clearSession();
     setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, ready, passwordLogin, requestOtp, verifyOtp, updateName, signOut }),
-    [user, ready, passwordLogin, requestOtp, verifyOtp, updateName, signOut],
+    () => ({ user, ready, passwordLogin, requestOtp, verifyOtp, updateName, refreshUser, signOut }),
+    [user, ready, passwordLogin, requestOtp, verifyOtp, updateName, refreshUser, signOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

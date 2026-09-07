@@ -47,7 +47,7 @@ export default function Welcome() {
 
           <Pressable
             style={({ pressed }) => [st.roleCard, st.roleCardAlt, pressed && st.pressed]}
-            onPress={() => router.push('/login')}
+            onPress={() => router.push({ pathname: '/login', params: { role: 'tech' } })}
           >
             <MaterialCommunityIcons name="hammer-wrench" size={28} color={C.navy} />
             <View style={{ flex: 1 }}>

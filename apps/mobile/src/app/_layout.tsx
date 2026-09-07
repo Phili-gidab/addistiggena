@@ -5,17 +5,20 @@ import {
   NotoSansEthiopic_700Bold,
 } from '@expo-google-fonts/noto-sans-ethiopic';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
+import { registerForPush } from '../lib/push';
 import { C } from '../lib/theme';
 import { AuthProvider, useAuth } from '../store/auth';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Shell() {
-  const { ready } = useAuth();
+  const { ready, user } = useAuth();
+  const pushed = useRef(false);
   const [fontsLoaded] = useFonts({
     Montserrat_700Bold,
     Montserrat_800ExtraBold,
@@ -29,6 +32,22 @@ function Shell() {
   useEffect(() => {
     if (ready && fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [ready, fontsLoaded]);
+
+  // register the device once per signed-in session
+  useEffect(() => {
+    if (!user || pushed.current) return;
+    pushed.current = true;
+    registerForPush();
+  }, [user]);
+
+  // tapping a job notification opens that booking
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+      const id = (res.notification.request.content.data as { bookingId?: string } | undefined)?.bookingId;
+      if (id) router.push(`/booking/${id}`);
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!ready || !fontsLoaded) return null;
 

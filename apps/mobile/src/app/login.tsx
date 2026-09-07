@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,9 @@ type Stage = 'phone' | 'code' | 'name' | 'password';
 /** Phone-OTP first (the consumer flow), with a username/password door for staff & demo. */
 export default function Login() {
   const { requestOtp, verifyOtp, passwordLogin, updateName } = useAuth();
+  /** "I am a technician" on the welcome screen sets this. */
+  const { role } = useLocalSearchParams<{ role?: string }>();
+  const asTech = role === 'tech';
   const [stage, setStage] = useState<Stage>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -33,6 +36,9 @@ export default function Login() {
 
   const go = (user: User) => {
     if (user.role === 'PROVIDER') router.replace('/(tech)/jobs');
+    // came in through "I am a technician" but the account is still a plain
+    // customer - send them through onboarding rather than the customer home
+    else if (asTech) router.replace('/tech-signup');
     else router.replace('/(customer)/home');
   };
 

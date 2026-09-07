@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -134,9 +135,14 @@ export default function Jobs() {
               <Hint>
                 {verified
                   ? 'Going online shares your position so nearby jobs reach you first.'
-                  : 'Complete registration on the website - once verified you can go online here.'}
+                  : profile
+                    ? 'Your documents are with the verification desk - you can go online as soon as they approve you.'
+                    : 'Finish your technician registration to start receiving jobs.'}
               </Hint>
             </View>
+            {!profile && (
+              <Btn title="Register" small onPress={() => router.push('/tech-signup')} />
+            )}
             {verified && (
               <Switch
                 value={!!profile?.isAvailable}

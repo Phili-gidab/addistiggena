@@ -210,6 +210,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       this.notifyProvider(
         dto.providerId,
         `Addis Tiggena: አዲስ ስራ · new ${category.nameEn} job #${created.id.slice(-6)} - respond within 5 minutes`,
+        created.id,
       );
       return this.getPublic(created.id);
     }
@@ -229,13 +230,13 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.booking.findUnique({ where: { id }, include: PUBLIC_INCLUDE });
   }
 
-  private notifyProvider(providerId: string, text: string) {
+  private notifyProvider(providerId: string, text: string, bookingId?: string) {
     this.prisma.providerProfile
       .findUnique({
         where: { id: providerId },
         select: { user: { select: { phone: true, telegramChatId: true } } },
       })
-      .then((p) => p && this.notifications.notify(p.user, text))
+      .then((p) => p && this.notifications.notify(p.user, text, bookingId ? { bookingId } : undefined))
       .catch(() => {});
   }
 
@@ -324,6 +325,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     this.notifications.notify(
       { phone: next.phone, telegramChatId: next.telegramChatId },
       `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} ~${(next.distanceM / 1000).toFixed(1)}km away - respond within 5 minutes`,
+      { bookingId },
     );
     return this.getPublic(bookingId);
   }
