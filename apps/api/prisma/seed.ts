@@ -110,14 +110,24 @@ async function main() {
     },
   });
 
-  // Demo provider (verified, available, located near Meskel Square) for local development
+  // Demo provider (verified, available, located near Meskel Square) for local development.
+  // DEMO_TECH_PHONE / DEMO_TECH_NAME let a deployment point this account at a
+  // REAL technician's handset so dispatch SMS can be demonstrated end to end -
+  // keep real numbers and names in the server .env, never in this public repo.
   const plumbing = await prisma.serviceCategory.findUniqueOrThrow({ where: { slug: 'plumbing' } });
+  const demoTechPhone = process.env.DEMO_TECH_PHONE ?? '+251911000002';
+  const demoTechName = process.env.DEMO_TECH_NAME ?? 'Abebe Tesfaye';
   const providerUser = await prisma.user.upsert({
-    where: { phone: '+251911000002' },
-    update: { role: 'PROVIDER', username: 'technician', passwordHash: hash('technician') },
+    where: { phone: demoTechPhone },
+    update: {
+      role: 'PROVIDER',
+      name: demoTechName,
+      username: 'technician',
+      passwordHash: hash('technician'),
+    },
     create: {
-      phone: '+251911000002',
-      name: 'Abebe Tesfaye',
+      phone: demoTechPhone,
+      name: demoTechName,
       role: 'PROVIDER',
       username: 'technician',
       passwordHash: hash('technician'),
