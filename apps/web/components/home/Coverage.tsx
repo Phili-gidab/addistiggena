@@ -1,23 +1,18 @@
 import { SUB_CITIES } from '../../lib/areas';
+import { Dict } from '../../lib/i18n';
 
 /** Geographic coverage - all 11 sub-cities with their neighbourhoods. */
-export function Coverage() {
+export function Coverage({ t }: { t: Dict }) {
   return (
     <section className="section" id="coverage">
       <div className="container">
         <div className="section-head">
           <div>
-            <span className="sec-kicker">Coverage · የአገልግሎት ሽፋን</span>
-            <h2 className="sec-title">
-              All 11 sub-cities of Addis Ababa
-              <span className="am">በሁሉም 11 ክፍለ ከተሞች እንገኛለን</span>
-            </h2>
+            <span className="sec-kicker">{t.coverage.kicker}</span>
+            <h2 className="sec-title">{t.coverage.title}</h2>
           </div>
         </div>
-        <p className="cov-note">
-          Technicians are matched from your own surroundings - tap a sub-city to see the
-          neighbourhoods we map for dispatch.
-        </p>
+        <p className="cov-note">{t.coverage.note}</p>
         <div className="cov-grid">
           {SUB_CITIES.map((s) => (
             <details key={s.name} className="cov-card">

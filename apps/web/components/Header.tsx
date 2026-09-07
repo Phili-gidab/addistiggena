@@ -5,20 +5,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { clearSession, getUser, isStaff, User } from '../lib/api';
+import { dict, Lang } from '../lib/i18n';
 import { lockScroll } from '../lib/motion';
+import { LangToggle } from './LangToggle';
 
-const LINKS = [
-  { href: '/#services', am: 'አገልግሎቶች', en: 'Services' },
-  { href: '/pricing', am: 'ዋጋዎች', en: 'Pricing' },
-  { href: '/faq', am: 'ጥያቄዎች', en: 'FAQ' },
-  { href: '/bookings', am: 'ማስያዣዎቼ', en: 'My bookings' },
-  { href: '/provider', am: 'ለባለሙያዎች', en: 'For technicians' },
+const LINKS: { href: string; key: 'services' | 'pricing' | 'faq' | 'bookings' | 'provider' }[] = [
+  { href: '/#services', key: 'services' },
+  { href: '/pricing', key: 'pricing' },
+  { href: '/faq', key: 'faq' },
+  { href: '/bookings', key: 'bookings' },
+  { href: '/provider', key: 'provider' },
 ];
 
 /** Staff accounts work in the console - customer/technician links are noise for them. */
 const STAFF_HIDDEN = ['/bookings', '/provider'];
 
-export function Header() {
+export function Header({ lang = 'en' }: { lang?: Lang }) {
+  const t = dict(lang).nav;
   const [user, setUser] = useState<User | null>(null);
   const [open, setOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -86,25 +89,26 @@ export function Header() {
                 href={l.href}
                 className={`hide-sm nav-link${pathname === l.href ? ' active' : ''}`}
               >
-                {l.en}
+                {t[l.key]}
               </Link>
             ))}
             {isStaff(user?.role) && (
               <Link href="/admin" className="hide-sm nav-link">
-                Admin
+                {t.admin}
               </Link>
             )}
             {user ? (
               <button className="btn btn-ghost btn-sm hide-sm" onClick={() => clearSession()}>
-                {user.name ?? user.phone.replace('+251', '0')} · Sign out
+                {user.name ?? user.phone.replace('+251', '0')} · {t.signOut}
               </button>
             ) : (
               <Link href="/login" className="btn btn-ghost btn-sm hide-sm">
-                Sign in
+                {t.signIn}
               </Link>
             )}
+            <LangToggle lang={lang} />
             <Link href="/book" className="btn btn-primary btn-sm">
-              Book now
+              {t.book}
             </Link>
             <button
               className={`burger${open ? ' active' : ''}`}
@@ -126,15 +130,13 @@ export function Header() {
             {links.map((l, i) => (
               <Link key={l.href} href={l.href} className="mnav-link" onClick={() => setOpen(false)}>
                 <span className="idx">0{i + 1}</span>
-                <span className="am">{l.am}</span>
-                <span className="en">{l.en}</span>
+                <span className="en">{t[l.key]}</span>
               </Link>
             ))}
             {isStaff(user?.role) && (
               <Link href="/admin" className="mnav-link" onClick={() => setOpen(false)}>
                 <span className="idx">0{links.length + 1}</span>
-                <span className="am">አስተዳደር</span>
-                <span className="en">Admin</span>
+                <span className="en">{t.admin}</span>
               </Link>
             )}
           </div>
@@ -147,14 +149,15 @@ export function Header() {
                   setOpen(false);
                 }}
               >
-                {user.name ?? user.phone.replace('+251', '0')} · Sign out
+                {user.name ?? user.phone.replace('+251', '0')} · {t.signOut}
               </button>
             ) : (
               <Link href="/login" className="btn btn-primary" onClick={() => setOpen(false)}>
-                ይግቡ · Sign in
+                {t.signIn}
               </Link>
             )}
-            <span className="mnav-tag">Addis Ababa · አዲስ አበባ</span>
+            <LangToggle lang={lang} />
+            <span className="mnav-tag">{t.city}</span>
           </div>
         </div>
       </div>

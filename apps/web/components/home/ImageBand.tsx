@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Dict } from '../../lib/i18n';
 import { BAND_IMG } from '../../lib/images';
 
 /**
@@ -8,7 +9,7 @@ import { BAND_IMG } from '../../lib/images';
  * is dragged vertically with the scroll (classic parallax) via rAF - no
  * library, disabled under reduced motion.
  */
-export function ImageBand() {
+export function ImageBand({ t }: { t: Dict }) {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -45,9 +46,9 @@ export function ImageBand() {
         <img src={BAND_IMG} alt="" loading="lazy" />
       </div>
       <span className="img-band-word" aria-hidden>
-        እንጠግናለን
+        {t.band.word}
       </span>
-      <span className="img-band-caption">We fix. - every trade, one platform</span>
+      <span className="img-band-caption">{t.band.caption}</span>
     </section>
   );
 }

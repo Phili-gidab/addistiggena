@@ -5,6 +5,7 @@ import './globals.css';
 import { ChatWidget } from '../components/ChatWidget';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
+import { currentLang } from '../lib/lang';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 const montserrat = Montserrat({
@@ -28,15 +29,16 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const lang = currentLang();
   return (
     <html
-      lang="am"
+      lang={lang === 'am' ? 'am' : 'en'}
       className={`${inter.variable} ${montserrat.variable} ${sansEthiopic.variable}`}
     >
       <body>
-        <Header />
+        <Header lang={lang} />
         {children}
-        <Footer />
+        <Footer lang={lang} />
         <ChatWidget />
       </body>
     </html>

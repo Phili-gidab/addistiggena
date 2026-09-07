@@ -5,38 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Category } from '../../lib/api';
+import { Dict, JOB_FEED, Lang, SEARCH_PLACEHOLDERS } from '../../lib/i18n';
 import { catalogBySlug, iconFor } from '../../lib/catalog';
 import { GUARANTEE_DAYS, SLOGAN } from '../../lib/content';
 import { BAND_IMG, HERO_IMG } from '../../lib/images';
 import { finePointer, gsap, reducedMotion, useGSAP } from '../../lib/motion';
 
-const PLACEHOLDERS = [
-  'What needs fixing? e.g. Mitad, socket, tap…',
-  'Electric Mitad repair…',
-  'Leaking pipe in the kitchen…',
-  'ቧንቧ ጥገና…',
-  'Wi-Fi router keeps dropping…',
-  'Door lock replacement…',
-  'Electrician in Bole…',
-];
 
-/** Rotating pool for the live-dispatch feed on the hero card. */
-interface FeedJob {
-  ic: string;
-  b: string;
-  small: string;
-  ok: string;
-  live?: boolean;
-}
-const JOB_POOL: FeedJob[] = [
-  { ic: '⚡', b: 'Electric Mitad repair', small: 'Bole Medhanialem · today 10:24', ok: '✓ Fixed · 650 ETB' },
-  { ic: '🚰', b: 'Pipe leakage repair', small: 'Jemo 1 condominium · en route', ok: '18 min', live: true },
-  { ic: '🔌', b: 'Socket & breaker fix', small: 'Piassa · today 11:02', ok: '✓ Fixed · 400 ETB' },
-  { ic: '📶', b: 'Wi-Fi router setup', small: 'CMC Michael · en route', ok: '9 min', live: true },
-  { ic: '🧊', b: 'Fridge not cooling', small: 'Gerji Mebrat Hail · on site', ok: 'diagnosing', live: true },
-  { ic: '🚪', b: 'Door lock replacement', small: 'Lideta condominium · today 09:40', ok: '✓ Fixed · 500 ETB' },
-  { ic: '🖥️', b: 'Office printer repair', small: 'Kazanchis · en route', ok: '12 min', live: true },
-];
+
+
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,7 +22,9 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let feedUid = 1;
 
 /** Search-first hero: type what's broken, jump straight into booking. */
-export function Hero({ categories }: { categories: Category[] }) {
+export function Hero({ categories, t, lang }: { categories: Category[]; t: Dict; lang: Lang }) {
+  const PLACEHOLDERS = SEARCH_PLACEHOLDERS[lang];
+  const JOB_POOL = JOB_FEED[lang];
   const router = useRouter();
   const root = useRef<HTMLElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -53,6 +32,7 @@ export function Hero({ categories }: { categories: Category[] }) {
   const [q, setQ] = useState('');
   const [focused, setFocused] = useState(false);
   const [ph, setPh] = useState(PLACEHOLDERS[0]);
+  useEffect(() => setPh(SEARCH_PLACEHOLDERS[lang][0]), [lang]);
   const [feed, setFeed] = useState(() => [
     { uid: -1, job: JOB_POOL[0] },
     { uid: -2, job: JOB_POOL[1] },
@@ -89,7 +69,9 @@ export function Hero({ categories }: { categories: Category[] }) {
     return () => {
       alive = false;
     };
-  }, []);
+    // restart in the new language when the reader switches
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   // live-dispatch feed: a new job slides in, the oldest leaves
   useEffect(() => {
@@ -208,26 +190,17 @@ export function Hero({ categories }: { categories: Category[] }) {
           <span className="hero-tagline">{SLOGAN}</span>
           <h1 className="hero-h1">
             <span className="hl-mask">
-              <span className="hl-line" data-hl>
-                A verified technician,
+              <span className={`hl-line${lang === 'am' ? ' am-h' : ''}`} data-hl>
+                {t.hero.line1}
               </span>
             </span>
             <span className="hl-mask">
-              <span className="hl-line b" data-hl>
-                at your door in minutes.
-              </span>
-            </span>
-            <span className="hl-mask">
-              <span className="hl-line am" data-hl>
-                ማንነቱ የተረጋገጠ የጥገና ባለሙያ በደቂቃ ውስጥ በርዎ ላይ
+              <span className={`hl-line b${lang === 'am' ? ' am-h' : ''}`} data-hl>
+                {t.hero.line2}
               </span>
             </span>
           </h1>
-          <p className="hero-p">
-            Mitad, wiring, plumbing, appliances, Wi-Fi - pick a service, pin your location, and the
-            nearest Woreda-cleared, CoC-certified technician is dispatched to you. As easy as
-            ordering a ride.
-          </p>
+          <p className="hero-p">{t.hero.lede}</p>
 
           <div style={{ position: 'relative' }}>
             <form
@@ -249,10 +222,10 @@ export function Hero({ categories }: { categories: Category[] }) {
                 onChange={(e) => setQ(e.target.value)}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setTimeout(() => setFocused(false), 150)}
-                aria-label="Search services"
+                aria-label={t.hero.searchLabel}
               />
               <button className="btn btn-primary btn-sm" type="submit">
-                Find a technician
+                {t.hero.searchBtn}
               </button>
             </form>
             {focused && matches.length > 0 && (
@@ -278,28 +251,28 @@ export function Hero({ categories }: { categories: Category[] }) {
                 <span data-cnt="30">30</span>
                 <em>′</em>
               </span>
-              <span className="l">Avg. arrival</span>
+              <span className="l">{t.hero.statArrival}</span>
             </span>
             <span className="hs">
               <span className="n">
                 <span data-cnt={GUARANTEE_DAYS}>{GUARANTEE_DAYS}</span>
                 <em>-day</em>
               </span>
-              <span className="l">Guarantee</span>
+              <span className="l">{t.hero.statGuarantee}</span>
             </span>
             <span className="hs">
               <span className="n">
                 <span data-cnt="14">14</span>
                 <em>h</em>
               </span>
-              <span className="l">Open daily · 6am-8pm</span>
+              <span className="l">{t.hero.statHours}</span>
             </span>
             <span className="hs">
               <span className="n">
                 <span data-cnt="11">11</span>
                 <em>/11</em>
               </span>
-              <span className="l">Sub-cities covered</span>
+              <span className="l">{t.hero.statSubCities}</span>
             </span>
           </div>
         </div>
@@ -334,13 +307,13 @@ export function Hero({ categories }: { categories: Category[] }) {
           <div className="hero-chip">
             <span className="ic ic-ping">✔</span>
             <span>
-              <b>Abebe T. - Verified</b>
-              <small>Woreda ✓ · CoC ✓ · Fayda ID ✓</small>
+              <b>Abebe T. - {t.hero.verified}</b>
+              <small>{t.hero.verifiedSub}</small>
             </span>
             <span className="ok">★ 4.9</span>
           </div>
           <Link href="/book" className="btn btn-primary" style={{ width: '100%' }}>
-            አገልግሎት ይዘዙ · Book a service
+            {t.hero.cta}
           </Link>
         </div>
       </div>

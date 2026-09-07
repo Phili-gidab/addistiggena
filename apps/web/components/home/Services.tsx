@@ -2,26 +2,27 @@
 
 import Link from 'next/link';
 import { Category } from '../../lib/api';
+import { Dict } from '../../lib/i18n';
 import { iconFor } from '../../lib/catalog';
 import { FALLBACK_IMG, tradeImg } from '../../lib/images';
 import { Reveal } from '../motion/Reveal';
 
 /** "All categories" - icon tile grid with hover photography, one tap to book. */
-export function Services({ categories }: { categories: Category[] }) {
+export function Services({ categories, t }: { categories: Category[]; t: Dict }) {
   return (
     <section className="section" id="services">
       <div className="container">
         <Reveal>
           <div className="section-head">
             <div>
-              <span className="sec-kicker">Services · አገልግሎቶች</span>
+              <span className="sec-kicker">{t.services.kicker}</span>
               <h2 className="sec-title">
-                All categories
-                <span className="am">ምን እንጠግንልዎ? የሚፈልጉትን ይምረጡ</span>
+                {t.services.title}
+                <span className="am">{t.services.sub}</span>
               </h2>
             </div>
             <Link href="/pricing" className="see-all">
-              See full price list →
+              {t.services.seeAll} →
             </Link>
           </div>
         </Reveal>
@@ -48,15 +49,17 @@ export function Services({ categories }: { categories: Category[] }) {
                     {c.nameEn}
                   </span>
                   <span className="am">{c.nameAm}</span>
-                  {c.priceFloorEtb && <span className="from">from ETB {c.priceFloorEtb}</span>}
+                  {c.priceFloorEtb && (
+                    <span className="from">
+                      {t.services.from} {c.priceFloorEtb}
+                    </span>
+                  )}
                 </span>
               </Link>
             </Reveal>
           ))}
           {categories.length === 0 && (
-            <p style={{ gridColumn: '1/-1', color: 'var(--muted)' }}>
-              The API is offline - start it with <code>npm run start:dev -w apps/api</code>.
-            </p>
+            <p style={{ gridColumn: '1/-1', color: 'var(--muted)' }}>{t.services.offline}</p>
           )}
         </div>
       </div>

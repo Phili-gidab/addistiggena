@@ -1,16 +1,16 @@
 import Link from 'next/link';
+import { Dict } from '../../lib/i18n';
 import { PRO_IMG } from '../../lib/images';
 
-const VETTING_STEPS = [
-  { n: '1', t: 'Registration & documents', s: 'Fayda / Resident ID + Woreda recommendation letter' },
-  { n: '2', t: 'Skill verification', s: 'Practical CoC assessment at a government center' },
-  { n: '3', t: 'Security clearance', s: 'Police clearance + local guarantor reference' },
-  { n: '4', t: 'Digital readiness', s: 'Smartphone with GPS + a working toolkit' },
-  { n: '5', t: 'Orientation & activation', s: 'Ethics training, app tutorial - then you go live' },
-];
-
 /** "Become a technician" - merit-based onboarding, per the vetting protocol. */
-export function ProBand() {
+export function ProBand({ t }: { t: Dict }) {
+  const steps = [
+    { n: '1', title: t.pro.v1t, sub: t.pro.v1 },
+    { n: '2', title: t.pro.v2t, sub: t.pro.v2 },
+    { n: '3', title: t.pro.v3t, sub: t.pro.v3 },
+    { n: '4', title: t.pro.v4t, sub: t.pro.v4 },
+    { n: '5', title: t.pro.v5t, sub: t.pro.v5 },
+  ];
   return (
     <section className="section" id="pros">
       <div className="container">
@@ -22,33 +22,26 @@ export function ProBand() {
           </div>
           <div>
             <span className="sec-kicker" style={{ color: '#7db8e8' }}>
-              For Professionals &amp; Technicians · ለባለሙያዎች እና ቴክኒሽያኖች
+              {t.pro.kicker}
             </span>
-            <h2>
-              Skill and trust over certification.
-              <span className="am">ችሎታዎና ታማኝነትዎ ብቻ በቂ ነው - ዲግሪ አያስፈልግም</span>
-            </h2>
-            <p>
-              No BA, MA or TVET diploma required - whether you learned your craft in school or
-              through years of hands-on work, proven skill, verified character, and a smartphone
-              are all you need to join. Clients pay you directly; the platform brings you the jobs.
-            </p>
+            <h2>{t.pro.title}</h2>
+            <p>{t.pro.lede}</p>
             <div className="prob-cta">
               <Link href="/provider" className="btn btn-primary">
-                Register as a technician →
+                {t.pro.cta} →
               </Link>
               <Link href="/#trust" className="btn btn-ghost">
-                How vetting works
+                {t.pro.cta2}
               </Link>
             </div>
           </div>
-          <div className="prob-steps" aria-label="Vetting pipeline">
-            {VETTING_STEPS.map((s) => (
+          <div className="prob-steps" aria-label={t.pro.vetting}>
+            {steps.map((s) => (
               <div key={s.n} className="prob-step">
                 <span className="n">{s.n}</span>
                 <span>
-                  {s.t}
-                  <small>{s.s}</small>
+                  {s.title}
+                  <small>{s.sub}</small>
                 </span>
               </div>
             ))}

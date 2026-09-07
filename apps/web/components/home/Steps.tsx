@@ -1,52 +1,27 @@
-const STEPS = [
-  {
-    n: '1',
-    en: 'Choose a service',
-    am: 'አገልግሎት ይምረጡ',
-    text: 'Pick the repair you need - Mitad, wiring, plumbing, appliances, Wi-Fi and more - then briefly describe the problem.',
-  },
-  {
-    n: '2',
-    en: 'Pin your location',
-    am: 'ቦታዎን ይግለፁ',
-    text: 'Drop a pin, pick your sub-city and add a landmark note - the flow is built for real Addis Ababa addresses.',
-  },
-  {
-    n: '3',
-    en: 'Technician dispatched',
-    am: 'ባለሙያ ይላካል',
-    text: 'The nearest verified technician in your surroundings accepts the job and heads over - arriving in 15-30 minutes on average.',
-  },
-  {
-    n: '4',
-    en: 'Pay the technician directly',
-    am: 'ለባለሙያው በቀጥታ ይክፈሉ',
-    text: 'Cash, Telebirr, CBE Birr or mobile banking - at the standard platform rate. Every repair carries a 5-day guarantee.',
-  },
-];
+import { Dict } from '../../lib/i18n';
 
 /** "How it works" - four clean numbered cards. */
-export function Steps() {
+export function Steps({ t }: { t: Dict }) {
+  const steps = [
+    { n: '1', title: t.steps.s1t, text: t.steps.s1 },
+    { n: '2', title: t.steps.s2t, text: t.steps.s2 },
+    { n: '3', title: t.steps.s3t, text: t.steps.s3 },
+    { n: '4', title: t.steps.s4t, text: t.steps.s4 },
+  ];
   return (
     <section className="section" id="how">
       <div className="container">
         <div className="section-head">
           <div>
-            <span className="sec-kicker">How it works · እንዴት ይሰራል</span>
-            <h2 className="sec-title">
-              Four steps, one visit
-              <span className="am">አራት ቀላል ደረጃዎችን ይከውኑ</span>
-            </h2>
+            <span className="sec-kicker">{t.steps.kicker}</span>
+            <h2 className="sec-title">{t.steps.title}</h2>
           </div>
         </div>
         <div className="step-row">
-          {STEPS.map((s) => (
+          {steps.map((s) => (
             <article key={s.n} className="step-card">
               <div className="n">{s.n}</div>
-              <h3>
-                {s.en}
-                <small>{s.am}</small>
-              </h3>
+              <h3>{s.title}</h3>
               <p>{s.text}</p>
             </article>
           ))}

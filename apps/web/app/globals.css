@@ -1625,3 +1625,21 @@ body.scroll-locked .site-header { transform: none; }
   font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; color: var(--blue);
   white-space: nowrap;
 }
+
+/* language switch (header + mobile menu) */
+.lang-toggle {
+  display: inline-flex; align-items: center; gap: 2px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface);
+}
+.lang-toggle button {
+  border-radius: 999px; padding: 0.28rem 0.6rem;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.76rem;
+  color: var(--muted); line-height: 1.2; transition: background 0.2s, color 0.2s;
+}
+.lang-toggle button.on { background: var(--navy); color: #fff; }
+.lang-toggle button:not(.on):hover { color: var(--navy); }
+.lang-toggle[data-pending='true'] { opacity: 0.6; }
+.mnav .lang-toggle { transform: scale(1.15); transform-origin: left center; }
+
+/* Amharic headline: the Ethiopic face needs a touch more room than Montserrat */
+.hero-h1 .hl-line.am-h { font-family: var(--font-am); font-size: 0.82em; line-height: 1.35; }

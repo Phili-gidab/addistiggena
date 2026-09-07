@@ -10,6 +10,8 @@ import { Story } from '../components/home/Story';
 import { Testimonials } from '../components/home/Testimonials';
 import { Trust } from '../components/home/Trust';
 import { API_URL, Category } from '../lib/api';
+import { dict } from '../lib/i18n';
+import { currentLang } from '../lib/lang';
 
 async function getCategories(): Promise<Category[]> {
   try {
@@ -23,20 +25,22 @@ async function getCategories(): Promise<Category[]> {
 
 export default async function HomePage() {
   const categories = await getCategories();
+  const lang = currentLang();
+  const t = dict(lang);
 
   return (
     <main>
-      <Hero categories={categories} />
+      <Hero categories={categories} t={t} lang={lang} />
       <Marquee />
-      <Services categories={categories} />
-      <PopularServices />
-      <Steps />
-      <ImageBand />
-      <Trust />
-      <Story />
-      <Testimonials />
-      <Coverage />
-      <ProBand />
+      <Services categories={categories} t={t} />
+      <PopularServices t={t} lang={lang} />
+      <Steps t={t} />
+      <ImageBand t={t} />
+      <Trust t={t} />
+      <Story t={t} />
+      <Testimonials t={t} lang={lang} />
+      <Coverage t={t} />
+      <ProBand t={t} />
     </main>
   );
 }
