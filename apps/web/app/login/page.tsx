@@ -14,7 +14,11 @@ function LoginForm() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [stage, setStage] = useState<'password' | 'phone' | 'code' | 'name'>('password');
+  const [stage, setStage] = useState<'password' | 'phone' | 'code' | 'name' | 'credentials'>(
+    'password',
+  );
+  /** password chosen during signup (separate from the sign-in field above) */
+  const [newPassword, setNewPassword] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -69,6 +73,8 @@ function LoginForm() {
       // greet each other by name instead of "Customer"/"Technician"
       if (!res.user.name) {
         setStage('name');
+      } else if (!res.user.username) {
+        setStage('credentials');
       } else {
         router.push(next);
       }
@@ -87,6 +93,25 @@ function LoginForm() {
       const updated = await api<User>('/users/me', {
         method: 'PATCH',
         body: JSON.stringify({ name: name.trim() }),
+      });
+      saveSession(localStorage.getItem('tg_token')!, updated);
+      setStage('credentials');
+      setBusy(false);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  /** Offered right after signup so the next sign-in needs no SMS code. */
+  async function submitCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const updated = await api<User>('/users/me/credentials', {
+        method: 'POST',
+        body: JSON.stringify({ username: username.trim().toLowerCase(), password: newPassword }),
       });
       saveSession(localStorage.getItem('tg_token')!, updated);
       router.push(next);
@@ -227,6 +252,52 @@ function LoginForm() {
               </form>
             )}
 
+            {stage === 'credentials' && (
+              <form onSubmit={submitCredentials}>
+                <div className="ok-box">
+                  Set a username and password so you can sign in without waiting for a code. Your
+                  phone number keeps working too.
+                </div>
+                <div className="field">
+                  <label>Username · መለያ ስም</label>
+                  <input
+                    placeholder="e.g. marta"
+                    value={username}
+                    onChange={(e) =>
+                      setUsername(e.target.value.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase())
+                    }
+                    autoComplete="username"
+                    autoFocus
+                    maxLength={40}
+                  />
+                </div>
+                <div className="field">
+                  <label>Password · የይለፍ ቃል (8+)</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%' }}
+                  disabled={busy || username.trim().length < 3 || newPassword.length < 8}
+                >
+                  {busy ? 'Saving…' : 'Save · አስቀምጥ'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-line btn-sm mt"
+                  onClick={() => router.push(next)}
+                >
+                  Skip - I will use my phone number
+                </button>
+              </form>
+            )}
+
             {stage === 'name' && (
               <form onSubmit={submitName}>
                 <div className="ok-box">Verified ✓ - welcome to Addis Tiggena.</div>
@@ -253,7 +324,7 @@ function LoginForm() {
                 <button
                   type="button"
                   className="btn btn-line btn-sm mt"
-                  onClick={() => router.push(next)}
+                  onClick={() => setStage('credentials')}
                 >
                   Skip for now
                 </button>

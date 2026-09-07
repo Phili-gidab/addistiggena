@@ -6,6 +6,8 @@ export interface User {
   id: string;
   phone: string;
   name: string | null;
+  /** set once the account chooses credentials - enables password sign-in */
+  username?: string | null;
   role:
     | 'CUSTOMER'
     | 'PROVIDER'

@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, ErrorBox, Field, H1, Hint, OkBox, Row } from '../../components/ui';
 import { C, F, S } from '../../lib/theme';
+import { CredentialsCard } from '../../components/CredentialsCard';
 import { useAuth } from '../../store/auth';
 
 export default function Profile() {
@@ -55,6 +56,8 @@ export default function Profile() {
             }}
           />
         </Card>
+
+        <CredentialsCard />
 
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Support · ድጋፍ</Text>

@@ -7,11 +7,11 @@ import { User } from '../lib/api';
 import { C, F, S } from '../lib/theme';
 import { useAuth } from '../store/auth';
 
-type Stage = 'phone' | 'code' | 'name' | 'password';
+type Stage = 'phone' | 'code' | 'name' | 'credentials' | 'password';
 
 /** Phone-OTP first (the consumer flow), with a username/password door for staff & demo. */
 export default function Login() {
-  const { requestOtp, verifyOtp, passwordLogin, updateName } = useAuth();
+  const { requestOtp, verifyOtp, passwordLogin, updateName, setCredentials } = useAuth();
   /** "I am a technician" on the welcome screen sets this. */
   const { role } = useLocalSearchParams<{ role?: string }>();
   const asTech = role === 'tech';
@@ -161,11 +161,57 @@ export default function Login() {
                 onPress={() =>
                   run(async () => {
                     await updateName(name.trim());
-                    router.replace('/(customer)/home');
+                    setStage('credentials');
                   })
                 }
               />
-              <Btn title="Skip for now" kind="ghost" style={{ marginTop: S.md }} onPress={() => router.replace('/(customer)/home')} />
+              <Btn title="Skip for now" kind="ghost" style={{ marginTop: S.md }} onPress={() => setStage('credentials')} />
+            </>
+          )}
+
+          {stage === 'credentials' && (
+            <>
+              <OkBox>Verified ✓ - welcome to Addis Tiggena.</OkBox>
+              <Hint style={{ marginBottom: S.md }}>
+                Choose a username and password so you can sign in without waiting for a code next
+                time. Your phone number keeps working too.
+              </Hint>
+              <Am style={{ marginBottom: S.lg }}>
+                በሚቀጥለው ጊዜ ኮድ ሳይጠብቁ እንዲገቡ የመለያ ስምና የይለፍ ቃል ይምረጡ
+              </Am>
+              <Field
+                label="Username · መለያ ስም"
+                placeholder="e.g. marta"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={username}
+                onChangeText={(v) => setUsername(v.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase())}
+                maxLength={40}
+              />
+              <Field
+                label="Password · የይለፍ ቃል (8+)"
+                placeholder="••••••••"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+              <Btn
+                title="Save · አስቀምጥ"
+                busy={busy}
+                disabled={username.trim().length < 3 || password.length < 8}
+                onPress={() =>
+                  run(async () => {
+                    await setCredentials(username.trim(), password);
+                    router.replace(asTech ? '/tech-signup' : '/(customer)/home');
+                  })
+                }
+              />
+              <Btn
+                title="Skip - I will use my phone number"
+                kind="ghost"
+                style={{ marginTop: S.md }}
+                onPress={() => router.replace(asTech ? '/tech-signup' : '/(customer)/home')}
+              />
             </>
           )}
 

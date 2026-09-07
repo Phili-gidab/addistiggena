@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, ErrorBox, H1, Hint, OkBox, Row, StatusPill } from '../../components/ui';
 import { api, DocumentType, ProviderProfile, uploadImage } from '../../lib/api';
 import { C, F, R, S } from '../../lib/theme';
+import { CredentialsCard } from '../../components/CredentialsCard';
 import { useAuth } from '../../store/auth';
 
 /** The paperwork the official onboarding protocol requires, in review order. */
@@ -94,6 +95,8 @@ export default function TechProfile() {
             </Row>
           </Card>
         )}
+
+        <CredentialsCard />
 
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Documents · ሰነዶች</Text>

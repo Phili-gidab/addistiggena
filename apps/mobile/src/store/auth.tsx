@@ -19,6 +19,8 @@ interface AuthState {
   updateName: (name: string) => Promise<void>;
   /** Re-read the account (e.g. after becoming a technician changes the role). */
   refreshUser: () => Promise<User | null>;
+  /** Choose a username + password so future sign-ins skip the SMS code. */
+  setCredentials: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -68,6 +70,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => (prev ? { ...prev, name: updated.name } : prev));
   }, []);
 
+  const setCredentials = useCallback(async (username: string, password: string) => {
+    const updated = await api<User>('/users/me/credentials', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+    setUser((prev) => (prev ? { ...prev, username: updated.username } : prev));
+  }, []);
+
   const refreshUser = useCallback(async () => {
     try {
       const fresh = await api<User>('/users/me');
@@ -86,8 +96,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, ready, passwordLogin, requestOtp, verifyOtp, updateName, refreshUser, signOut }),
-    [user, ready, passwordLogin, requestOtp, verifyOtp, updateName, refreshUser, signOut],
+    () => ({
+      user,
+      ready,
+      passwordLogin,
+      requestOtp,
+      verifyOtp,
+      updateName,
+      setCredentials,
+      refreshUser,
+      signOut,
+    }),
+    [
+      user,
+      ready,
+      passwordLogin,
+      requestOtp,
+      verifyOtp,
+      updateName,
+      setCredentials,
+      refreshUser,
+      signOut,
+    ],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
