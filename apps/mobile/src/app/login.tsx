@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Am, Btn, ErrorBox, Field, H1, Hint, OkBox } from '../components/ui';
+import { Am, Btn, ErrorBox, Field, H1, Hint, OkBox, Row } from '../components/ui';
 import { User } from '../lib/api';
 import { C, F, S } from '../lib/theme';
 import { useAuth } from '../store/auth';
@@ -19,9 +19,17 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [devCode, setDevCode] = useState<string | null>(null);
+  /** server enforces a 60s resend cooldown - mirror it so the link is honest */
+  const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const codeRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((c) => (c > 0 ? c - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
 
   const go = (user: User) => {
     if (user.role === 'PROVIDER') router.replace('/(tech)/jobs');
@@ -73,6 +81,7 @@ export default function Login() {
                     const res = await requestOtp(phone);
                     setDevCode(res.devCode ?? null);
                     setStage('code');
+                    setCooldown(60);
                     setTimeout(() => codeRef.current?.focus(), 350);
                   })
                 }
@@ -93,7 +102,7 @@ export default function Login() {
                 onChangeText={(v) => setCode(v.replace(/\D/g, ''))}
                 style={st.codeInput}
               />
-              {devCode && <OkBox>Test mode (SMS gateway pending) - your code is {devCode}</OkBox>}
+              {devCode && <OkBox>Test mode - your code is {devCode}</OkBox>}
               <Btn
                 title="Verify · አረጋግጥ"
                 busy={busy}
@@ -106,6 +115,23 @@ export default function Login() {
                   })
                 }
               />
+              <Row style={st.resendRow}>
+                {cooldown > 0 ? (
+                  <Text style={st.resendText}>Resend the code in {cooldown}s</Text>
+                ) : (
+                  <Pressable
+                    onPress={() =>
+                      run(async () => {
+                        const res = await requestOtp(phone);
+                        setDevCode(res.devCode ?? null);
+                        setCooldown(60);
+                      })
+                    }
+                  >
+                    <Text style={st.resendLink}>Didn&apos;t get it? Resend code · ኮድ በድጋሚ ላክ</Text>
+                  </Pressable>
+                )}
+              </Row>
               <Btn title="← Change number" kind="ghost" style={{ marginTop: S.md }} onPress={() => { setStage('phone'); setCode(''); }} />
             </>
           )}
@@ -177,5 +203,21 @@ export default function Login() {
 const st = StyleSheet.create({
   wrap: { padding: S.xl, paddingTop: S.xxl },
   eyebrow: { fontFamily: F.bodySemi, fontSize: 11, letterSpacing: 1.6, color: C.blue, marginBottom: 8 },
-  codeInput: { fontFamily: F.displayBold, fontSize: 24, letterSpacing: 12, textAlign: 'center' },
+  codeInput: {
+    fontFamily: F.displayBold,
+    fontSize: 24,
+    letterSpacing: 10,
+    textAlign: 'center',
+    // a 24px display face does not fit the 50px default box: Android clips the
+    // ascenders unless the height grows and the extra font padding is dropped
+    height: 64,
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    // letterSpacing also trails the last digit, so nudge the run back to centre
+    paddingLeft: 10,
+  },
+  resendRow: { justifyContent: 'center', marginTop: S.md },
+  resendText: { fontFamily: F.body, fontSize: 13, color: C.muted },
+  resendLink: { fontFamily: F.bodySemi, fontSize: 13, color: C.blue },
 });

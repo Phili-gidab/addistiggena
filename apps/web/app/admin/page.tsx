@@ -17,6 +17,7 @@ import {
   StaffRole,
   Ticket,
 } from '../../lib/api';
+import { SUB_CITIES } from '../../lib/areas';
 
 const DispatchMap = dynamic(() => import('../../components/DispatchMap'), { ssr: false });
 
@@ -286,6 +287,14 @@ export default function AdminPage() {
     note: string;
     refund: string;
   } | null>(null);
+  const [newTech, setNewTech] = useState({
+    name: '',
+    phone: '',
+    categoryId: '',
+    subCity: '',
+    yearsExperience: '',
+    verified: true,
+  });
   const [newStaff, setNewStaff] = useState({
     name: '',
     phone: '',
@@ -410,6 +419,34 @@ export default function AdminPage() {
       await api('/admin/staff', { method: 'POST', body: JSON.stringify(newStaff) });
       setNotice(`Staff account "${newStaff.username}" created (${newStaff.role}).`);
       setNewStaff({ name: '', phone: '', username: '', password: '', role: 'SUPPORT_AGENT' });
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /** Onboard a technician the office vetted in person, instead of waiting for a
+   *  website self-registration. They sign in with phone OTP - no password here. */
+  async function createTechnician(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      const years = Number(newTech.yearsExperience);
+      await api('/admin/technicians', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newTech.name.trim(),
+          phone: newTech.phone.trim(),
+          categoryId: newTech.categoryId,
+          subCity: newTech.subCity || undefined,
+          yearsExperience: Number.isFinite(years) && years > 0 ? years : undefined,
+          verified: newTech.verified,
+        }),
+      });
+      setNotice(
+        `Technician "${newTech.name.trim()}" added. They sign in with their phone number; dispatch reaches them once they go online in the app.`,
+      );
+      setNewTech({ name: '', phone: '', categoryId: '', subCity: '', yearsExperience: '', verified: true });
       reload();
     } catch (err) {
       setError((err as Error).message);
@@ -972,6 +1009,45 @@ export default function AdminPage() {
 
               {view === 'technicians' && (
                 <div className="panel">
+                  <h2>Add a technician</h2>
+                  <p className="hint" style={{ marginBottom: '0.7rem' }}>
+                    For professionals onboarded in person. They sign in with this phone number
+                    (one-time code) - no password is issued. Dispatch can only reach them once
+                    they go online in the app, which shares their position.
+                  </p>
+                  <form onSubmit={createTechnician} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.4rem' }}>
+                    <input className="input" style={{ maxWidth: 170 }} placeholder="Full name" value={newTech.name}
+                      onChange={(e) => setNewTech({ ...newTech, name: e.target.value })} />
+                    <input className="input" style={{ maxWidth: 140 }} placeholder="09… phone" value={newTech.phone}
+                      onChange={(e) => setNewTech({ ...newTech, phone: e.target.value })} />
+                    <select className="input" style={{ maxWidth: 200 }} value={newTech.categoryId}
+                      onChange={(e) => setNewTech({ ...newTech, categoryId: e.target.value })}>
+                      <option value="">Trade…</option>
+                      {cats.filter((c) => c.isActive !== false).map((c) => (
+                        <option key={c.id} value={c.id}>{c.nameEn}</option>
+                      ))}
+                    </select>
+                    <select className="input" style={{ maxWidth: 170 }} value={newTech.subCity}
+                      onChange={(e) => setNewTech({ ...newTech, subCity: e.target.value })}>
+                      <option value="">Sub-city…</option>
+                      {SUB_CITIES.map((sc) => (
+                        <option key={sc.name} value={sc.name}>{sc.name}</option>
+                      ))}
+                    </select>
+                    <input className="input" style={{ maxWidth: 110 }} placeholder="years exp." inputMode="numeric"
+                      value={newTech.yearsExperience}
+                      onChange={(e) => setNewTech({ ...newTech, yearsExperience: e.target.value.replace(/\D/g, '') })} />
+                    <label className="hint" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <input type="checkbox" checked={newTech.verified}
+                        onChange={(e) => setNewTech({ ...newTech, verified: e.target.checked })} />
+                      documents already vetted
+                    </label>
+                    <button className="btn btn-dark btn-sm"
+                      disabled={newTech.name.trim().length < 2 || newTech.phone.trim().length < 9 || !newTech.categoryId}>
+                      + Add technician
+                    </button>
+                  </form>
+
                   <h2>Technicians ({technicians.length})</h2>
                   <div style={{ overflowX: 'auto' }}>
                     <table className="table">

@@ -62,6 +62,68 @@ class CreateStaffDto {
   role: Role;
 }
 
+/** Onboarding a technician in the office/field, rather than waiting for them to
+ *  self-register on the website. They sign in with phone OTP like any other
+ *  technician, so no password is issued here. */
+class CreateTechnicianDto {
+  @IsString()
+  @Length(2, 100)
+  name: string;
+
+  @IsString()
+  @Length(9, 20)
+  phone: string;
+
+  @IsString()
+  categoryId: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  subCity?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  woreda?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  bio?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(60)
+  yearsExperience?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(50)
+  serviceRadiusKm?: number;
+
+  /** Mark verified straight away (staff vetted the documents in person). */
+  @IsOptional()
+  @IsIn([true, false])
+  verified?: boolean;
+
+  /** Optional home base - without it dispatch cannot reach them until they go
+   *  online in the app, which pings their GPS. */
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng?: number;
+}
+
 class CategoryUpdateDto {
   @IsOptional()
   @IsNumber()
@@ -540,6 +602,72 @@ export class AdminController {
       username,
     });
     return user;
+  }
+
+  // -- Technician onboarding (staff-created accounts) -------------------------
+
+  @Post('technicians')
+  @Roles('ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER')
+  async createTechnician(@CurrentUser() actor: AuthUser, @Body() dto: CreateTechnicianDto) {
+    const phone = normalizePhone(dto.phone);
+    const category = await this.prisma.serviceCategory.findUnique({
+      where: { id: dto.categoryId },
+    });
+    if (!category || !category.isActive) throw new BadRequestException('Unknown service category');
+
+    const existing = await this.prisma.user.findUnique({
+      where: { phone },
+      include: { providerProfile: { select: { id: true } } },
+    });
+    if (existing?.providerProfile) {
+      throw new BadRequestException('That phone already belongs to a technician');
+    }
+    if (existing && existing.role !== 'CUSTOMER') {
+      throw new BadRequestException('That phone belongs to a staff account');
+    }
+
+    // An existing customer can become a technician - keep their account and
+    // history instead of refusing the number.
+    const user = existing
+      ? await this.prisma.user.update({
+          where: { id: existing.id },
+          data: { role: 'PROVIDER', name: dto.name },
+        })
+      : await this.prisma.user.create({
+          data: { name: dto.name, phone, role: 'PROVIDER', language: 'AM' },
+        });
+
+    const profile = await this.prisma.providerProfile.create({
+      data: {
+        userId: user.id,
+        categoryId: dto.categoryId,
+        bio: dto.bio,
+        subCity: dto.subCity,
+        woreda: dto.woreda,
+        yearsExperience: dto.yearsExperience,
+        serviceRadiusKm: dto.serviceRadiusKm ?? 10,
+        verificationStatus: dto.verified ? 'VERIFIED' : 'PENDING',
+        // never online until they say so in the app
+        isAvailable: false,
+        lat: dto.lat,
+        lng: dto.lng,
+      },
+    });
+    if (dto.lat !== undefined && dto.lng !== undefined) {
+      await this.prisma.$executeRaw`UPDATE "ProviderProfile" SET "location" = ST_SetSRID(ST_MakePoint(${dto.lng}, ${dto.lat}), 4326)::geography WHERE "id" = ${profile.id}`;
+    }
+    await this.prisma.wallet.create({ data: { providerId: profile.id } });
+
+    this.audit.log(actor, 'TECHNICIAN_CREATE', 'ProviderProfile', profile.id, undefined, {
+      phone,
+      category: category.nameEn,
+      verified: !!dto.verified,
+    });
+    this.notifications.notify(
+      { phone, telegramChatId: null },
+      `Addis Tiggena: እንኳን ደህና መጡ · your technician account is ready. Sign in with this phone number at ${process.env.WEB_PUBLIC_URL ?? 'addistiggena.com'} or in the app.`,
+    );
+    return { id: profile.id, userId: user.id, name: user.name, phone, verificationStatus: profile.verificationStatus };
   }
 
   // -- Audit log (spec section 8: every manual override, with reason) ---------
