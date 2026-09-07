@@ -34,7 +34,14 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Roles Super Admin may hand out (spec section 3: only role that creates admin-level accounts). */
-const CREATABLE_STAFF_ROLES = ['ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER', 'SUPPORT_AGENT'];
+const CREATABLE_STAFF_ROLES = [
+  'ADMIN',
+  'OPS_MANAGER',
+  'VERIFICATION_OFFICER',
+  'SUPPORT_AGENT',
+  'FINANCE_OFFICER',
+  'SUBCITY_COORDINATOR',
+];
 
 /** GPS stall detection threshold while EN_ROUTE (spec section 5). */
 const GPS_STALL_MS = 15 * 60 * 1000;
@@ -60,6 +67,12 @@ class CreateStaffDto {
 
   @IsIn(CREATABLE_STAFF_ROLES)
   role: Role;
+
+  /** Required for SUBCITY_COORDINATOR - the sub-city they are responsible for. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  subCity?: string;
 }
 
 /** Onboarding a technician in the office/field, rather than waiting for them to
@@ -370,7 +383,7 @@ export class AdminController {
   // ── Payout processing (proposal §4.4 steps 09-10) ──────────────────────────
 
   @Get('payouts')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
   payouts(@Query() query: PayoutQueueQuery) {
     return this.prisma.payout.findMany({
       where: { status: query.status ?? 'REQUESTED' },
@@ -385,7 +398,7 @@ export class AdminController {
   }
 
   @Post('payouts/:id/process')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
   async processPayout(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
     this.audit.log(actor, 'PAYOUT_PROCESS', 'Payout', id);
     const payout = await this.prisma.payout.findUnique({ where: { id } });
@@ -399,7 +412,7 @@ export class AdminController {
   }
 
   @Post('payouts/:id/reject')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
   async rejectPayout(
     @CurrentUser() actor: AuthUser,
     @Param('id') id: string,
@@ -571,7 +584,7 @@ export class AdminController {
   staff() {
     return this.prisma.user.findMany({
       where: { role: { in: CREATABLE_STAFF_ROLES as Role[] } },
-      select: { id: true, name: true, phone: true, username: true, role: true, createdAt: true },
+      select: { id: true, name: true, phone: true, username: true, role: true, subCity: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -586,6 +599,9 @@ export class AdminController {
       select: { id: true },
     });
     if (clash) throw new BadRequestException('Phone or username already in use');
+    if (dto.role === 'SUBCITY_COORDINATOR' && !dto.subCity) {
+      throw new BadRequestException('A sub-city coordinator needs a sub-city');
+    }
     const user = await this.prisma.user.create({
       data: {
         name: dto.name,
@@ -593,9 +609,10 @@ export class AdminController {
         username,
         passwordHash: hashSync(dto.password, 10),
         role: dto.role,
+        subCity: dto.role === 'SUBCITY_COORDINATOR' ? dto.subCity : null,
         language: 'EN',
       },
-      select: { id: true, name: true, phone: true, username: true, role: true, createdAt: true },
+      select: { id: true, name: true, phone: true, username: true, role: true, subCity: true, createdAt: true },
     });
     this.audit.log(actor, 'STAFF_CREATE', 'User', user.id, undefined, {
       role: dto.role,

@@ -91,15 +91,35 @@ export interface Ticket {
   createdAt: string;
 }
 
+/** Vetting paperwork - the four the onboarding protocol requires, plus extras. */
+export type DocumentType =
+  | 'NATIONAL_ID'
+  | 'WOREDA_RECOMMENDATION'
+  | 'COC_CERTIFICATE'
+  | 'TRADE_CERTIFICATE'
+  | 'POLICE_CLEARANCE'
+  | 'PORTFOLIO';
+
+export interface ProviderDocument {
+  id: string;
+  type: DocumentType;
+  objectKey: string;
+  state: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewNote: string | null;
+  createdAt: string;
+}
+
 export interface ProviderProfile {
   id: string;
   bio: string | null;
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
+  verificationNote?: string | null;
   isAvailable: boolean;
   ratingAvg: number;
   ratingCount: number;
   category?: Category;
   serviceRadiusKm: number;
+  documents?: ProviderDocument[];
 }
 
 export interface Wallet {

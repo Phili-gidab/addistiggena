@@ -109,6 +109,7 @@ interface StaffAccount {
   id: string;
   name: string | null;
   phone: string;
+  subCity?: string | null;
   username: string | null;
   role: string;
   createdAt: string;
@@ -167,6 +168,8 @@ const MENU: Record<StaffRole, ViewKey[]> = {
   OPS_MANAGER: ['dashboard', 'map', 'bookings', 'technicians', 'reviews', 'categories', 'settings'],
   VERIFICATION_OFFICER: ['dashboard', 'verification', 'technicians'],
   SUPPORT_AGENT: ['dashboard', 'tickets', 'bookings', 'technicians', 'reviews'],
+  FINANCE_OFFICER: ['dashboard', 'payouts', 'settings'],
+  SUBCITY_COORDINATOR: ['dashboard', 'map', 'bookings', 'technicians'],
 };
 
 const VIEW_LABEL: Record<ViewKey, string> = {
@@ -233,6 +236,16 @@ const ROLE_TITLES: Record<StaffRole, { en: string; am: string; sub: string }> = 
     en: 'Support desk',
     am: 'የደንበኞች ድጋፍ',
     sub: 'Disputes, guarantee claims, re-inspections, customer and technician lookup.',
+  },
+  FINANCE_OFFICER: {
+    en: 'Finance desk',
+    am: 'የፋይናንስ ክፍል',
+    sub: 'Technician payouts, platform commission and revenue oversight.',
+  },
+  SUBCITY_COORDINATOR: {
+    en: 'Sub-city operations',
+    am: 'የክፍለ ከተማ ስምሪት',
+    sub: 'Live jobs, technicians and coverage for one sub-city.',
   },
 };
 
@@ -301,6 +314,7 @@ export default function AdminPage() {
     username: '',
     password: '',
     role: 'SUPPORT_AGENT',
+    subCity: '',
   });
 
   const can = useCallback((v: ViewKey, r: StaffRole | null = role) => (r ? MENU[r].includes(v) : false), [role]);
@@ -418,7 +432,7 @@ export default function AdminPage() {
     try {
       await api('/admin/staff', { method: 'POST', body: JSON.stringify(newStaff) });
       setNotice(`Staff account "${newStaff.username}" created (${newStaff.role}).`);
-      setNewStaff({ name: '', phone: '', username: '', password: '', role: 'SUPPORT_AGENT' });
+      setNewStaff({ name: '', phone: '', username: '', password: '', role: 'SUPPORT_AGENT', subCity: '' });
       reload();
     } catch (err) {
       setError((err as Error).message);
@@ -1293,7 +1307,9 @@ export default function AdminPage() {
                           {m.name ?? m.username} · <code>{m.username}</code>
                         </span>
                         <span className="when" style={{ display: 'block' }}>
-                          {m.role.replace(/_/g, ' ').toLowerCase()} · {m.phone} · since {fmtDate(m.createdAt)}
+                          {m.role.replace(/_/g, ' ').toLowerCase()}
+                          {m.subCity ? ` · ${m.subCity}` : ''} · {m.phone} · since{' '}
+                          {fmtDate(m.createdAt)}
                         </span>
                       </span>
                     </div>
@@ -1312,15 +1328,27 @@ export default function AdminPage() {
                       <option value="OPS_MANAGER">Operations Manager</option>
                       <option value="VERIFICATION_OFFICER">Verification Officer</option>
                       <option value="SUPPORT_AGENT">Support Agent</option>
+                      <option value="FINANCE_OFFICER">Finance Officer</option>
+                      <option value="SUBCITY_COORDINATOR">Sub-city Coordinator</option>
                       <option value="ADMIN">Super Admin</option>
                     </select>
+                    {newStaff.role === 'SUBCITY_COORDINATOR' && (
+                      <select className="input" style={{ maxWidth: 170 }} value={newStaff.subCity}
+                        onChange={(e) => setNewStaff({ ...newStaff, subCity: e.target.value })}>
+                        <option value="">Sub-city…</option>
+                        {SUB_CITIES.map((sc) => (
+                          <option key={sc.name} value={sc.name}>{sc.name}</option>
+                        ))}
+                      </select>
+                    )}
                     <button
                       className="btn btn-dark btn-sm"
                       disabled={
                         newStaff.name.length < 2 ||
                         newStaff.phone.length < 9 ||
                         newStaff.username.length < 3 ||
-                        newStaff.password.length < 8
+                        newStaff.password.length < 8 ||
+                        (newStaff.role === 'SUBCITY_COORDINATOR' && !newStaff.subCity)
                       }
                     >
                       + Create account

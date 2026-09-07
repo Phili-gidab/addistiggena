@@ -40,4 +40,11 @@ export const CurrentUser = createParamDecorator(
 );
 
 /** Back-office roles (spec section 2, Day 1 set). ADMIN is the Super Admin. */
-export const STAFF_ROLES = ['ADMIN', 'OPS_MANAGER', 'VERIFICATION_OFFICER', 'SUPPORT_AGENT'];
+export const STAFF_ROLES = [
+  'ADMIN',
+  'OPS_MANAGER',
+  'VERIFICATION_OFFICER',
+  'SUPPORT_AGENT',
+  'FINANCE_OFFICER',
+  'SUBCITY_COORDINATOR',
+];

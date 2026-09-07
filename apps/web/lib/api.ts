@@ -6,7 +6,15 @@ export interface User {
   id: string;
   phone: string;
   name: string | null;
-  role: 'CUSTOMER' | 'PROVIDER' | 'ADMIN' | 'OPS_MANAGER' | 'VERIFICATION_OFFICER' | 'SUPPORT_AGENT';
+  role:
+    | 'CUSTOMER'
+    | 'PROVIDER'
+    | 'ADMIN'
+    | 'OPS_MANAGER'
+    | 'VERIFICATION_OFFICER'
+    | 'SUPPORT_AGENT'
+    | 'FINANCE_OFFICER'
+    | 'SUBCITY_COORDINATOR';
   language: 'AM' | 'EN';
 }
 
@@ -73,7 +81,13 @@ export interface Booking {
   review?: { stars: number; state: string } | null;
 }
 
-export type StaffRole = 'ADMIN' | 'OPS_MANAGER' | 'VERIFICATION_OFFICER' | 'SUPPORT_AGENT';
+export type StaffRole =
+  | 'ADMIN'
+  | 'OPS_MANAGER'
+  | 'VERIFICATION_OFFICER'
+  | 'SUPPORT_AGENT'
+  | 'FINANCE_OFFICER'
+  | 'SUBCITY_COORDINATOR';
 
 /** Back-office roles that may open /admin (each sees its own scoped view). */
 export function isStaff(role: User['role'] | undefined): role is StaffRole {
@@ -81,7 +95,9 @@ export function isStaff(role: User['role'] | undefined): role is StaffRole {
     role === 'ADMIN' ||
     role === 'OPS_MANAGER' ||
     role === 'VERIFICATION_OFFICER' ||
-    role === 'SUPPORT_AGENT'
+    role === 'SUPPORT_AGENT' ||
+    role === 'FINANCE_OFFICER' ||
+    role === 'SUBCITY_COORDINATOR'
   );
 }
 
