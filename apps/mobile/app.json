@@ -2,7 +2,7 @@
   "expo": {
     "name": "Addis Tiggena",
     "slug": "addis-tiggena",
-    "version": "1.0.0",
+    "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "addistiggena",
@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.amnen.addistiggena"
+      "package": "com.amnen.addistiggena",
+      "versionCode": 3
     },
     "web": {
       "output": "static",

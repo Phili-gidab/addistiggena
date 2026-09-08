@@ -1442,7 +1442,7 @@ export default function AdminPage() {
                           customer since {fmtDate(context.customer.createdAt)}
                         </span>
                       </div>
-                      <div className="kpi-row" style={{ marginBottom: '1rem' }}>
+                      <div className="tiles" style={{ marginBottom: '1rem' }}>
                         {tile(context.stats.bookings, 'bookings')}
                         {tile(context.stats.completed, 'completed')}
                         {tile(context.stats.cancelled, 'cancelled')}
@@ -1707,7 +1707,7 @@ export default function AdminPage() {
 
               {view === 'finance' && can('finance') && (
                 <>
-                  <div className="kpi-row">
+                  <div className="tiles">
                     {tile(
                       `${MONEY(finance?.collectedTodayEtb ?? 0)} ETB`,
                       'collected today',
@@ -1940,7 +1940,7 @@ export default function AdminPage() {
 
                   <div className="panel">
                     <h2>Platform at a glance</h2>
-                    <div className="kpi-row" style={{ marginTop: '0.6rem' }}>
+                    <div className="tiles" style={{ marginTop: '0.6rem' }}>
                       {tile(system?.scale.customers ?? '…', 'customers')}
                       {tile(system?.scale.technicians ?? '…', 'technicians')}
                       {tile(system?.scale.bookings ?? '…', 'bookings all time')}
