@@ -94,7 +94,25 @@ interface PendingProvider {
   bio: string | null;
   subCity: string | null;
   woreda: string | null;
-  faydaIdNumber: string | null;
+  gender: string | null;
+  idType: string | null;
+  idNumber: string | null;
+  email: string | null;
+  residentialSubCity: string | null;
+  residentialWoreda: string | null;
+  houseNumber: string | null;
+  specialization: string | null;
+  educationLevel: string | null;
+  certifications: string | null;
+  guarantorRelation: string | null;
+  guarantorSubCity: string | null;
+  guarantorWoreda: string | null;
+  guarantorHouseNo: string | null;
+  guarantorIdNumber: string | null;
+  declarationName: string | null;
+  declarationSignedAt: string | null;
+  registeredAt: string | null;
+  registeredBy: { name: string | null; username: string | null } | null;
   yearsExperience: number | null;
   guarantorName: string | null;
   guarantorPhone: string | null;
@@ -371,6 +389,35 @@ const REQUIRED_DOCS = [
   { type: 'POLICE_CLEARANCE', label: 'Police clearance' },
 ];
 
+/** A blank Technician Registration Form - every field the paper form has. */
+const EMPTY_TECH = {
+  name: '',
+  phone: '',
+  categoryId: '',
+  subCity: '',
+  yearsExperience: '',
+  verified: true,
+  gender: '',
+  idType: 'FAYDA',
+  idNumber: '',
+  email: '',
+  residentialSubCity: '',
+  residentialWoreda: '',
+  houseNumber: '',
+  specialization: '',
+  educationLevel: '',
+  certifications: '',
+  woreda: '',
+  guarantorName: '',
+  guarantorRelation: '',
+  guarantorPhone: '',
+  guarantorSubCity: '',
+  guarantorWoreda: '',
+  guarantorHouseNo: '',
+  guarantorIdNumber: '',
+  declarationName: '',
+};
+
 const ACTIVE_STATUSES = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
 
 // ── page ─────────────────────────────────────────────────────────────────────
@@ -432,14 +479,9 @@ export default function AdminPage() {
     landmark: '',
     description: '',
   });
-  const [newTech, setNewTech] = useState({
-    name: '',
-    phone: '',
-    categoryId: '',
-    subCity: '',
-    yearsExperience: '',
-    verified: true,
-  });
+  const [newTech, setNewTech] = useState(EMPTY_TECH);
+  /** the console form starts folded to the four fields staff use most */
+  const [fullForm, setFullForm] = useState(false);
   const [newStaff, setNewStaff] = useState({
     name: '',
     phone: '',
@@ -704,6 +746,25 @@ export default function AdminPage() {
           phone: newTech.phone.trim(),
           categoryId: newTech.categoryId,
           subCity: newTech.subCity || undefined,
+          woreda: newTech.woreda.trim() || undefined,
+          gender: newTech.gender || undefined,
+          idType: newTech.idNumber.trim() ? newTech.idType : undefined,
+          idNumber: newTech.idNumber.trim() || undefined,
+          email: newTech.email.trim() || undefined,
+          residentialSubCity: newTech.residentialSubCity || undefined,
+          residentialWoreda: newTech.residentialWoreda.trim() || undefined,
+          houseNumber: newTech.houseNumber.trim() || undefined,
+          specialization: newTech.specialization.trim() || undefined,
+          educationLevel: newTech.educationLevel || undefined,
+          certifications: newTech.certifications.trim() || undefined,
+          guarantorName: newTech.guarantorName.trim() || undefined,
+          guarantorRelation: newTech.guarantorRelation.trim() || undefined,
+          guarantorPhone: newTech.guarantorPhone.trim() || undefined,
+          guarantorSubCity: newTech.guarantorSubCity || undefined,
+          guarantorWoreda: newTech.guarantorWoreda.trim() || undefined,
+          guarantorHouseNo: newTech.guarantorHouseNo.trim() || undefined,
+          guarantorIdNumber: newTech.guarantorIdNumber.trim() || undefined,
+          declarationName: newTech.declarationName.trim() || undefined,
           yearsExperience: Number.isFinite(years) && years > 0 ? years : undefined,
           verified: newTech.verified,
         }),
@@ -711,7 +772,7 @@ export default function AdminPage() {
       setNotice(
         `Technician "${newTech.name.trim()}" added. They sign in with their phone number; dispatch reaches them once they go online in the app.`,
       );
-      setNewTech({ name: '', phone: '', categoryId: '', subCity: '', yearsExperience: '', verified: true });
+      setNewTech(EMPTY_TECH);
       reload();
     } catch (err) {
       setError((err as Error).message);
@@ -1154,15 +1215,77 @@ export default function AdminPage() {
                       <div className="hint">{p.user.phone}</div>
                       <div className="hint">
                         {[
-                          p.subCity && `${p.woreda ? `Woreda ${p.woreda}, ` : ''}${p.subCity}`,
-                          p.faydaIdNumber && `Fayda: ${p.faydaIdNumber}`,
+                          p.gender?.toLowerCase(),
+                          p.specialization,
                           p.yearsExperience != null && `${p.yearsExperience} yrs exp.`,
-                          p.guarantorName &&
-                            `Guarantor: ${p.guarantorName}${p.guarantorPhone ? ` (${p.guarantorPhone})` : ''}`,
+                          p.educationLevel?.replace(/_/g, ' ').toLowerCase(),
                         ]
                           .filter(Boolean)
-                          .join(' · ') || 'no vetting details submitted'}
+                          .join(' · ') || 'no professional details submitted'}
                       </div>
+                      {/* the whole registration form, folded away until the
+                          officer actually needs to check it against the paper */}
+                      <details className="form-detail">
+                        <summary>Registration form</summary>
+                        <dl>
+                          <dt>ID</dt>
+                          <dd>
+                            {p.idNumber
+                              ? `${p.idNumber} (${(p.idType ?? 'FAYDA').toLowerCase()})`
+                              : '-'}
+                          </dd>
+                          <dt>Email</dt>
+                          <dd>{p.email ?? '-'}</dd>
+                          <dt>Lives at</dt>
+                          <dd>
+                            {[
+                              p.residentialSubCity,
+                              p.residentialWoreda && `Woreda ${p.residentialWoreda}`,
+                              p.houseNumber && `House ${p.houseNumber}`,
+                            ]
+                              .filter(Boolean)
+                              .join(', ') || '-'}
+                          </dd>
+                          <dt>Works in</dt>
+                          <dd>
+                            {[p.subCity, p.woreda && `Woreda ${p.woreda}`].filter(Boolean).join(', ') || '-'}
+                          </dd>
+                          <dt>Certificates</dt>
+                          <dd>{p.certifications ?? '-'}</dd>
+                          <dt>Guarantor</dt>
+                          <dd>
+                            {p.guarantorName
+                              ? [
+                                  p.guarantorName,
+                                  p.guarantorRelation && `(${p.guarantorRelation})`,
+                                  p.guarantorPhone,
+                                  p.guarantorIdNumber && `ID ${p.guarantorIdNumber}`,
+                                  [
+                                    p.guarantorSubCity,
+                                    p.guarantorWoreda && `Woreda ${p.guarantorWoreda}`,
+                                    p.guarantorHouseNo && `House ${p.guarantorHouseNo}`,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(', '),
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')
+                              : '-'}
+                          </dd>
+                          <dt>Declaration</dt>
+                          <dd>
+                            {p.declarationSignedAt
+                              ? `signed by ${p.declarationName ?? 'applicant'} on ${fmtDate(p.declarationSignedAt)}`
+                              : 'not signed'}
+                          </dd>
+                          <dt>Registered by</dt>
+                          <dd>
+                            {p.registeredBy
+                              ? `${p.registeredBy.name ?? p.registeredBy.username}${p.registeredAt ? ` on ${fmtDate(p.registeredAt)}` : ''}`
+                              : 'self-registered'}
+                          </dd>
+                        </dl>
+                      </details>
                     </td>
                     <td>{p.category.nameEn}</td>
                     <td>
@@ -1566,10 +1689,102 @@ export default function AdminPage() {
                         onChange={(e) => setNewTech({ ...newTech, verified: e.target.checked })} />
                       documents already vetted
                     </label>
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => setFullForm(!fullForm)}
+                    >
+                      {fullForm ? 'hide the rest of the form' : 'fill the whole registration form'}
+                    </button>
                     <button className="btn btn-dark btn-sm"
                       disabled={newTech.name.trim().length < 2 || newTech.phone.trim().length < 9 || !newTech.categoryId}>
                       + Add technician
                     </button>
+
+                    {fullForm && (
+                      <div style={{ width: '100%' }}>
+                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Personal details</div>
+                        <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <select className="input" style={{ maxWidth: 120 }} value={newTech.gender}
+                            onChange={(e) => setNewTech({ ...newTech, gender: e.target.value })}>
+                            <option value="">Gender…</option>
+                            <option value="MALE">Male</option>
+                            <option value="FEMALE">Female</option>
+                          </select>
+                          <select className="input" style={{ maxWidth: 150 }} value={newTech.idType}
+                            onChange={(e) => setNewTech({ ...newTech, idType: e.target.value })}>
+                            <option value="FAYDA">Fayda / National ID</option>
+                            <option value="KEBELE">Kebele ID</option>
+                          </select>
+                          <input className="input" style={{ maxWidth: 170 }} placeholder="ID number" value={newTech.idNumber}
+                            onChange={(e) => setNewTech({ ...newTech, idNumber: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 190 }} placeholder="email (optional)" value={newTech.email}
+                            onChange={(e) => setNewTech({ ...newTech, email: e.target.value })} />
+                          <select className="input" style={{ maxWidth: 170 }} value={newTech.residentialSubCity}
+                            onChange={(e) => setNewTech({ ...newTech, residentialSubCity: e.target.value })}>
+                            <option value="">Lives in…</option>
+                            {SUB_CITIES.map((sc) => (
+                              <option key={sc.name} value={sc.name}>{sc.name}</option>
+                            ))}
+                          </select>
+                          <input className="input" style={{ maxWidth: 100 }} placeholder="woreda" value={newTech.residentialWoreda}
+                            onChange={(e) => setNewTech({ ...newTech, residentialWoreda: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 110 }} placeholder="house no." value={newTech.houseNumber}
+                            onChange={(e) => setNewTech({ ...newTech, houseNumber: e.target.value })} />
+                        </div>
+
+                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Skills and service area</div>
+                        <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <input className="input" style={{ maxWidth: 220 }} placeholder="specialization" value={newTech.specialization}
+                            onChange={(e) => setNewTech({ ...newTech, specialization: e.target.value })} />
+                          <select className="input" style={{ maxWidth: 160 }} value={newTech.educationLevel}
+                            onChange={(e) => setNewTech({ ...newTech, educationLevel: e.target.value })}>
+                            <option value="">Education…</option>
+                            <option value="TVET">TVET</option>
+                            <option value="DIPLOMA">Diploma</option>
+                            <option value="DEGREE">Degree</option>
+                            <option value="ABOVE_DEGREE">Above degree</option>
+                          </select>
+                          <input className="input" style={{ flex: 1, minWidth: 200 }} placeholder="certificates / licences"
+                            value={newTech.certifications}
+                            onChange={(e) => setNewTech({ ...newTech, certifications: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 130 }} placeholder="service woreda" value={newTech.woreda}
+                            onChange={(e) => setNewTech({ ...newTech, woreda: e.target.value })} />
+                        </div>
+
+                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Guarantor</div>
+                        <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <input className="input" style={{ maxWidth: 160 }} placeholder="name" value={newTech.guarantorName}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorName: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 150 }} placeholder="relationship" value={newTech.guarantorRelation}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorRelation: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 140 }} placeholder="09… phone" value={newTech.guarantorPhone}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorPhone: e.target.value })} />
+                          <select className="input" style={{ maxWidth: 160 }} value={newTech.guarantorSubCity}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorSubCity: e.target.value })}>
+                            <option value="">Sub-city…</option>
+                            {SUB_CITIES.map((sc) => (
+                              <option key={sc.name} value={sc.name}>{sc.name}</option>
+                            ))}
+                          </select>
+                          <input className="input" style={{ maxWidth: 100 }} placeholder="woreda" value={newTech.guarantorWoreda}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorWoreda: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 110 }} placeholder="house no." value={newTech.guarantorHouseNo}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorHouseNo: e.target.value })} />
+                          <input className="input" style={{ maxWidth: 150 }} placeholder="their ID number" value={newTech.guarantorIdNumber}
+                            onChange={(e) => setNewTech({ ...newTech, guarantorIdNumber: e.target.value })} />
+                        </div>
+
+                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Declaration</div>
+                        <p className="hint mb">
+                          Type the name the applicant signed the paper form under. Your own account
+                          is recorded as the registrar automatically.
+                        </p>
+                        <input className="input" style={{ maxWidth: 240 }} placeholder="name on the signature line"
+                          value={newTech.declarationName}
+                          onChange={(e) => setNewTech({ ...newTech, declarationName: e.target.value })} />
+                      </div>
+                    )}
                   </form>
 
                   <h2>Technicians ({technicians.length})</h2>

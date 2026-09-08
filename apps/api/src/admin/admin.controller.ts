@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsIn,
   IsNotEmpty,
@@ -31,6 +32,9 @@ import {
   DepositMethod,
   DepositStatus,
   DocumentType,
+  EducationLevel,
+  Gender,
+  IdType,
   Prisma,
   ReviewState,
   Role,
@@ -140,6 +144,95 @@ class CreateTechnicianDto {
   @Min(1)
   @Max(50)
   serviceRadiusKm?: number;
+
+  // ── the rest of the paper Technician Registration Form ──────────────────
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @IsOptional()
+  @IsEnum(IdType)
+  idType?: IdType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  idNumber?: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: 'Enter a valid email address' })
+  @MaxLength(160)
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  residentialSubCity?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  residentialWoreda?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  houseNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialization?: string;
+
+  @IsOptional()
+  @IsEnum(EducationLevel)
+  educationLevel?: EducationLevel;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  certifications?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  guarantorName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  guarantorRelation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  guarantorPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  guarantorSubCity?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  guarantorWoreda?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  guarantorHouseNo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  guarantorIdNumber?: string;
+
+  /** Name the applicant signed the declaration under, from the paper form. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  declarationName?: string;
 
   /** Mark verified straight away (staff vetted the documents in person). */
   @IsOptional()
@@ -409,7 +502,13 @@ export class AdminController {
   providers(@Query() query: ProviderQueueQuery) {
     return this.prisma.providerProfile.findMany({
       where: { verificationStatus: query.status ?? 'PENDING' },
-      include: { user: { select: { name: true, phone: true } }, category: true, documents: true },
+      include: {
+        user: { select: { name: true, phone: true } },
+        category: true,
+        documents: true,
+        // "Registered By" - who keyed the paper form in
+        registeredBy: { select: { name: true, username: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -1041,6 +1140,30 @@ export class AdminController {
         isAvailable: false,
         lat: dto.lat,
         lng: dto.lng,
+        // the rest of the registration form
+        gender: dto.gender,
+        idType: dto.idType,
+        idNumber: dto.idNumber,
+        email: dto.email,
+        residentialSubCity: dto.residentialSubCity,
+        residentialWoreda: dto.residentialWoreda,
+        houseNumber: dto.houseNumber,
+        specialization: dto.specialization,
+        educationLevel: dto.educationLevel,
+        certifications: dto.certifications,
+        guarantorName: dto.guarantorName,
+        guarantorRelation: dto.guarantorRelation,
+        guarantorPhone: dto.guarantorPhone,
+        guarantorSubCity: dto.guarantorSubCity,
+        guarantorWoreda: dto.guarantorWoreda,
+        guarantorHouseNo: dto.guarantorHouseNo,
+        guarantorIdNumber: dto.guarantorIdNumber,
+        // "Registered By" on the paper form - who keyed it in, and when
+        registeredById: actor.userId,
+        registeredAt: new Date(),
+        ...(dto.declarationName
+          ? { declarationName: dto.declarationName, declarationSignedAt: new Date() }
+          : {}),
       },
     });
     if (dto.lat !== undefined && dto.lng !== undefined) {

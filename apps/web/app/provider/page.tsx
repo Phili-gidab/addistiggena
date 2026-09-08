@@ -21,7 +21,23 @@ interface Profile {
   bio: string | null;
   subCity: string | null;
   woreda: string | null;
-  faydaIdNumber: string | null;
+  gender: string | null;
+  idType: string | null;
+  idNumber: string | null;
+  email: string | null;
+  residentialSubCity: string | null;
+  residentialWoreda: string | null;
+  houseNumber: string | null;
+  specialization: string | null;
+  educationLevel: string | null;
+  certifications: string | null;
+  guarantorRelation: string | null;
+  guarantorSubCity: string | null;
+  guarantorWoreda: string | null;
+  guarantorHouseNo: string | null;
+  guarantorIdNumber: string | null;
+  declarationName: string | null;
+  declarationSignedAt: string | null;
   yearsExperience: number | null;
   guarantorName: string | null;
   guarantorPhone: string | null;
@@ -78,7 +94,23 @@ export default function ProviderPage() {
   const [radius, setRadius] = useState('5');
   const [subCity, setSubCity] = useState('');
   const [woreda, setWoreda] = useState('');
-  const [faydaId, setFaydaId] = useState('');
+  const [gender, setGender] = useState('');
+  const [idType, setIdType] = useState('FAYDA');
+  const [idNumber, setIdNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [resSubCity, setResSubCity] = useState('');
+  const [resWoreda, setResWoreda] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [specialization, setSpecialization] = useState('');
+  const [educationLevel, setEducationLevel] = useState('');
+  const [certifications, setCertifications] = useState('');
+  const [guarantorRelation, setGuarantorRelation] = useState('');
+  const [guarantorSubCity, setGuarantorSubCity] = useState('');
+  const [guarantorWoreda, setGuarantorWoreda] = useState('');
+  const [guarantorHouseNo, setGuarantorHouseNo] = useState('');
+  const [guarantorIdNumber, setGuarantorIdNumber] = useState('');
+  const [declarationName, setDeclarationName] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [years, setYears] = useState('');
   const [guarantorName, setGuarantorName] = useState('');
   const [guarantorPhone, setGuarantorPhone] = useState('');
@@ -192,10 +224,25 @@ export default function ProviderPage() {
           serviceRadiusKm: Number(radius),
           subCity: subCity || undefined,
           woreda: woreda || undefined,
-          faydaIdNumber: faydaId || undefined,
+          gender: gender || undefined,
+          idType: idNumber ? idType : undefined,
+          idNumber: idNumber || undefined,
+          email: email || undefined,
+          residentialSubCity: resSubCity || undefined,
+          residentialWoreda: resWoreda || undefined,
+          houseNumber: houseNumber || undefined,
+          specialization: specialization || undefined,
           yearsExperience: years ? Number(years) : undefined,
+          educationLevel: educationLevel || undefined,
+          certifications: certifications || undefined,
           guarantorName: guarantorName || undefined,
+          guarantorRelation: guarantorRelation || undefined,
           guarantorPhone: guarantorPhone || undefined,
+          guarantorSubCity: guarantorSubCity || undefined,
+          guarantorWoreda: guarantorWoreda || undefined,
+          guarantorHouseNo: guarantorHouseNo || undefined,
+          guarantorIdNumber: guarantorIdNumber || undefined,
+          declarationName: declarationName || undefined,
         }),
       });
       // set an initial base location so matching can find us (browser GPS, else Addis center)
@@ -270,52 +317,207 @@ export default function ProviderPage() {
                   ))}
                 </select>
               </div>
+              <div className="sub-h" style={{ marginTop: '1.1rem' }}>1 · Personal details</div>
               <div className="row" style={{ alignItems: 'stretch' }}>
-                <div className="field" style={{ flex: 1, minWidth: 160 }}>
-                  <label>Sub-city · ክፍለ ከተማ</label>
-                  <select value={subCity} onChange={(e) => setSubCity(e.target.value)}>
+                <div className="field" style={{ flex: 0.8, minWidth: 130 }}>
+                  <label>Gender · ጾታ</label>
+                  <select value={gender} onChange={(e) => setGender(e.target.value)}>
                     <option value="">Choose…</option>
-                    {SUB_CITIES.map((s) => (
-                      <option key={s.name} value={s.name}>
-                        {s.name} · {s.nameAm}
+                    <option value="MALE">Male · ወንድ</option>
+                    <option value="FEMALE">Female · ሴት</option>
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 150 }}>
+                  <label>ID type · የመታወቂያ ዓይነት</label>
+                  <select value={idType} onChange={(e) => setIdType(e.target.value)}>
+                    <option value="FAYDA">Fayda / National ID</option>
+                    <option value="KEBELE">Kebele ID</option>
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 1.2, minWidth: 160 }}>
+                  <label>ID number · የመታወቂያ ቁጥር</label>
+                  <input
+                    placeholder="ID number"
+                    value={idNumber}
+                    onChange={(e) => setIdNumber(e.target.value)}
+                    maxLength={40}
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label>Email address (optional) · ኢመይል</label>
+                <input
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value.trim())}
+                  maxLength={160}
+                />
+              </div>
+              <div className="row" style={{ alignItems: 'stretch' }}>
+                <div className="field" style={{ flex: 1.2, minWidth: 160 }}>
+                  <label>Where you live · የመኖሪያ ክፍለ ከተማ</label>
+                  <select value={resSubCity} onChange={(e) => setResSubCity(e.target.value)}>
+                    <option value="">Choose…</option>
+                    {SUB_CITIES.map((x) => (
+                      <option key={x.name} value={x.name}>
+                        {x.name} · {x.nameAm}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="field" style={{ flex: 1, minWidth: 120 }}>
+                <div className="field" style={{ flex: 0.7, minWidth: 110 }}>
                   <label>Woreda · ወረዳ</label>
-                  <input placeholder="e.g. 03" value={woreda} onChange={(e) => setWoreda(e.target.value)} maxLength={20} />
+                  <input value={resWoreda} onChange={(e) => setResWoreda(e.target.value)} maxLength={20} />
+                </div>
+                <div className="field" style={{ flex: 0.7, minWidth: 110 }}>
+                  <label>House no. · የቤት ቁጥር</label>
+                  <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} maxLength={40} />
                 </div>
               </div>
+
+              <div className="sub-h" style={{ marginTop: '1.1rem' }}>2 · Professional and technical skills</div>
               <div className="row" style={{ alignItems: 'stretch' }}>
-                <div className="field" style={{ flex: 1.4, minWidth: 180 }}>
-                  <label>Fayda / Resident ID no. · የፋይዳ መታወቂያ ቁጥር</label>
-                  <input placeholder="National Digital ID number" value={faydaId} onChange={(e) => setFaydaId(e.target.value)} maxLength={40} />
+                <div className="field" style={{ flex: 1.5, minWidth: 180 }}>
+                  <label>Specialization · ዋና ሙያ</label>
+                  <input
+                    placeholder="e.g. house wiring and breaker panels"
+                    value={specialization}
+                    onChange={(e) => setSpecialization(e.target.value)}
+                    maxLength={120}
+                  />
                 </div>
-                <div className="field" style={{ flex: 0.6, minWidth: 120 }}>
+                <div className="field" style={{ flex: 0.5, minWidth: 110 }}>
                   <label>Years of experience</label>
                   <input value={years} onChange={(e) => setYears(e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={2} />
                 </div>
-              </div>
-              <div className="row" style={{ alignItems: 'stretch' }}>
-                <div className="field" style={{ flex: 1, minWidth: 160 }}>
-                  <label>Guarantor name · ዋስ</label>
-                  <input placeholder="Local resident or family member" value={guarantorName} onChange={(e) => setGuarantorName(e.target.value)} maxLength={120} />
+                <div className="field" style={{ flex: 1, minWidth: 150 }}>
+                  <label>Education · የትምህርት ደረጃ</label>
+                  <select value={educationLevel} onChange={(e) => setEducationLevel(e.target.value)}>
+                    <option value="">Choose…</option>
+                    <option value="TVET">TVET · ቴክኒክና ሙያ</option>
+                    <option value="DIPLOMA">Diploma · ዲፕሎማ</option>
+                    <option value="DEGREE">Degree · ዲግሪ</option>
+                    <option value="ABOVE_DEGREE">Above degree</option>
+                  </select>
                 </div>
-                <div className="field" style={{ flex: 1, minWidth: 160 }}>
-                  <label>Guarantor phone</label>
+              </div>
+              <div className="field">
+                <label>Certificates or licences held (optional)</label>
+                <input
+                  placeholder="e.g. CoC Level III, TVET electrical"
+                  value={certifications}
+                  onChange={(e) => setCertifications(e.target.value)}
+                  maxLength={300}
+                />
+              </div>
+
+              <div className="sub-h" style={{ marginTop: '1.1rem' }}>3 · Where you want to work</div>
+              <div className="row" style={{ alignItems: 'stretch' }}>
+                <div className="field" style={{ flex: 1.2, minWidth: 160 }}>
+                  <label>Preferred service sub-city · ክፍለ ከተማ</label>
+                  <select value={subCity} onChange={(e) => setSubCity(e.target.value)}>
+                    <option value="">Choose…</option>
+                    {SUB_CITIES.map((x) => (
+                      <option key={x.name} value={x.name}>
+                        {x.name} · {x.nameAm}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 0.6, minWidth: 110 }}>
+                  <label>Woreda · ወረዳ</label>
+                  <input placeholder="e.g. 03" value={woreda} onChange={(e) => setWoreda(e.target.value)} maxLength={20} />
+                </div>
+                <div className="field" style={{ flex: 0.6, minWidth: 110 }}>
+                  <label>Service radius (km)</label>
+                  <input value={radius} onChange={(e) => setRadius(e.target.value.replace(/\D/g, ''))} inputMode="numeric" />
+                </div>
+              </div>
+              <div className="field">
+                <label>About your work (optional)</label>
+                <textarea rows={3} placeholder="Specialities, e.g. Electric Mitad repair, wiring…" value={bio} onChange={(e) => setBio(e.target.value)} />
+              </div>
+
+              <div className="sub-h" style={{ marginTop: '1.1rem' }}>4 · Guarantor and background check</div>
+              <p className="hint mb">
+                Your emergency contact and guarantor - someone who vouches for you. The verification
+                desk may call them.
+              </p>
+              <div className="row" style={{ alignItems: 'stretch' }}>
+                <div className="field" style={{ flex: 1, minWidth: 150 }}>
+                  <label>Full name · ስም</label>
+                  <input placeholder="Full name" value={guarantorName} onChange={(e) => setGuarantorName(e.target.value)} maxLength={120} />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 150 }}>
+                  <label>Relationship · ግንኙነት</label>
+                  <input placeholder="e.g. brother, former employer" value={guarantorRelation} onChange={(e) => setGuarantorRelation(e.target.value)} maxLength={60} />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 150 }}>
+                  <label>Phone · ስልክ ቁጥር</label>
                   <input placeholder="09… or +2519…" value={guarantorPhone} onChange={(e) => setGuarantorPhone(e.target.value.trim())} inputMode="tel" maxLength={20} />
                 </div>
               </div>
-              <div className="field">
-                <label>Service radius (km)</label>
-                <input value={radius} onChange={(e) => setRadius(e.target.value.replace(/\D/g, ''))} inputMode="numeric" />
+              <div className="row" style={{ alignItems: 'stretch' }}>
+                <div className="field" style={{ flex: 1.2, minWidth: 160 }}>
+                  <label>Their sub-city · ክፍለ ከተማ</label>
+                  <select value={guarantorSubCity} onChange={(e) => setGuarantorSubCity(e.target.value)}>
+                    <option value="">Choose…</option>
+                    {SUB_CITIES.map((x) => (
+                      <option key={x.name} value={x.name}>
+                        {x.name} · {x.nameAm}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field" style={{ flex: 0.6, minWidth: 100 }}>
+                  <label>Woreda</label>
+                  <input value={guarantorWoreda} onChange={(e) => setGuarantorWoreda(e.target.value)} maxLength={20} />
+                </div>
+                <div className="field" style={{ flex: 0.6, minWidth: 100 }}>
+                  <label>House no.</label>
+                  <input value={guarantorHouseNo} onChange={(e) => setGuarantorHouseNo(e.target.value)} maxLength={40} />
+                </div>
+                <div className="field" style={{ flex: 1, minWidth: 140 }}>
+                  <label>Their ID number</label>
+                  <input value={guarantorIdNumber} onChange={(e) => setGuarantorIdNumber(e.target.value)} maxLength={40} />
+                </div>
               </div>
-              <div className="field">
-                <label>Bio</label>
-                <textarea rows={3} placeholder="Specialities, e.g. Electric Mitad repair, wiring…" value={bio} onChange={(e) => setBio(e.target.value)} />
+
+              <div className="declaration">
+                <b>የስምምነት ማረጋገጫ · Declaration</b>
+                <p>
+                  ከላይ የተገለፀው ሙሉ መረጃ እውነተኛ እና የራሴ መሆኑን አረጋግጣለሁ። በፕላትፎርሙ በኩል የተመደብኩበትን የሥራ
+                  ትእዛዝ ስቀበል የፕላትፎርሙን መመሪያዎች፣ ደንቦችና ሕጎች አክብሬ ለመሥራት እስማማለሁ፤ በሥራው ወቅት ወይም
+                  በሥራው ምክንያት ለሚደርስ ጥፋት፣ ጉዳት ወይም ቸልተኝነት ሙሉ የሕግና የፋይናንስ ኃላፊነት እወስዳለሁ።
+                </p>
+                <p>
+                  I certify that the information above is accurate and true. I consent to the
+                  background checks required for onboarding. By accepting a work assignment through
+                  the platform I agree to abide by all platform policies, standards and guidelines,
+                  and I take full legal and financial liability for any damage, fault or negligence
+                  occurring during or because of the service.
+                </p>
+                <label className="agree">
+                  <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                  <span>I agree · እስማማለሁ</span>
+                </label>
+                <div className="field" style={{ marginTop: '0.6rem' }}>
+                  <label>Type your full name to sign · ሙሉ ስም ይፃፉ</label>
+                  <input
+                    placeholder="Your full name"
+                    value={declarationName}
+                    onChange={(e) => setDeclarationName(e.target.value)}
+                    maxLength={120}
+                  />
+                </div>
               </div>
-              <button className="btn btn-primary" disabled={busy || !categoryId} style={{ width: '100%' }}>
+
+              <button
+                className="btn btn-primary"
+                disabled={busy || !categoryId || !agreed || declarationName.trim().length < 3}
+                style={{ width: '100%' }}
+              >
                 {busy ? 'Registering…' : 'Register · ይመዝገቡ'}
               </button>
             </form>

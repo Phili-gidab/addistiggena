@@ -38,13 +38,32 @@ export class ProvidersService {
     });
     if (!category || !category.isActive) throw new BadRequestException('Unknown service category');
 
+    // Every field on the official Technician Registration Form.
     const vetting = {
+      gender: dto.gender,
+      idType: dto.idType,
+      idNumber: dto.idNumber,
+      email: dto.email,
+      residentialSubCity: dto.residentialSubCity,
+      residentialWoreda: dto.residentialWoreda,
+      houseNumber: dto.houseNumber,
+      specialization: dto.specialization,
+      yearsExperience: dto.yearsExperience,
+      educationLevel: dto.educationLevel,
+      certifications: dto.certifications,
       subCity: dto.subCity,
       woreda: dto.woreda,
-      faydaIdNumber: dto.faydaIdNumber,
-      yearsExperience: dto.yearsExperience,
       guarantorName: dto.guarantorName,
+      guarantorRelation: dto.guarantorRelation,
       guarantorPhone: dto.guarantorPhone,
+      guarantorSubCity: dto.guarantorSubCity,
+      guarantorWoreda: dto.guarantorWoreda,
+      guarantorHouseNo: dto.guarantorHouseNo,
+      guarantorIdNumber: dto.guarantorIdNumber,
+      // the server stamps the signing date so it cannot be backdated
+      ...(dto.declarationName
+        ? { declarationName: dto.declarationName, declarationSignedAt: new Date() }
+        : {}),
     };
     const [profile] = await this.prisma.$transaction([
       this.prisma.providerProfile.upsert({

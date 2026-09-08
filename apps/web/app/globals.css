@@ -1677,3 +1677,23 @@ body.scroll-locked .site-header { transform: none; }
 .link-btn:hover { color: var(--blue-deep); }
 
 .sub-h { font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; color: var(--navy); margin-bottom: 0.5rem; }
+
+/* ── technician registration: declaration and the vetting form ──────────── */
+.declaration {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); padding: 1rem 1.1rem; margin: 1.1rem 0 1.2rem;
+}
+.declaration b { display: block; font-family: var(--font-display); font-size: 0.92rem; color: var(--navy); margin-bottom: 0.5rem; }
+.declaration p { font-size: 0.82rem; line-height: 1.65; color: var(--muted); margin-bottom: 0.6rem; }
+.declaration .agree { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 600; color: var(--navy); cursor: pointer; }
+.declaration .agree input { width: 17px; height: 17px; accent-color: var(--blue); }
+
+/* the applicant's whole form, folded away in the verification queue */
+.form-detail { margin-top: 0.4rem; }
+.form-detail summary { cursor: pointer; color: var(--blue); font-size: 0.76rem; font-weight: 600; }
+.form-detail dl {
+  display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.6rem;
+  margin-top: 0.45rem; font-size: 0.75rem; max-width: 230px;
+}
+.form-detail dt { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.form-detail dd { color: var(--navy); margin: 0; overflow-wrap: anywhere; }

@@ -76,6 +76,24 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
+/// The form accepts either national ID - Fayda or the older Kebele card.
+enum IdType {
+  FAYDA
+  KEBELE
+}
+
+enum EducationLevel {
+  TVET
+  DIPLOMA
+  DEGREE
+  ABOVE_DEGREE
+}
+
 enum LedgerType {
   JOB_CREDIT
   COMMISSION
@@ -128,6 +146,7 @@ model User {
   ticketsResolved SupportTicket[] @relation("TicketResolver")
   auditEntries    AuditLog[]
   depositsRecorded Deposit[]       @relation("DepositRecorder")
+  techniciansRegistered ProviderProfile[] @relation("TechnicianRegistrar")
 }
 
 model OtpCode {
@@ -165,13 +184,49 @@ model ProviderProfile {
   bio                String?
   /// Public profile photo (absolute URL; demo fleet uses stock portraits)
   avatarUrl          String?
-  /// Vetting protocol fields (official onboarding document)
+
+  // ── Technician Registration Form section 1: personal details ────────────
+  gender             Gender?
+  idType             IdType?
+  idNumber           String?
+  email              String?
+  /// where the technician lives - distinct from where they want to work
+  residentialSubCity String?
+  residentialWoreda  String?
+  houseNumber        String?
+
+  // ── section 2: professional and technical skills ────────────────────────
+  /// their stated trade in their own words; categoryId is what dispatch uses
+  specialization     String?
+  yearsExperience    Int?
+  educationLevel     EducationLevel?
+  /// certificates or licences held, free text off the form
+  certifications     String?
+
+  // ── section 3: operational and service details ──────────────────────────
+  /// preferred service area - drives coverage and sub-city coordination
   subCity            String?
   woreda             String?
-  faydaIdNumber      String?
-  yearsExperience    Int?
+
+  // ── section 4: guarantor / emergency contact and background check ───────
   guarantorName      String?
+  guarantorRelation  String?
   guarantorPhone     String?
+  guarantorSubCity   String?
+  guarantorWoreda    String?
+  guarantorHouseNo   String?
+  guarantorIdNumber  String?
+
+  /// The declaration on the form: information is accurate, consent to a
+  /// background check, and full legal and financial liability for the work.
+  /// Name typed at signing stands in for the signature.
+  declarationName    String?
+  declarationSignedAt DateTime?
+
+  /// Set when the office registered them from a paper form ("Registered By").
+  registeredById     String?
+  registeredBy       User?                                 @relation("TechnicianRegistrar", fields: [registeredById], references: [id])
+  registeredAt       DateTime?
   serviceRadiusKm    Float                                 @default(5)
   isAvailable        Boolean                               @default(false)
   verificationStatus VerificationStatus                    @default(PENDING)
