@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Am, Btn, Card, CatIcon, ErrorBox, Field, H1, Hint, Row } from '../../components/ui';
 import { api, Booking, CategoryAvailability, Category, uploadImage } from '../../lib/api';
 import { SUB_CITIES } from '../../lib/catalog';

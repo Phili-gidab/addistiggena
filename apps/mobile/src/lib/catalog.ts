@@ -1,5 +1,5 @@
 /** Category icons + Addis sub-cities - mirrors the web lib. */
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 export type MCIName = keyof typeof MaterialCommunityIcons.glyphMap;
 

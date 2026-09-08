@@ -1,5 +1,5 @@
 /** Addis Tiggena mobile UI kit - buttons, cards, fields, pills, timeline dots. */
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { forwardRef, useState } from 'react';
 import {
   ActivityIndicator,
