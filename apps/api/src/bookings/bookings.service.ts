@@ -20,16 +20,21 @@ import {
   SendMessageDto,
 } from './bookings.dto';
 
-const OFFER_WINDOW_MS = 5 * 60_000; // provider has 5 minutes to respond (client decision 2026-08-24)
+/** Defaults agreed with the client; a Super Admin can override both from the
+ *  console (AppConfig offer_window_minutes / escalate_after_attempts). */
+const DEFAULT_OFFER_WINDOW_MS = 5 * 60_000; // 5 minutes to respond (2026-08-24)
+
+/** Settings are read at most once a minute - dispatch runs on every booking. */
+const CONFIG_TTL_MS = 60_000;
 
 /**
  * After this many declines/timeouts the job escalates to the Ops queue for
  * manual assignment instead of walking the pool (roles/workflow spec section 5).
  * Client decision 2026-08-29: ONE attempt - the closest technician gets the job
- * offer, and if they do not respond inside the 5-minute window a human assigns
- * the next one rather than the system cascading on its own.
+ * offer, and if they do not respond inside the window a human assigns the next
+ * one rather than the system cascading on its own.
  */
-const ESCALATE_AFTER_ATTEMPTS = 1;
+const DEFAULT_ESCALATE_AFTER_ATTEMPTS = 1;
 
 /** Average urban travel speed used for the ETA estimate - Addis traffic, mixed transport. */
 const AVG_SPEED_KMH = 18;
@@ -85,6 +90,41 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BookingsService.name);
   private sweepTimer?: NodeJS.Timeout;
   private sweeping = false;
+  private rules = {
+    offerWindowMs: DEFAULT_OFFER_WINDOW_MS,
+    escalateAfter: DEFAULT_ESCALATE_AFTER_ATTEMPTS,
+    readAt: 0,
+  };
+
+  /**
+   * Dispatch rules as the Super Admin has them set. Cached briefly so a
+   * high-traffic dispatch path does not hit the config table on every call, and
+   * always falls back to the agreed defaults if the row is missing or invalid.
+   */
+  private async dispatchRules(): Promise<{ offerWindowMs: number; escalateAfter: number }> {
+    if (Date.now() - this.rules.readAt < CONFIG_TTL_MS) return this.rules;
+    try {
+      const rows = await this.prisma.appConfig.findMany({
+        where: { key: { in: ['offer_window_minutes', 'escalate_after_attempts'] } },
+      });
+      const cfg = Object.fromEntries(rows.map((r) => [r.key, Number(r.value)]));
+      const minutes = cfg.offer_window_minutes;
+      const attempts = cfg.escalate_after_attempts;
+      this.rules = {
+        offerWindowMs:
+          Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : DEFAULT_OFFER_WINDOW_MS,
+        escalateAfter:
+          Number.isFinite(attempts) && attempts > 0
+            ? attempts
+            : DEFAULT_ESCALATE_AFTER_ATTEMPTS,
+        readAt: Date.now(),
+      };
+    } catch (err) {
+      this.logger.warn(`Could not read dispatch rules, using defaults: ${(err as Error).message}`);
+      this.rules.readAt = Date.now();
+    }
+    return this.rules;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -194,7 +234,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         description: dto.description,
         priceQuoteEtb: category.priceFloorEtb,
         photoObjectKey: dto.photoObjectKey ?? null,
-        offerExpiresAt: dto.providerId ? new Date(Date.now() + OFFER_WINDOW_MS) : null,
+        offerExpiresAt: dto.providerId
+          ? new Date(Date.now() + (await this.dispatchRules()).offerWindowMs)
+          : null,
       },
     });
 
@@ -266,10 +308,11 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     };
 
     const exclude = booking.offers.map((o) => o.providerId);
+    const rules = await this.dispatchRules();
 
     // the offered technician declined or let the window lapse -> hold for
     // manual assignment by Ops instead of auto-offering the next one
-    if (exclude.length >= ESCALATE_AFTER_ATTEMPTS && !booking.escalatedAt) {
+    if (exclude.length >= rules.escalateAfter && !booking.escalatedAt) {
       const { count } = await this.prisma.booking.updateMany({
         where: claim,
         data: { providerId: null, offerExpiresAt: null, escalatedAt: new Date() },
@@ -310,7 +353,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       return this.getPublic(bookingId);
     }
 
-    const expiresAt = new Date(Date.now() + OFFER_WINDOW_MS);
+    const expiresAt = new Date(Date.now() + rules.offerWindowMs);
     const { count } = await this.prisma.booking.updateMany({
       where: claim,
       data: { providerId: next.id, offerExpiresAt: expiresAt },
@@ -469,7 +512,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     if (!profile || profile.verificationStatus !== 'VERIFIED') {
       throw new BadRequestException('Technician must exist and be VERIFIED');
     }
-    const expiresAt = new Date(Date.now() + OFFER_WINDOW_MS);
+    const expiresAt = new Date(Date.now() + (await this.dispatchRules()).offerWindowMs);
     await this.prisma.$transaction([
       this.prisma.bookingOffer.updateMany({
         where: { bookingId, outcome: 'PENDING' },

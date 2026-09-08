@@ -105,6 +105,78 @@ interface OpsBooking extends Booking {
   escalatedAt?: string | null;
 }
 
+interface Finance {
+  collectedTodayEtb: number;
+  commissionTodayEtb: number;
+  completedToday: number;
+  payoutsDueEtb: number;
+  payoutsDueCount: number;
+  exceptions: { unpaidJobs: number; openRefunds: number };
+  queue: {
+    id: string;
+    ref: string;
+    category: string;
+    technician: string | null;
+    customerPaidEtb: number;
+    commissionEtb: number;
+    technicianPayoutEtb: number | null;
+    gateway: string | null;
+    state: 'READY' | 'PAYMENT_ISSUE';
+    completedAt: string | null;
+  }[];
+}
+
+interface CustomerContext {
+  customer: { id: string; name: string | null; phone: string; createdAt: string };
+  stats: {
+    bookings: number;
+    completed: number;
+    cancelled: number;
+    lifetimeSpendEtb: number;
+    openCases: number;
+  };
+  bookings: {
+    id: string;
+    ref: string;
+    status: string;
+    category: string;
+    technician: string | null;
+    amountEtb: number | null;
+    stars: number | null;
+    createdAt: string;
+    completedAt: string | null;
+  }[];
+  cases: {
+    id: string;
+    type: string;
+    status: string;
+    note: string;
+    resolutionNote: string | null;
+    refundEtb: number | null;
+    createdAt: string;
+    resolvedAt: string | null;
+  }[];
+}
+
+interface SystemInfo {
+  services: {
+    sms: string;
+    smsNotifications: boolean;
+    telegramBot: boolean;
+    payments: { cash: boolean; chapa: boolean; telebirr: boolean };
+  };
+  dispatch: {
+    offerWindowMinutes: number;
+    escalateAfterAttempts: number;
+    arrivalTargetMinutes: number;
+    workingHours: string;
+  };
+  money: { commissionRate: number; supportRefundCapEtb: number };
+  pending: { vetting: number; tickets: number };
+  scale: { staff: number; technicians: number; customers: number; bookings: number };
+  lastAuditEntry: string | null;
+}
+
 interface StaffAccount {
   id: string;
   name: string | null;
@@ -141,6 +213,8 @@ type ViewKey =
   | 'map'
   | 'bookings'
   | 'technicians'
+  | 'finance'
+  | 'system'
   | 'verification'
   | 'tickets'
   | 'payouts'
@@ -156,6 +230,7 @@ const MENU: Record<StaffRole, ViewKey[]> = {
     'map',
     'bookings',
     'technicians',
+    'finance',
     'verification',
     'tickets',
     'payouts',
@@ -163,12 +238,13 @@ const MENU: Record<StaffRole, ViewKey[]> = {
     'categories',
     'staff',
     'audit',
+    'system',
     'settings',
   ],
   OPS_MANAGER: ['dashboard', 'map', 'bookings', 'technicians', 'reviews', 'categories', 'settings'],
   VERIFICATION_OFFICER: ['dashboard', 'verification', 'technicians'],
   SUPPORT_AGENT: ['dashboard', 'tickets', 'bookings', 'technicians', 'reviews'],
-  FINANCE_OFFICER: ['dashboard', 'payouts', 'settings'],
+  FINANCE_OFFICER: ['dashboard', 'finance', 'payouts', 'settings'],
   SUBCITY_COORDINATOR: ['dashboard', 'map', 'bookings', 'technicians'],
 };
 
@@ -177,6 +253,8 @@ const VIEW_LABEL: Record<ViewKey, string> = {
   map: 'Live dispatch map',
   bookings: 'Bookings',
   technicians: 'Technicians',
+  finance: 'Finance',
+  system: 'Platform controls',
   verification: 'Verification queue',
   tickets: 'Support tickets',
   payouts: 'Payouts',
@@ -191,6 +269,7 @@ const VIEW_LABEL: Record<ViewKey, string> = {
 const NAV_GROUPS: { label: string; items: ViewKey[] }[] = [
   { label: 'Overview', items: ['dashboard', 'map'] },
   { label: 'Operations', items: ['bookings', 'technicians', 'verification', 'tickets', 'payouts', 'reviews'] },
+  { label: 'Money', items: ['finance'] },
   { label: 'Platform', items: ['categories', 'staff', 'audit', 'settings'] },
 ];
 
@@ -212,6 +291,8 @@ const ICONS: Record<ViewKey, React.ReactNode> = (() => {
     categories: I(<><path d="M3 10.5V4.8C3 3.8 3.8 3 4.8 3h5.7c.5 0 .9.2 1.3.5l8.7 8.7c.7.7.7 1.8 0 2.6l-5.7 5.7c-.7.7-1.8.7-2.6 0l-8.7-8.7a1.8 1.8 0 0 1-.5-1.3Z" /><circle cx="7.5" cy="7.5" r="1.2" /></>),
     staff: I(<><circle cx="10" cy="8" r="3.5" /><path d="M3.5 20c.8-3.4 3.4-5 6.5-5 1.7 0 3.2.5 4.4 1.4" /><path d="M18.5 14v6M15.5 17h6" /></>),
     audit: I(<><path d="M6 2.5h9l4 4V21.5H6z" /><path d="M15 2.5V7h4M9.5 12h6M9.5 16h6" /></>),
+    finance: I(<><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /><circle cx="17" cy="14.5" r="1.6" /></>),
+    system: I(<><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></>),
     settings: I(<><path d="M4 21v-6M4 9V3M12 21v-9M12 6V3M20 21v-4M20 11V3" /><path d="M1.5 15h5M9.5 6h5M17.5 17h5" /></>),
   };
 })();
@@ -266,6 +347,9 @@ const ACTIVE_STATUSES = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PRO
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
+/** ETB amounts read better without decimals in an operations table. */
+const MONEY = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
 export default function AdminPage() {
   const router = useRouter();
   const [role, setRole] = useState<StaffRole | null>(null);
@@ -300,6 +384,20 @@ export default function AdminPage() {
     note: string;
     refund: string;
   } | null>(null);
+  /** Meskel Square - the default pin for a booking taken over the phone. */
+  const [pin, setPin] = useState({ lat: 9.0108, lng: 38.7613 });
+  const [finance, setFinance] = useState<Finance | null>(null);
+  const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [context, setContext] = useState<CustomerContext | null>(null);
+  const [rules, setRules] = useState({ offerWindowMinutes: '', escalateAfterAttempts: '', arrivalTargetMinutes: '' });
+  const [newCase, setNewCase] = useState({ bookingId: '', type: 'DISPUTE', note: '' });
+  const [newBooking, setNewBooking] = useState({
+    phone: '',
+    customerName: '',
+    categoryId: '',
+    landmark: '',
+    description: '',
+  });
   const [newTech, setNewTech] = useState({
     name: '',
     phone: '',
@@ -327,6 +425,8 @@ export default function AdminPage() {
         api<OpsBooking[]>('/admin/bookings').then(setBookings).catch(() => {});
       }
       api<Technician[]>('/admin/technicians').then(setTechnicians).catch(() => {});
+      if (MENU[r].includes('finance')) api<Finance>('/admin/finance').then(setFinance).catch(() => {});
+      if (r === 'ADMIN') api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
       if (r === 'ADMIN' || r === 'OPS_MANAGER') {
         api<Analytics>('/admin/analytics').then(setAnalytics).catch(() => {});
         api<{ escalated: OpsBooking[]; stalled: OpsBooking[] }>('/admin/ops/queue')
@@ -467,6 +567,100 @@ export default function AdminPage() {
     }
   }
 
+  /** Pull the whole customer picture behind a case - history, money, cases. */
+  async function loadContext(customerId: string) {
+    setError('');
+    setContext(null);
+    try {
+      setContext(await api<CustomerContext>(`/admin/customers/${customerId}/context`));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /** Support raising a case from a phone call. */
+  async function createCase(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      await api('/admin/tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          bookingId: newCase.bookingId.trim(),
+          type: newCase.type,
+          note: newCase.note.trim(),
+        }),
+      });
+      setNotice('Case opened - it is now in the queue.');
+      setNewCase({ bookingId: '', type: 'DISPUTE', note: '' });
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /** Call-centre booking: staff take the job for a customer on the phone. */
+  async function createBookingForCaller(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      const created = await api<{ id: string }>('/admin/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          phone: newBooking.phone.trim(),
+          customerName: newBooking.customerName.trim() || undefined,
+          categoryId: newBooking.categoryId,
+          lat: pin.lat,
+          lng: pin.lng,
+          landmarkNote: newBooking.landmark.trim() || undefined,
+          description: newBooking.description.trim() || undefined,
+        }),
+      });
+      setNotice(
+        `Booking #${created.id.slice(-6).toUpperCase()} created - the closest technician has been offered the job.`,
+      );
+      setNewBooking({ phone: '', customerName: '', categoryId: '', landmark: '', description: '' });
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /** Dispatch rules the platform actually runs on. */
+  async function saveRules(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      const body: Record<string, number> = {};
+      if (rules.offerWindowMinutes) body.offerWindowMinutes = Number(rules.offerWindowMinutes);
+      if (rules.escalateAfterAttempts) body.escalateAfterAttempts = Number(rules.escalateAfterAttempts);
+      if (rules.arrivalTargetMinutes) body.arrivalTargetMinutes = Number(rules.arrivalTargetMinutes);
+      await api('/admin/config/dispatch', { method: 'PUT', body: JSON.stringify(body) });
+      setNotice('Dispatch rules updated - they apply to new jobs within a minute.');
+      setRules({ offerWindowMinutes: '', escalateAfterAttempts: '', arrivalTargetMinutes: '' });
+      api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /** The finance CSV needs the auth header, so fetch then save the blob. */
+  async function exportFinance() {
+    setError('');
+    try {
+      const res = await authorizedFetch('/admin/finance/export');
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `addis-tiggena-finance-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function openDocument(objectKey: string) {
     setError('');
     try {
@@ -510,10 +704,11 @@ export default function AdminPage() {
 
   // ── reusable pieces ────────────────────────────────────────────────────────
 
-  const tile = (v: string | number, k: string, hi = false) => (
+  const tile = (v: string | number, k: string, hi = false, sub?: string) => (
     <div className={`tile${hi ? ' hi' : ''}`} key={k}>
       <div className="v">{v}</div>
       <div className="k">{k}</div>
+      {sub && <div className="s">{sub}</div>}
     </div>
   );
 
@@ -581,7 +776,11 @@ export default function AdminPage() {
           {t.booking.category.nameEn})
         </span>
         <span className="when" style={{ display: 'block', maxWidth: 460 }}>
-          “{t.note}” - {t.openedBy.name ?? t.openedBy.phone} · {fmtDate(t.createdAt)}
+          “{t.note}” -{' '}
+          <button type="button" className="link-btn" onClick={() => loadContext(t.booking.customer.id)}>
+            {t.booking.customer.name ?? t.booking.customer.phone}
+          </button>{' '}
+          · {fmtDate(t.createdAt)}
           {t.booking.provider?.user
             ? ` · technician: ${t.booking.provider.user.name ?? t.booking.provider.user.phone}`
             : ''}
@@ -959,13 +1158,95 @@ export default function AdminPage() {
               {view === 'dashboard' && dashboardView}
 
               {view === 'map' && can('map') && (
+                <>
+                  <div className="panel mb">
+                    <h2>Create booking (phone order)</h2>
+                    <p className="hint mb">
+                      For a customer who calls instead of using the app. An unknown number becomes a
+                      customer account, and the closest verified technician is offered the job the
+                      moment you save. Drag the pin on the map below first if the caller is not near
+                      Meskel Square.
+                    </p>
+                    <form
+                      onSubmit={createBookingForCaller}
+                      className="row"
+                      style={{ flexWrap: 'wrap', gap: '0.5rem' }}
+                    >
+                      <input
+                        className="input"
+                        style={{ maxWidth: 150 }}
+                        placeholder="09… phone"
+                        value={newBooking.phone}
+                        onChange={(e) => setNewBooking({ ...newBooking, phone: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        style={{ maxWidth: 160 }}
+                        placeholder="caller name"
+                        value={newBooking.customerName}
+                        onChange={(e) =>
+                          setNewBooking({ ...newBooking, customerName: e.target.value })
+                        }
+                      />
+                      <select
+                        className="input"
+                        style={{ maxWidth: 200 }}
+                        value={newBooking.categoryId}
+                        onChange={(e) => setNewBooking({ ...newBooking, categoryId: e.target.value })}
+                      >
+                        <option value="">Service…</option>
+                        {cats
+                          .filter((c) => c.isActive !== false)
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.nameEn}
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        className="input"
+                        style={{ maxWidth: 200 }}
+                        placeholder="landmark"
+                        value={newBooking.landmark}
+                        onChange={(e) => setNewBooking({ ...newBooking, landmark: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        style={{ flex: 1, minWidth: 200 }}
+                        placeholder="what is broken?"
+                        value={newBooking.description}
+                        onChange={(e) =>
+                          setNewBooking({ ...newBooking, description: e.target.value })
+                        }
+                      />
+                      <button
+                        className="btn btn-dark btn-sm"
+                        disabled={newBooking.phone.trim().length < 9 || !newBooking.categoryId}
+                      >
+                        + Create booking
+                      </button>
+                    </form>
+                    <p className="hint">
+                      pin {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
+                      <button
+                        type="button"
+                        className="link-btn"
+                        style={{ marginLeft: '0.5rem' }}
+                        onClick={() => setPin({ lat: 9.0108, lng: 38.7613 })}
+                      >
+                        reset
+                      </button>
+                    </p>
+                  </div>
+
                 <div className="panel">
                   <h2>
                     Live dispatch map · {mapJobs.length} active job{mapJobs.length === 1 ? '' : 's'},{' '}
                     {mapTechs.length} technician{mapTechs.length === 1 ? '' : 's'} online
                   </h2>
                   <DispatchMap jobs={mapJobs} techs={mapTechs} />
-                </div>
+                  </div>
+                </>
               )}
 
               {view === 'bookings' && (
@@ -1102,6 +1383,133 @@ export default function AdminPage() {
 
               {view === 'tickets' && can('tickets') && (
                 <>
+                  <div className="panel mb">
+                    <div className="spread mb">
+                      <h2>New support case</h2>
+                      {context && (
+                        <button className="btn btn-line btn-sm" onClick={() => setContext(null)}>
+                          Close customer view
+                        </button>
+                      )}
+                    </div>
+                    <p className="hint mb">
+                      Raise a case from a phone call. Paste the booking reference the customer reads
+                      out - the six characters after the # - or open a booking below to load their
+                      whole history first.
+                    </p>
+                    <form onSubmit={createCase} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <input
+                        className="input"
+                        style={{ maxWidth: 260 }}
+                        placeholder="booking id"
+                        value={newCase.bookingId}
+                        onChange={(e) => setNewCase({ ...newCase, bookingId: e.target.value })}
+                      />
+                      <select
+                        className="input"
+                        style={{ maxWidth: 190 }}
+                        value={newCase.type}
+                        onChange={(e) => setNewCase({ ...newCase, type: e.target.value })}
+                      >
+                        <option value="DISPUTE">Dispute</option>
+                        <option value="GUARANTEE_CLAIM">Guarantee claim</option>
+                        <option value="SAFETY">Safety</option>
+                      </select>
+                      <input
+                        className="input"
+                        style={{ flex: 1, minWidth: 220 }}
+                        placeholder="what did the customer report?"
+                        value={newCase.note}
+                        onChange={(e) => setNewCase({ ...newCase, note: e.target.value })}
+                      />
+                      <button
+                        className="btn btn-dark btn-sm"
+                        disabled={newCase.bookingId.trim().length < 6 || newCase.note.trim().length < 5}
+                      >
+                        + Open case
+                      </button>
+                    </form>
+                  </div>
+
+                  {context && (
+                    <div className="panel mb">
+                      <div className="spread mb">
+                        <h2>
+                          {context.customer.name ?? 'Customer'}{' '}
+                          <span className="hint">{context.customer.phone}</span>
+                        </h2>
+                        <span className="hint">
+                          customer since {fmtDate(context.customer.createdAt)}
+                        </span>
+                      </div>
+                      <div className="kpi-row" style={{ marginBottom: '1rem' }}>
+                        {tile(context.stats.bookings, 'bookings')}
+                        {tile(context.stats.completed, 'completed')}
+                        {tile(context.stats.cancelled, 'cancelled')}
+                        {tile(`${MONEY(context.stats.lifetimeSpendEtb)} ETB`, 'lifetime spend')}
+                        {tile(context.stats.openCases, 'open cases')}
+                      </div>
+
+                      <h3 className="sub-h">Booking history</h3>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Booking</th>
+                              <th>Status</th>
+                              <th>Technician</th>
+                              <th>Paid</th>
+                              <th>Rating</th>
+                              <th>When</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {context.bookings.map((b) => (
+                              <tr key={b.id}>
+                                <td>
+                                  #{b.ref}
+                                  <div className="hint">{b.category}</div>
+                                </td>
+                                <td>
+                                  <StatusBadge status={b.status} />
+                                </td>
+                                <td>{b.technician ?? '-'}</td>
+                                <td>{b.amountEtb ? `${MONEY(b.amountEtb)} ETB` : '-'}</td>
+                                <td>{b.stars ? `★ ${b.stars}` : '-'}</td>
+                                <td className="hint">{fmtDate(b.createdAt)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <h3 className="sub-h mt">Communication timeline</h3>
+                      {context.cases.length === 0 ? (
+                        <p className="hint">No cases have ever been opened on this account.</p>
+                      ) : (
+                        context.cases.map((c) => (
+                          <div key={c.id} className="booking-row" style={{ cursor: 'default' }}>
+                            <span>
+                              <span className="what">
+                                {c.type.replace(/_/g, ' ').toLowerCase()} ·{' '}
+                                <span className="hint">{c.status.toLowerCase()}</span>
+                              </span>
+                              <span className="when" style={{ display: 'block' }}>
+                                {fmtDate(c.createdAt)}
+                                {c.resolvedAt ? ` · closed ${fmtDate(c.resolvedAt)}` : ''}
+                                {c.refundEtb ? ` · refunded ${MONEY(c.refundEtb)} ETB` : ''}
+                              </span>
+                              <span className="hint" style={{ display: 'block' }}>
+                                {c.note}
+                                {c.resolutionNote ? ` → ${c.resolutionNote}` : ''}
+                              </span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
                   <div className="panel">
                     <h2>Open tickets ({tickets.length})</h2>
                     {refundCap != null && role === 'SUPPORT_AGENT' && (
@@ -1295,6 +1703,251 @@ export default function AdminPage() {
                     </table>
                   </div>
                 </div>
+              )}
+
+              {view === 'finance' && can('finance') && (
+                <>
+                  <div className="kpi-row">
+                    {tile(
+                      `${MONEY(finance?.collectedTodayEtb ?? 0)} ETB`,
+                      'collected today',
+                      false,
+                      finance ? `${finance.completedToday} paid jobs` : undefined,
+                    )}
+                    {tile(
+                      `${MONEY(finance?.payoutsDueEtb ?? 0)} ETB`,
+                      'technician payouts',
+                      false,
+                      finance ? `${finance.payoutsDueCount} ready for processing` : undefined,
+                    )}
+                    {tile(
+                      (finance?.exceptions.unpaidJobs ?? 0) + (finance?.exceptions.openRefunds ?? 0),
+                      'exceptions',
+                      false,
+                      finance
+                        ? `${finance.exceptions.openRefunds} refund · ${finance.exceptions.unpaidJobs} unpaid`
+                        : undefined,
+                    )}
+                  </div>
+
+                  <div className="panel">
+                    <div className="spread mb">
+                      <h2>Today&rsquo;s payment queue</h2>
+                      <button className="btn btn-primary btn-sm" onClick={exportFinance}>
+                        Export daily report
+                      </button>
+                    </div>
+                    <p className="hint mb">
+                      Commission of {system ? Math.round(system.money.commissionRate * 100) : 14}% is
+                      taken from each completed job; the remainder is what the technician is owed.
+                    </p>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Booking</th>
+                            <th>Technician</th>
+                            <th>Customer payment</th>
+                            <th>Payout</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(finance?.queue ?? []).map((r) => (
+                            <tr key={r.id}>
+                              <td>
+                                #{r.ref}
+                                <div className="hint">{r.category}</div>
+                              </td>
+                              <td>{r.technician ?? '-'}</td>
+                              <td>
+                                {r.customerPaidEtb ? `${MONEY(r.customerPaidEtb)} ETB` : '-'}
+                                {r.gateway && <div className="hint">{r.gateway.toLowerCase()}</div>}
+                              </td>
+                              <td>
+                                {r.technicianPayoutEtb !== null
+                                  ? `${MONEY(r.technicianPayoutEtb)} ETB`
+                                  : '-'}
+                              </td>
+                              <td>
+                                <span
+                                  className={r.state === 'READY' ? 'pill ok' : 'pill danger'}
+                                >
+                                  {r.state === 'READY' ? 'Ready' : 'Payment issue'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                          {finance && finance.queue.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="hint">
+                                No completed jobs yet today.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {view === 'system' && can('system') && (
+                <>
+                  <div className="panel mb">
+                    <h2>Service health</h2>
+                    <p className="hint mb">
+                      What is switched on right now. A service that is off is not broken - it is
+                      waiting on credentials.
+                    </p>
+                    <div className="sys-grid">
+                      {[
+                        {
+                          label: 'SMS gateway',
+                          on: (system?.services.sms ?? 'console') !== 'console',
+                          detail:
+                            system?.services.sms === 'console'
+                              ? 'console only - codes reach the log, not the customer'
+                              : `${system?.services.sms} · notifications ${system?.services.smsNotifications ? 'on' : 'OTP only'}`,
+                        },
+                        {
+                          label: 'Telegram bot',
+                          on: !!system?.services.telegramBot,
+                          detail: system?.services.telegramBot ? 'running' : 'BOT_TOKEN not set',
+                        },
+                        {
+                          label: 'Cash payments',
+                          on: true,
+                          detail: 'always available',
+                        },
+                        {
+                          label: 'Chapa',
+                          on: !!system?.services.payments.chapa,
+                          detail: system?.services.payments.chapa ? 'connected' : 'merchant keys pending',
+                        },
+                        {
+                          label: 'Telebirr',
+                          on: !!system?.services.payments.telebirr,
+                          detail: system?.services.payments.telebirr ? 'connected' : 'merchant keys pending',
+                        },
+                      ].map((x) => (
+                        <div key={x.label} className="sys-card">
+                          <span className={x.on ? 'dot on' : 'dot off'} aria-hidden />
+                          <span>
+                            <b>{x.label}</b>
+                            <small>{x.detail}</small>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="panel mb">
+                    <h2>Dispatch rules</h2>
+                    <p className="hint mb">
+                      These drive live dispatch. The offer window is how long the closest technician
+                      has to accept before the job escalates to the Ops queue for manual assignment.
+                    </p>
+                    <form onSubmit={saveRules} className="row" style={{ flexWrap: 'wrap', gap: '0.6rem' }}>
+                      <div className="field" style={{ maxWidth: 190 }}>
+                        <label>Offer window (minutes)</label>
+                        <input
+                          className="input"
+                          inputMode="numeric"
+                          placeholder={String(system?.dispatch.offerWindowMinutes ?? 5)}
+                          value={rules.offerWindowMinutes}
+                          onChange={(e) =>
+                            setRules({ ...rules, offerWindowMinutes: e.target.value.replace(/\D/g, '') })
+                          }
+                        />
+                      </div>
+                      <div className="field" style={{ maxWidth: 210 }}>
+                        <label>Offers before escalation</label>
+                        <input
+                          className="input"
+                          inputMode="numeric"
+                          placeholder={String(system?.dispatch.escalateAfterAttempts ?? 1)}
+                          value={rules.escalateAfterAttempts}
+                          onChange={(e) =>
+                            setRules({ ...rules, escalateAfterAttempts: e.target.value.replace(/\D/g, '') })
+                          }
+                        />
+                      </div>
+                      <div className="field" style={{ maxWidth: 200 }}>
+                        <label>Arrival target (minutes)</label>
+                        <input
+                          className="input"
+                          inputMode="numeric"
+                          placeholder={String(system?.dispatch.arrivalTargetMinutes ?? 30)}
+                          value={rules.arrivalTargetMinutes}
+                          onChange={(e) =>
+                            setRules({ ...rules, arrivalTargetMinutes: e.target.value.replace(/\D/g, '') })
+                          }
+                        />
+                      </div>
+                      <button className="btn btn-dark btn-sm" style={{ alignSelf: 'center' }}>
+                        Save rules
+                      </button>
+                    </form>
+                    <p className="hint">
+                      Working hours {system?.dispatch.workingHours ?? '06:00-20:00'} · support refund
+                      cap {MONEY(system?.money.supportRefundCapEtb ?? 500)} ETB
+                    </p>
+                  </div>
+
+                  <div className="panel mb">
+                    <h2>Controlled approvals</h2>
+                    <div className="sys-grid">
+                      <button className="sys-card as-btn" onClick={() => setView('verification')}>
+                        <span>
+                          <b>Technician verification</b>
+                          <small>Approve skills and documents, suspend with a reason</small>
+                        </span>
+                        {!!system?.pending.vetting && (
+                          <span className="pill warn">{system.pending.vetting} pending</span>
+                        )}
+                      </button>
+                      <button className="sys-card as-btn" onClick={() => setView('tickets')}>
+                        <span>
+                          <b>Open support cases</b>
+                          <small>Disputes, guarantee claims and re-inspections</small>
+                        </span>
+                        {!!system?.pending.tickets && (
+                          <span className="pill warn">{system.pending.tickets} open</span>
+                        )}
+                      </button>
+                      <button className="sys-card as-btn" onClick={() => setView('staff')}>
+                        <span>
+                          <b>Roles and permissions</b>
+                          <small>
+                            {system?.scale.staff ?? 0} staff accounts, each limited to their own views
+                          </small>
+                        </span>
+                      </button>
+                      <button className="sys-card as-btn" onClick={() => setView('audit')}>
+                        <span>
+                          <b>Audit log</b>
+                          <small>
+                            Every override, price change and account action
+                            {system?.lastAuditEntry
+                              ? ` · last ${fmtDate(system.lastAuditEntry)}`
+                              : ''}
+                          </small>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="panel">
+                    <h2>Platform at a glance</h2>
+                    <div className="kpi-row" style={{ marginTop: '0.6rem' }}>
+                      {tile(system?.scale.customers ?? '…', 'customers')}
+                      {tile(system?.scale.technicians ?? '…', 'technicians')}
+                      {tile(system?.scale.bookings ?? '…', 'bookings all time')}
+                      {tile(system?.scale.staff ?? '…', 'staff accounts')}
+                    </div>
+                  </div>
+                </>
               )}
 
               {view === 'staff' && can('staff') && (

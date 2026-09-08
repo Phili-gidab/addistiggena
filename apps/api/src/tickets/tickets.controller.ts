@@ -63,6 +63,13 @@ export class TicketsController {
 
   // ── staff (Support Agent queue; Ops and Super Admin can also act) ─────────
 
+  /** Support desk raising a case from a phone call or their own review. */
+  @Post('admin/tickets')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
+  openForCustomer(@CurrentUser() user: AuthUser, @Body() dto: OpenTicketDto) {
+    return this.tickets.openAsStaff(user, dto.bookingId, dto.type, dto.note);
+  }
+
   @Get('admin/tickets')
   @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
   queue(@Query() query: TicketQueueQuery) {

@@ -2,6 +2,7 @@
  * API client for the Addis Tiggena platform - React Native flavour of apps/web/lib/api.ts.
  * Tokens live in expo-secure-store; a 401 triggers one silent refresh then a logout event.
  */
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.addistiggena.com';
@@ -245,15 +246,52 @@ export async function api<T>(path: string, init: RequestInit = {}, retried = fal
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-/** Multipart upload of a local image uri; returns the stored objectKey. */
+/**
+ * Upload a local image (booking photo, vetting document) and return its
+ * objectKey.
+ *
+ * This uses the native multipart uploader rather than fetch + FormData: since
+ * SDK 54 the runtime's fetch rejects React Native's `{ uri, name, type }` file
+ * part with "Unsupported FormDataPart implementation", which is what broke
+ * document upload on the technician profile.
+ */
 export async function uploadImage(uri: string): Promise<{ objectKey: string; url: string }> {
   const name = uri.split('/').pop() ?? 'photo.jpg';
   const ext = name.split('.').pop()?.toLowerCase();
-  const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-  const fd = new FormData();
-  // React Native FormData file part
-  fd.append('file', { uri, name, type } as unknown as Blob);
-  return api<{ objectKey: string; url: string }>('/uploads', { method: 'POST', body: fd });
+  const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+  const send = async () =>
+    FileSystem.uploadAsync(`${API_URL}/uploads`, uri, {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType,
+      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
+    });
+
+  let res = await send();
+  // same silent-refresh-then-retry contract as api()
+  if (res.status === 401 && accessToken) {
+    if (await tryRefresh()) {
+      res = await send();
+    } else {
+      await clearSession();
+      onSessionLost?.();
+      throw new ApiError('Your session expired - please sign in again.', 401);
+    }
+  }
+  if (res.status >= 400) {
+    let message = `Upload failed (${res.status})`;
+    try {
+      const body = JSON.parse(res.body) as { message?: string | string[] };
+      const m = Array.isArray(body.message) ? body.message.join(', ') : body.message;
+      if (m) message = m;
+    } catch {
+      /* non-JSON error body - keep the status message */
+    }
+    throw new ApiError(message, res.status);
+  }
+  return JSON.parse(res.body) as { objectKey: string; url: string };
 }
 
 /** Auth-gated image: fetch as blob and return an object URL... RN cannot use

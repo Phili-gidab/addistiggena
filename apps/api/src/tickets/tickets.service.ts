@@ -50,6 +50,32 @@ export class TicketsService {
   }
 
   /** Customer dispute ("something is wrong") or guarantee claim; technician safety flag. */
+  /**
+   * Open a case for a booking the actor is not a party to - a support agent
+   * taking a phone call. Same duplicate guard and dispute flag as the customer
+   * path; the opener is recorded so the audit trail shows who raised it.
+   */
+  async openAsStaff(user: AuthUser, bookingId: string, type: TicketType, note: string) {
+    const booking = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const existing = await this.prisma.supportTicket.findFirst({
+      where: { bookingId, type, status: { in: ['OPEN', 'RE_INSPECTION'] } },
+    });
+    if (existing) {
+      throw new BadRequestException('A case of this type is already open for this booking');
+    }
+
+    const [ticket] = await this.prisma.$transaction([
+      this.prisma.supportTicket.create({
+        data: { bookingId, openedById: user.userId, type, note },
+        include: TICKET_INCLUDE,
+      }),
+      this.prisma.booking.update({ where: { id: bookingId }, data: { disputedAt: new Date() } }),
+    ]);
+    return ticket;
+  }
+
   async open(user: AuthUser, bookingId: string, type: TicketType, note: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },

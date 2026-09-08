@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,6 +24,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { Response } from 'express';
 import { PayoutStatus, Prisma, ReviewState, Role, VerificationStatus } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
 import { AuditService } from '../audit/audit.service';
@@ -135,6 +137,67 @@ class CreateTechnicianDto {
   @Min(-180)
   @Max(180)
   lng?: number;
+}
+
+/** Call-centre booking: staff take a job over the phone for a customer. */
+class StaffBookingDto {
+  @IsString()
+  @Length(9, 20)
+  phone: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  customerName?: string;
+
+  @IsString()
+  categoryId: string;
+
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  lat: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  landmarkNote?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  description?: string;
+}
+
+/** Dispatch rules a Super Admin can tune without a redeploy. */
+class DispatchRulesDto {
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(30)
+  offerWindowMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  escalateAfterAttempts?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(5)
+  @Max(180)
+  arrivalTargetMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  workingHours?: string;
 }
 
 class CategoryUpdateDto {
@@ -687,6 +750,332 @@ export class AdminController {
     return { id: profile.id, userId: user.id, name: user.name, phone, verificationStatus: profile.verificationStatus };
   }
 
+  // -- Finance workspace (spec section 2: Finance Officer) --------------------
+
+  /** Today's money in one call: what customers paid, what technicians are owed,
+   *  and the exceptions a human has to chase. */
+  @Get('finance')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async finance() {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+
+    const [collected, payoutsDue, unpaidJobs, openRefunds, queue] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: { status: 'CONFIRMED', confirmedAt: { gte: dayStart } },
+        _sum: { amountEtb: true, commissionEtb: true },
+        _count: { _all: true },
+      }),
+      this.prisma.payout.aggregate({
+        where: { status: 'REQUESTED' },
+        _sum: { amountEtb: true },
+        _count: { _all: true },
+      }),
+      // completed long ago but still unpaid - the classic exception to chase
+      this.prisma.booking.count({
+        where: { status: 'COMPLETED', completedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) } },
+      }),
+      this.prisma.supportTicket.count({
+        where: { status: { in: ['OPEN', 'RE_INSPECTION'] }, refundEtb: { not: null } },
+      }),
+      this.prisma.booking.findMany({
+        where: { OR: [{ status: 'PAID', paidAt: { gte: dayStart } }, { status: 'COMPLETED' }] },
+        include: {
+          category: { select: { nameEn: true } },
+          payment: { select: { amountEtb: true, commissionEtb: true, gateway: true, status: true } },
+          provider: { select: { user: { select: { name: true } } } },
+        },
+        orderBy: { completedAt: 'desc' },
+        take: 60,
+      }),
+    ]);
+
+    return {
+      collectedTodayEtb: Number(collected._sum.amountEtb ?? 0),
+      commissionTodayEtb: Number(collected._sum.commissionEtb ?? 0),
+      completedToday: collected._count._all,
+      payoutsDueEtb: Number(payoutsDue._sum.amountEtb ?? 0),
+      payoutsDueCount: payoutsDue._count._all,
+      exceptions: { unpaidJobs, openRefunds },
+      queue: queue.map((b) => {
+        const paid = Number(b.payment?.amountEtb ?? 0);
+        const fee = Number(b.payment?.commissionEtb ?? 0);
+        return {
+          id: b.id,
+          ref: b.id.slice(-6).toUpperCase(),
+          category: b.category.nameEn,
+          technician: b.provider?.user?.name ?? null,
+          customerPaidEtb: paid,
+          commissionEtb: fee,
+          technicianPayoutEtb: paid ? paid - fee : null,
+          gateway: b.payment?.gateway ?? null,
+          state: b.status === 'PAID' ? 'READY' : 'PAYMENT_ISSUE',
+          completedAt: b.completedAt,
+        };
+      }),
+    };
+  }
+
+  /** The same day's rows as a CSV the finance desk can file or import. */
+  @Get('finance/export')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async financeExport(@Res({ passthrough: true }) res: Response) {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const rows = await this.prisma.booking.findMany({
+      where: { status: { in: ['PAID', 'COMPLETED'] }, completedAt: { gte: dayStart } },
+      include: {
+        category: { select: { nameEn: true } },
+        payment: true,
+        customer: { select: { name: true, phone: true } },
+        provider: { select: { user: { select: { name: true, phone: true } } } },
+      },
+      orderBy: { completedAt: 'asc' },
+    });
+
+    const esc = (v: unknown) => {
+      const t = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+    };
+    const lines = [
+      [
+        'booking',
+        'completed_at',
+        'service',
+        'customer',
+        'customer_phone',
+        'technician',
+        'technician_phone',
+        'status',
+        'gateway',
+        'customer_paid_etb',
+        'commission_etb',
+        'technician_payout_etb',
+      ].join(','),
+    ];
+    for (const b of rows) {
+      const paid = Number(b.payment?.amountEtb ?? 0);
+      const fee = Number(b.payment?.commissionEtb ?? 0);
+      lines.push(
+        [
+          b.id.slice(-6).toUpperCase(),
+          b.completedAt?.toISOString() ?? '',
+          b.category.nameEn,
+          b.customer?.name ?? '',
+          b.customer?.phone ?? '',
+          b.provider?.user?.name ?? '',
+          b.provider?.user?.phone ?? '',
+          b.status,
+          b.payment?.gateway ?? '',
+          paid || '',
+          fee || '',
+          paid ? paid - fee : '',
+        ]
+          .map(esc)
+          .join(','),
+      );
+    }
+    const day = dayStart.toISOString().slice(0, 10);
+    res.set({
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': 'attachment; filename="addis-tiggena-finance-' + day + '.csv"',
+    });
+    return lines.join('\n');
+  }
+
+  // -- Support: the customer behind a case ------------------------------------
+
+  /** Everything a support agent needs on one screen: who they are, their repair
+   *  history, what they paid, and every case opened on their account. */
+  @Get('customers/:id/context')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
+  async customerContext(@Param('id') id: string) {
+    const customer = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, phone: true, createdAt: true, language: true },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const [bookings, tickets] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: { customerId: id },
+        include: {
+          category: { select: { nameEn: true, nameAm: true } },
+          payment: { select: { amountEtb: true, gateway: true, status: true } },
+          provider: { select: { user: { select: { name: true, phone: true } } } },
+          review: { select: { stars: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+      this.prisma.supportTicket.findMany({
+        where: { booking: { customerId: id } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
+
+    const paid = bookings.filter((b) => b.payment?.status === 'CONFIRMED');
+    return {
+      customer,
+      stats: {
+        bookings: bookings.length,
+        completed: bookings.filter((b) => ['COMPLETED', 'PAID'].includes(b.status)).length,
+        cancelled: bookings.filter((b) => b.status === 'CANCELLED').length,
+        lifetimeSpendEtb: paid.reduce((sum, b) => sum + Number(b.payment?.amountEtb ?? 0), 0),
+        openCases: tickets.filter((t) => ['OPEN', 'RE_INSPECTION'].includes(t.status)).length,
+      },
+      bookings: bookings.map((b) => ({
+        id: b.id,
+        ref: b.id.slice(-6).toUpperCase(),
+        status: b.status,
+        category: b.category.nameEn,
+        technician: b.provider?.user?.name ?? null,
+        technicianPhone: b.provider?.user?.phone ?? null,
+        amountEtb: b.payment ? Number(b.payment.amountEtb) : null,
+        gateway: b.payment?.gateway ?? null,
+        stars: b.review?.stars ?? null,
+        createdAt: b.createdAt,
+        completedAt: b.completedAt,
+      })),
+      cases: tickets.map((t) => ({
+        id: t.id,
+        bookingId: t.bookingId,
+        type: t.type,
+        status: t.status,
+        note: t.note,
+        resolutionNote: t.resolutionNote,
+        refundEtb: t.refundEtb ? Number(t.refundEtb) : null,
+        createdAt: t.createdAt,
+        resolvedAt: t.resolvedAt,
+      })),
+    };
+  }
+
+  // -- Call-centre booking (spec section 4: phone orders) ---------------------
+
+  /** Take a booking over the phone. An unknown number becomes a customer
+   *  account, so the caller keeps the same history as an app user. */
+  @Post('bookings')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT', 'SUBCITY_COORDINATOR')
+  async createBookingForCustomer(@CurrentUser() actor: AuthUser, @Body() dto: StaffBookingDto) {
+    const phone = normalizePhone(dto.phone);
+    let customer = await this.prisma.user.findUnique({ where: { phone } });
+    if (customer && !['CUSTOMER', 'PROVIDER'].includes(customer.role)) {
+      throw new BadRequestException('That phone belongs to a staff account');
+    }
+    if (!customer) {
+      customer = await this.prisma.user.create({
+        data: { phone, name: dto.customerName ?? null, role: 'CUSTOMER', language: 'AM' },
+      });
+    } else if (dto.customerName && !customer.name) {
+      customer = await this.prisma.user.update({
+        where: { id: customer.id },
+        data: { name: dto.customerName },
+      });
+    }
+
+    const booking = await this.bookingsService.create(customer.id, {
+      categoryId: dto.categoryId,
+      lat: dto.lat,
+      lng: dto.lng,
+      landmarkNote: dto.landmarkNote,
+      description: dto.description,
+    });
+    if (!booking) throw new BadRequestException('Could not create the booking');
+    this.audit.log(actor, 'BOOKING_CREATE_BY_STAFF', 'Booking', booking.id, undefined, {
+      phone,
+      category: dto.categoryId,
+    });
+    return booking;
+  }
+
+  // -- Platform controls (Super Admin) ---------------------------------------
+
+  /** One health-and-configuration snapshot: what is switched on, what is
+   *  pending, and where the platform's numbers currently sit. */
+  @Get('system')
+  @Roles('ADMIN')
+  async system() {
+    const [
+      configs,
+      pendingVetting,
+      openTickets,
+      staffCount,
+      providers,
+      customers,
+      bookings,
+      lastAudit,
+    ] = await Promise.all([
+      this.prisma.appConfig.findMany(),
+      this.prisma.providerProfile.count({ where: { verificationStatus: 'PENDING' } }),
+      this.prisma.supportTicket.count({ where: { status: { in: ['OPEN', 'RE_INSPECTION'] } } }),
+      this.prisma.user.count({ where: { role: { in: CREATABLE_STAFF_ROLES as Role[] } } }),
+      this.prisma.providerProfile.count(),
+      this.prisma.user.count({ where: { role: 'CUSTOMER' } }),
+      this.prisma.booking.count(),
+      this.prisma.auditLog.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const cfg = Object.fromEntries(configs.map((c) => [c.key, c.value]));
+    return {
+      services: {
+        // a console SMS provider means OTP codes reach the log, not the customer
+        sms: process.env.SMS_PROVIDER ?? 'console',
+        smsNotifications: (process.env.SMS_NOTIFICATIONS ?? 'on') !== 'off',
+        telegramBot: !!process.env.BOT_TOKEN,
+        payments: {
+          cash: true,
+          chapa: !!process.env.CHAPA_SECRET_KEY,
+          telebirr: !!process.env.TELEBIRR_APP_KEY,
+        },
+      },
+      dispatch: {
+        offerWindowMinutes: Number(cfg.offer_window_minutes ?? 5),
+        escalateAfterAttempts: Number(cfg.escalate_after_attempts ?? 1),
+        arrivalTargetMinutes: Number(cfg.arrival_target_minutes ?? 30),
+        workingHours: cfg.working_hours ?? '06:00-20:00',
+      },
+      money: {
+        commissionRate: Number(cfg.commission_rate ?? 0.14),
+        supportRefundCapEtb: Number(cfg.support_refund_cap_etb ?? 500),
+      },
+      pending: { vetting: pendingVetting, tickets: openTickets },
+      scale: { staff: staffCount, technicians: providers, customers, bookings },
+      lastAuditEntry: lastAudit?.createdAt ?? null,
+    };
+  }
+
+  /** Tune dispatch behaviour without a redeploy - every change is audited. */
+  @Put('config/dispatch')
+  @Roles('ADMIN')
+  async setDispatchRules(@CurrentUser() actor: AuthUser, @Body() dto: DispatchRulesDto) {
+    const pairs: [string, string][] = [];
+    if (dto.offerWindowMinutes !== undefined)
+      pairs.push(['offer_window_minutes', String(dto.offerWindowMinutes)]);
+    if (dto.escalateAfterAttempts !== undefined)
+      pairs.push(['escalate_after_attempts', String(dto.escalateAfterAttempts)]);
+    if (dto.arrivalTargetMinutes !== undefined)
+      pairs.push(['arrival_target_minutes', String(dto.arrivalTargetMinutes)]);
+    if (dto.workingHours !== undefined) pairs.push(['working_hours', dto.workingHours]);
+    if (!pairs.length) throw new BadRequestException('Nothing to change');
+
+    for (const [key, value] of pairs) {
+      await this.prisma.appConfig.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value },
+      });
+    }
+    this.audit.log(actor, 'DISPATCH_RULES_UPDATE', 'AppConfig', 'dispatch', undefined, {
+      changed: Object.fromEntries(pairs),
+    });
+    return Object.fromEntries(pairs);
+  }
+
   // -- Audit log (spec section 8: every manual override, with reason) ---------
 
   @Get('audit')
@@ -734,6 +1123,7 @@ export class AdminController {
       approvedThisWeek,
       flaggedForReview,
       enRouteOld,
+      onlineSubCities,
     ] = await Promise.all([
       this.prisma.booking.count({
         where: { status: { in: ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'] } },
@@ -766,6 +1156,12 @@ export class AdminController {
       }),
       this.prisma.providerProfile.count({ where: { verificationStatus: 'SUSPENDED' } }),
       this.prisma.booking.count({ where: { status: 'EN_ROUTE', enRouteAt: { lt: stallBefore } } }),
+      // which sub-cities actually have someone online right now
+      this.prisma.providerProfile.findMany({
+        where: { isAvailable: true, verificationStatus: 'VERIFIED', subCity: { not: null } },
+        select: { subCity: true },
+        distinct: ['subCity'],
+      }),
     ]);
 
     const avg = (xs: number[]) =>
@@ -779,7 +1175,15 @@ export class AdminController {
     void dayAgo;
 
     return {
-      ops: { activeJobs, awaitingDispatch, escalated, stalledEnRoute: enRouteOld, techniciansOnline, avgArrivalMin },
+      ops: {
+        activeJobs,
+        awaitingDispatch,
+        escalated,
+        stalledEnRoute: enRouteOld,
+        techniciansOnline,
+        subCitiesCovered: onlineSubCities.length,
+        avgArrivalMin,
+      },
       support: { openTickets, activeClaims, resolvedToday, avgResolutionMin },
       verification: { pendingApplications, approvedThisWeek, flaggedForReview },
     };
