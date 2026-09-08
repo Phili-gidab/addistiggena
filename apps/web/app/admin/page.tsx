@@ -1172,7 +1172,9 @@ export default function AdminPage() {
                           {d.type.replace(/_/g, ' ').toLowerCase()}
                         </button>
                       ))}
-                      <div className="hint" style={{ marginTop: '0.3rem' }}>
+                      {/* wraps onto two lines - on one it makes the table wider
+                          than the panel and pushes verify/reject out of reach */}
+                      <div className="hint" style={{ marginTop: '0.3rem', maxWidth: 230 }}>
                         {REQUIRED_DOCS.map((r) => (
                           <span key={r.type} style={{ marginRight: '0.6rem', whiteSpace: 'nowrap' }}>
                             {p.documents.some((d) => d.type === r.type) ? '✓' : '✗'} {r.label}
