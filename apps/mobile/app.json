@@ -2,7 +2,7 @@
   "expo": {
     "name": "Addis Tiggena",
     "slug": "addis-tiggena",
-    "version": "1.9.1",
+    "version": "1.10.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "addistiggena",
@@ -21,7 +21,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.amnen.addistiggena",
-      "versionCode": 4
+      "versionCode": 5
     },
     "web": {
       "output": "static",
