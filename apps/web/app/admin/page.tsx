@@ -1184,7 +1184,17 @@ export default function AdminPage() {
                           the office or send a photo, so the desk files it here
                           rather than waiting for them to use the app. */}
                       {docUpload?.providerId === p.id ? (
-                        <div className="row" style={{ gap: '0.4rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+                        <div
+                          className="row"
+                          style={{
+                            gap: '0.4rem',
+                            marginTop: '0.45rem',
+                            flexWrap: 'wrap',
+                            // keep the control inside the cell, or it pushes the
+                            // verify/reject buttons off the edge of the table
+                            maxWidth: 210,
+                          }}
+                        >
                           <select
                             className="input"
                             style={{ maxWidth: 175, fontSize: '0.78rem' }}
@@ -1202,7 +1212,7 @@ export default function AdminPage() {
                             type="file"
                             accept="image/*,application/pdf"
                             disabled={uploading}
-                            style={{ fontSize: '0.75rem', maxWidth: 190 }}
+                            style={{ fontSize: '0.75rem', maxWidth: 200 }}
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) uploadDocumentFor(file, p.id, docUpload.type);

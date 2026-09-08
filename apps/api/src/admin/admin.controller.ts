@@ -909,7 +909,7 @@ export class AdminController {
     // The last enabled Super Admin must stay a Super Admin, or nobody can
     // administer the platform again.
     if (member.role === 'ADMIN' && role !== 'ADMIN') {
-      await this.assertNotLastAdmin(id, 'change the role of');
+      await this.assertNotLastAdmin(id, 'change its role');
     }
     if (dto.phone) {
       const phone = normalizePhone(dto.phone);
@@ -956,7 +956,7 @@ export class AdminController {
     if (member.id === actor.userId) {
       throw new BadRequestException('You cannot disable your own account');
     }
-    if (member.role === 'ADMIN') await this.assertNotLastAdmin(id, 'disable');
+    if (member.role === 'ADMIN') await this.assertNotLastAdmin(id, 'disable it');
     if (member.disabledAt) throw new BadRequestException('Account is already disabled');
 
     this.audit.log(actor, 'STAFF_DISABLE', 'User', id, dto.note);
@@ -989,7 +989,7 @@ export class AdminController {
     });
     if (others === 0) {
       throw new BadRequestException(
-        `This is the only active Super Admin - you cannot ${action} it. Promote another account first.`,
+        `This is the only active Super Admin - you cannot ${action}. Promote another account first.`,
       );
     }
   }
