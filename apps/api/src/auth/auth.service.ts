@@ -122,6 +122,11 @@ export class AuthService {
     if (!ok || !user?.passwordHash) {
       throw new UnauthorizedException('Wrong username or password');
     }
+    // checked after the password so a wrong guess cannot enumerate which
+    // accounts exist and are disabled
+    if (user.disabledAt) {
+      throw new UnauthorizedException('This account has been disabled - contact your administrator');
+    }
     return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }
 

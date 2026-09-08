@@ -229,6 +229,9 @@ async function main() {
   const catBySlug = new Map(
     (await prisma.serviceCategory.findMany({ select: { id: true, slug: true } })).map((c) => [c.slug, c.id]),
   );
+  // Marks the seeded opening balance so re-running the seed does not stack it up.
+  const SEED_DEPOSIT_REF = 'SEED-OPENING-CREDIT';
+
   for (const t of FLEET) {
     const categoryId = catBySlug.get(t.slug);
     if (!categoryId) continue;
@@ -259,7 +262,44 @@ async function main() {
       create: { userId: u.id, ...data },
     });
     await prisma.$executeRaw`UPDATE "ProviderProfile" SET "location" = ST_SetSRID(ST_MakePoint(${t.lng}, ${t.lat}), 4326)::geography WHERE "id" = ${p.id}`;
-    await prisma.wallet.upsert({ where: { providerId: p.id }, update: {}, create: { providerId: p.id } });
+
+    // Demo fleet starts with commission credit on the books. Without it every
+    // technician sits at zero, the first job pushes them negative, and dispatch
+    // stops offering work part-way through a demo.
+    const wallet = await prisma.wallet.upsert({
+      where: { providerId: p.id },
+      update: {},
+      create: { providerId: p.id },
+    });
+    const opening = 1500;
+    const seeded = await prisma.deposit.findFirst({
+      where: { walletId: wallet.id, reference: SEED_DEPOSIT_REF },
+    });
+    if (!seeded) {
+      await prisma.deposit.create({
+        data: {
+          walletId: wallet.id,
+          amountEtb: opening,
+          method: 'CASH_OFFICE',
+          reference: SEED_DEPOSIT_REF,
+          status: 'CONFIRMED',
+          note: 'Opening commission credit (demo data)',
+          settledAt: new Date(),
+        },
+      });
+      await prisma.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'DEPOSIT',
+          amountEtb: opening,
+          note: 'Opening commission credit (demo data)',
+        },
+      });
+      await prisma.wallet.update({
+        where: { id: wallet.id },
+        data: { balanceEtb: opening },
+      });
+    }
   }
 
   console.log('Seed complete:', {

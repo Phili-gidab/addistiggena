@@ -12,8 +12,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  IsBoolean,
   IsEnum,
   IsIn,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -25,7 +27,15 @@ import {
   MinLength,
 } from 'class-validator';
 import { Response } from 'express';
-import { PayoutStatus, Prisma, ReviewState, Role, VerificationStatus } from '@prisma/client';
+import {
+  DepositMethod,
+  DepositStatus,
+  DocumentType,
+  Prisma,
+  ReviewState,
+  Role,
+  VerificationStatus,
+} from '@prisma/client';
 import { hashSync } from 'bcryptjs';
 import { AuditService } from '../audit/audit.service';
 import { normalizePhone } from '../auth/auth.dto';
@@ -34,6 +44,18 @@ import { AuthUser } from '../auth/jwt.strategy';
 import { BookingsService } from '../bookings/bookings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+
+/** Everything the console shows about a staff account - never the password. */
+const STAFF_FIELDS = {
+  id: true,
+  name: true,
+  phone: true,
+  username: true,
+  role: true,
+  subCity: true,
+  disabledAt: true,
+  createdAt: true,
+} as const;
 
 /** Roles Super Admin may hand out (spec section 3: only role that creates admin-level accounts). */
 const CREATABLE_STAFF_ROLES = [
@@ -198,6 +220,13 @@ class DispatchRulesDto {
   @IsString()
   @MaxLength(20)
   workingHours?: string;
+
+  /** Deposit balance a technician must hold to keep being offered jobs. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10000)
+  minWalletBalanceEtb?: number;
 }
 
 class CategoryUpdateDto {
@@ -289,10 +318,78 @@ class ProviderQueueQuery {
   status?: VerificationStatus;
 }
 
-class PayoutQueueQuery {
+class DepositQueueQuery {
   @IsOptional()
-  @IsEnum(PayoutStatus)
-  status?: PayoutStatus;
+  @IsEnum(DepositStatus)
+  status?: DepositStatus;
+}
+
+/** Finance recording a top-up they can see on the company bank statement. */
+class RecordDepositDto {
+  @IsString()
+  @IsNotEmpty()
+  providerId: string;
+
+  @IsNumber()
+  @Min(1)
+  amountEtb: number;
+
+  @IsEnum(DepositMethod)
+  method: DepositMethod;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  reference: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string;
+
+  /** Set when the officer has the slip in hand and is crediting immediately. */
+  @IsOptional()
+  @IsBoolean()
+  confirmNow?: boolean;
+}
+
+/** Editing an existing staff account. Every field is optional - only what
+ *  changed is sent. Password is only set when a reset was asked for. */
+class UpdateStaffDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phone?: string;
+
+  @IsOptional()
+  @IsEnum(Role)
+  role?: Role;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  subCity?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  password?: string;
+}
+
+/** Staff uploading a document on a technician's behalf - the file is already
+ *  in object storage via POST /uploads, this records what it is. */
+class StaffDocumentDto {
+  @IsEnum(DocumentType)
+  type: DocumentType;
+
+  @IsString()
+  @IsNotEmpty()
+  objectKey: string;
 }
 
 @Controller('admin')
@@ -315,6 +412,29 @@ export class AdminController {
       include: { user: { select: { name: true, phone: true } }, category: true, documents: true },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  /**
+   * Upload paperwork on a technician's behalf. Most applicants bring their
+   * Fayda ID and CoC certificate to the office in person, or send a photo over
+   * the phone, so the verification desk needs to file it themselves rather than
+   * wait for the technician to work out the app. The file itself goes through
+   * POST /uploads first; this records what it is and who it belongs to.
+   */
+  @Post('providers/:id/documents')
+  @Roles('ADMIN', 'VERIFICATION_OFFICER', 'OPS_MANAGER')
+  async uploadDocumentFor(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: StaffDocumentDto,
+  ) {
+    const profile = await this.prisma.providerProfile.findUnique({ where: { id } });
+    if (!profile) throw new NotFoundException('Technician not found');
+    const doc = await this.prisma.providerDocument.create({
+      data: { providerId: id, type: dto.type, objectKey: dto.objectKey },
+    });
+    this.audit.log(actor, 'DOCUMENT_UPLOAD', 'ProviderProfile', id, dto.type);
+    return doc;
   }
 
   @Post('providers/:id/verify')
@@ -443,67 +563,152 @@ export class AdminController {
     });
   }
 
-  // ── Payout processing (proposal §4.4 steps 09-10) ──────────────────────────
+  // ── Deposits: technicians pre-fund the commission they owe ─────────────────
+  // The technician takes the customer's cash, so the platform never pays them
+  // out. Instead they top up a wallet and each settled job debits commission.
+  // Only a CONFIRMED deposit moves a balance - finance matches the reference
+  // against the bank statement first.
 
-  @Get('payouts')
+  @Get('deposits')
   @Roles('ADMIN', 'FINANCE_OFFICER')
-  payouts(@Query() query: PayoutQueueQuery) {
-    return this.prisma.payout.findMany({
-      where: { status: query.status ?? 'REQUESTED' },
+  deposits(@Query() query: DepositQueueQuery) {
+    return this.prisma.deposit.findMany({
+      where: query.status ? { status: query.status } : {},
       include: {
         wallet: {
-          include: { provider: { include: { user: { select: { name: true, phone: true } } } } },
+          include: {
+            provider: {
+              include: { user: { select: { name: true, phone: true } }, category: true },
+            },
+          },
         },
+        recordedBy: { select: { name: true, username: true } },
       },
-      orderBy: { requestedAt: 'asc' },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 100,
     });
   }
 
-  @Post('payouts/:id/process')
+  /** Wallet balances, lowest first - who is about to stop receiving jobs. */
+  @Get('wallets')
   @Roles('ADMIN', 'FINANCE_OFFICER')
-  async processPayout(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
-    this.audit.log(actor, 'PAYOUT_PROCESS', 'Payout', id);
-    const payout = await this.prisma.payout.findUnique({ where: { id } });
-    if (!payout) throw new NotFoundException('Payout not found');
-    if (payout.status !== 'REQUESTED') throw new BadRequestException('Payout already handled');
-    // In production this is where the Telebirr/bank transfer API is called.
-    return this.prisma.payout.update({
-      where: { id },
-      data: { status: 'PROCESSED', processedAt: new Date() },
-    });
+  async wallets() {
+    const [rows, floorRow] = await Promise.all([
+      this.prisma.wallet.findMany({
+        include: {
+          provider: {
+            include: { user: { select: { name: true, phone: true } }, category: true },
+          },
+        },
+        orderBy: { balanceEtb: 'asc' },
+        take: 200,
+      }),
+      this.prisma.appConfig.findUnique({ where: { key: 'min_wallet_balance_etb' } }),
+    ]);
+    const floor = Number(floorRow?.value ?? 0);
+    return {
+      minBalanceEtb: Number.isFinite(floor) ? floor : 0,
+      wallets: rows.map((w) => ({
+        id: w.id,
+        balanceEtb: Number(w.balanceEtb),
+        blocked: Number(w.balanceEtb) < (Number.isFinite(floor) ? floor : 0),
+        technician: w.provider.user.name ?? w.provider.user.phone,
+        phone: w.provider.user.phone,
+        trade: w.provider.category?.nameEn ?? null,
+      })),
+    };
   }
 
-  @Post('payouts/:id/reject')
+  /** Finance records a deposit they can see on the bank statement. */
+  @Post('deposits')
   @Roles('ADMIN', 'FINANCE_OFFICER')
-  async rejectPayout(
+  async recordDeposit(@CurrentUser() actor: AuthUser, @Body() dto: RecordDepositDto) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { id: dto.providerId },
+    });
+    if (!profile) throw new NotFoundException('Technician not found');
+    const wallet = await this.prisma.wallet.upsert({
+      where: { providerId: profile.id },
+      update: {},
+      create: { providerId: profile.id },
+    });
+    const clash = await this.prisma.deposit.findFirst({
+      where: { walletId: wallet.id, reference: dto.reference.trim(), status: { not: 'REJECTED' } },
+    });
+    if (clash) throw new BadRequestException('That reference is already recorded');
+
+    const deposit = await this.prisma.deposit.create({
+      data: {
+        walletId: wallet.id,
+        amountEtb: new Prisma.Decimal(dto.amountEtb),
+        method: dto.method,
+        reference: dto.reference.trim(),
+        note: dto.note?.trim() || null,
+        recordedById: actor.userId,
+      },
+    });
+    this.audit.log(actor, 'DEPOSIT_RECORD', 'Deposit', deposit.id, `${dto.amountEtb} ETB`);
+    return dto.confirmNow ? this.confirmDeposit(actor, deposit.id) : deposit;
+  }
+
+  @Post('deposits/:id/confirm')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async confirmDeposit(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    const deposit = await this.prisma.deposit.findUnique({ where: { id } });
+    if (!deposit) throw new NotFoundException('Deposit not found');
+    if (deposit.status !== 'PENDING') throw new BadRequestException('Deposit already handled');
+    this.audit.log(actor, 'DEPOSIT_CONFIRM', 'Deposit', id, `${deposit.amountEtb} ETB`);
+
+    const settled = await this.prisma.$transaction(async (tx) => {
+      // conditional claim: two officers confirming at once must credit once
+      const { count } = await tx.deposit.updateMany({
+        where: { id, status: 'PENDING' },
+        data: { status: 'CONFIRMED', settledAt: new Date(), recordedById: actor.userId },
+      });
+      if (count === 0) return null;
+      await tx.walletTransaction.create({
+        data: {
+          walletId: deposit.walletId,
+          type: 'DEPOSIT',
+          amountEtb: deposit.amountEtb,
+          note: `Deposit confirmed - ${deposit.method.replace(/_/g, ' ').toLowerCase()} ref ${deposit.reference}`,
+        },
+      });
+      return tx.wallet.update({
+        where: { id: deposit.walletId },
+        data: { balanceEtb: { increment: deposit.amountEtb } },
+        include: { provider: { include: { user: true } } },
+      });
+    });
+    if (!settled) throw new BadRequestException('Deposit already handled');
+
+    this.notifications.notify(
+      settled.provider.user,
+      `Addis Tiggena: ${deposit.amountEtb} ETB deposit confirmed. Balance ${settled.balanceEtb} ETB.`,
+    );
+    return this.prisma.deposit.findUnique({ where: { id } });
+  }
+
+  @Post('deposits/:id/reject')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async rejectDeposit(
     @CurrentUser() actor: AuthUser,
     @Param('id') id: string,
     @Body() dto: VerdictDto,
   ) {
-    this.audit.log(actor, 'PAYOUT_REJECT', 'Payout', id, dto.note);
-    const payout = await this.prisma.payout.findUnique({ where: { id } });
-    if (!payout) throw new NotFoundException('Payout not found');
-    if (payout.status !== 'REQUESTED') throw new BadRequestException('Payout already handled');
-    // refund the reserved funds back to the wallet
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.payout.update({
-        where: { id },
-        data: { status: 'REJECTED', processedAt: new Date() },
-      });
-      await tx.walletTransaction.create({
-        data: {
-          walletId: payout.walletId,
-          type: 'ADJUSTMENT',
-          amountEtb: payout.amountEtb,
-          note: `Payout rejected${dto.note ? ` - ${dto.note}` : ''} (refund)`,
-        },
-      });
-      await tx.wallet.update({
-        where: { id: payout.walletId },
-        data: { balanceEtb: { increment: payout.amountEtb } },
-      });
-      return updated;
+    const deposit = await this.prisma.deposit.findUnique({ where: { id } });
+    if (!deposit) throw new NotFoundException('Deposit not found');
+    if (deposit.status !== 'PENDING') throw new BadRequestException('Deposit already handled');
+    this.audit.log(actor, 'DEPOSIT_REJECT', 'Deposit', id, dto.note);
+    // nothing was ever credited, so rejecting only closes the row
+    return this.prisma.deposit.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        settledAt: new Date(),
+        recordedById: actor.userId,
+        note: dto.note ?? deposit.note,
+      },
     });
   }
 
@@ -647,7 +852,7 @@ export class AdminController {
   staff() {
     return this.prisma.user.findMany({
       where: { role: { in: CREATABLE_STAFF_ROLES as Role[] } },
-      select: { id: true, name: true, phone: true, username: true, role: true, subCity: true, createdAt: true },
+      select: STAFF_FIELDS,
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -675,13 +880,118 @@ export class AdminController {
         subCity: dto.role === 'SUBCITY_COORDINATOR' ? dto.subCity : null,
         language: 'EN',
       },
-      select: { id: true, name: true, phone: true, username: true, role: true, subCity: true, createdAt: true },
+      select: STAFF_FIELDS,
     });
     this.audit.log(actor, 'STAFF_CREATE', 'User', user.id, undefined, {
       role: dto.role,
       username,
     });
     return user;
+  }
+
+  /** Edit an existing staff account: details, role, sub-city, password reset. */
+  @Put('staff/:id')
+  @Roles('ADMIN')
+  async updateStaff(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateStaffDto,
+  ) {
+    const member = await this.prisma.user.findUnique({ where: { id } });
+    if (!member || !CREATABLE_STAFF_ROLES.includes(member.role)) {
+      throw new NotFoundException('Staff account not found');
+    }
+    const role = dto.role ?? member.role;
+    const subCity = dto.subCity ?? member.subCity;
+    if (role === 'SUBCITY_COORDINATOR' && !subCity) {
+      throw new BadRequestException('A sub-city coordinator needs a sub-city');
+    }
+    // The last enabled Super Admin must stay a Super Admin, or nobody can
+    // administer the platform again.
+    if (member.role === 'ADMIN' && role !== 'ADMIN') {
+      await this.assertNotLastAdmin(id, 'change the role of');
+    }
+    if (dto.phone) {
+      const phone = normalizePhone(dto.phone);
+      const clash = await this.prisma.user.findFirst({
+        where: { phone, id: { not: id } },
+        select: { id: true },
+      });
+      if (clash) throw new BadRequestException('That phone is already in use');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        name: dto.name ?? undefined,
+        phone: dto.phone ? normalizePhone(dto.phone) : undefined,
+        role: dto.role ?? undefined,
+        subCity: role === 'SUBCITY_COORDINATOR' ? subCity : null,
+        passwordHash: dto.password ? hashSync(dto.password, 10) : undefined,
+      },
+      select: STAFF_FIELDS,
+    });
+    this.audit.log(actor, 'STAFF_UPDATE', 'User', id, undefined, {
+      role: updated.role,
+      passwordReset: Boolean(dto.password),
+    });
+    return updated;
+  }
+
+  /**
+   * Disable rather than delete: the account keeps its audit trail and the
+   * bookings and tickets it touched, but sign-in is refused from now on.
+   */
+  @Post('staff/:id/disable')
+  @Roles('ADMIN')
+  async disableStaff(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: VerdictDto,
+  ) {
+    const member = await this.prisma.user.findUnique({ where: { id } });
+    if (!member || !CREATABLE_STAFF_ROLES.includes(member.role)) {
+      throw new NotFoundException('Staff account not found');
+    }
+    if (member.id === actor.userId) {
+      throw new BadRequestException('You cannot disable your own account');
+    }
+    if (member.role === 'ADMIN') await this.assertNotLastAdmin(id, 'disable');
+    if (member.disabledAt) throw new BadRequestException('Account is already disabled');
+
+    this.audit.log(actor, 'STAFF_DISABLE', 'User', id, dto.note);
+    return this.prisma.user.update({
+      where: { id },
+      data: { disabledAt: new Date() },
+      select: STAFF_FIELDS,
+    });
+  }
+
+  @Post('staff/:id/enable')
+  @Roles('ADMIN')
+  async enableStaff(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    const member = await this.prisma.user.findUnique({ where: { id } });
+    if (!member || !CREATABLE_STAFF_ROLES.includes(member.role)) {
+      throw new NotFoundException('Staff account not found');
+    }
+    this.audit.log(actor, 'STAFF_ENABLE', 'User', id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { disabledAt: null },
+      select: STAFF_FIELDS,
+    });
+  }
+
+  /** Refuses to leave the platform with no way back in. */
+  private async assertNotLastAdmin(id: string, action: string) {
+    const others = await this.prisma.user.count({
+      where: { role: 'ADMIN', disabledAt: null, id: { not: id } },
+    });
+    if (others === 0) {
+      throw new BadRequestException(
+        `This is the only active Super Admin - you cannot ${action} it. Promote another account first.`,
+      );
+    }
   }
 
   // -- Technician onboarding (staff-created accounts) -------------------------
@@ -752,23 +1062,35 @@ export class AdminController {
 
   // -- Finance workspace (spec section 2: Finance Officer) --------------------
 
-  /** Today's money in one call: what customers paid, what technicians are owed,
-   *  and the exceptions a human has to chase. */
+  /** Today's money in one call: what customers paid, the commission we earned,
+   *  the deposits waiting to be checked, and the exceptions a human has to chase. */
   @Get('finance')
   @Roles('ADMIN', 'FINANCE_OFFICER')
   async finance() {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
 
-    const [collected, payoutsDue, unpaidJobs, openRefunds, queue] = await Promise.all([
+    const [collected, depositsPending, depositsToday, arrears, unpaidJobs, openRefunds, queue] =
+      await Promise.all([
       this.prisma.payment.aggregate({
         where: { status: 'CONFIRMED', confirmedAt: { gte: dayStart } },
         _sum: { amountEtb: true, commissionEtb: true },
         _count: { _all: true },
       }),
-      this.prisma.payout.aggregate({
-        where: { status: 'REQUESTED' },
+      this.prisma.deposit.aggregate({
+        where: { status: 'PENDING' },
         _sum: { amountEtb: true },
+        _count: { _all: true },
+      }),
+      this.prisma.deposit.aggregate({
+        where: { status: 'CONFIRMED', settledAt: { gte: dayStart } },
+        _sum: { amountEtb: true },
+        _count: { _all: true },
+      }),
+      // technicians who have run their commission balance into the red
+      this.prisma.wallet.aggregate({
+        where: { balanceEtb: { lt: 0 } },
+        _sum: { balanceEtb: true },
         _count: { _all: true },
       }),
       // completed long ago but still unpaid - the classic exception to chase
@@ -794,8 +1116,12 @@ export class AdminController {
       collectedTodayEtb: Number(collected._sum.amountEtb ?? 0),
       commissionTodayEtb: Number(collected._sum.commissionEtb ?? 0),
       completedToday: collected._count._all,
-      payoutsDueEtb: Number(payoutsDue._sum.amountEtb ?? 0),
-      payoutsDueCount: payoutsDue._count._all,
+      depositsPendingEtb: Number(depositsPending._sum.amountEtb ?? 0),
+      depositsPendingCount: depositsPending._count._all,
+      depositsTodayEtb: Number(depositsToday._sum.amountEtb ?? 0),
+      depositsTodayCount: depositsToday._count._all,
+      arrearsEtb: Math.abs(Number(arrears._sum.balanceEtb ?? 0)),
+      arrearsCount: arrears._count._all,
       exceptions: { unpaidJobs, openRefunds },
       queue: queue.map((b) => {
         const paid = Number(b.payment?.amountEtb ?? 0);
@@ -807,7 +1133,8 @@ export class AdminController {
           technician: b.provider?.user?.name ?? null,
           customerPaidEtb: paid,
           commissionEtb: fee,
-          technicianPayoutEtb: paid ? paid - fee : null,
+          /** cash the technician keeps at the door - never touches our account */
+          technicianKeepsEtb: paid ? paid - fee : null,
           gateway: b.payment?.gateway ?? null,
           state: b.status === 'PAID' ? 'READY' : 'PAYMENT_ISSUE',
           completedAt: b.completedAt,
@@ -850,7 +1177,7 @@ export class AdminController {
         'gateway',
         'customer_paid_etb',
         'commission_etb',
-        'technician_payout_etb',
+        'technician_keeps_etb',
       ].join(','),
     ];
     for (const b of rows) {
@@ -1038,6 +1365,7 @@ export class AdminController {
         escalateAfterAttempts: Number(cfg.escalate_after_attempts ?? 1),
         arrivalTargetMinutes: Number(cfg.arrival_target_minutes ?? 30),
         workingHours: cfg.working_hours ?? '06:00-20:00',
+        minWalletBalanceEtb: Number(cfg.min_wallet_balance_etb ?? 0),
       },
       money: {
         commissionRate: Number(cfg.commission_rate ?? 0.14),
@@ -1061,6 +1389,8 @@ export class AdminController {
     if (dto.arrivalTargetMinutes !== undefined)
       pairs.push(['arrival_target_minutes', String(dto.arrivalTargetMinutes)]);
     if (dto.workingHours !== undefined) pairs.push(['working_hours', dto.workingHours]);
+    if (dto.minWalletBalanceEtb !== undefined)
+      pairs.push(['min_wallet_balance_etb', String(dto.minWalletBalanceEtb)]);
     if (!pairs.length) throw new BadRequestException('Nothing to change');
 
     for (const [key, value] of pairs) {

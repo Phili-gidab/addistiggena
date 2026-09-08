@@ -59,13 +59,34 @@ interface Overview {
   };
 }
 
-interface AdminPayout {
+interface AdminDeposit {
   id: string;
   amountEtb: string;
-  destination: string;
-  status: string;
-  requestedAt: string;
-  wallet: { provider: { user: { name: string | null; phone: string } } };
+  method: string;
+  reference: string;
+  status: 'PENDING' | 'CONFIRMED' | 'REJECTED';
+  note: string | null;
+  createdAt: string;
+  settledAt: string | null;
+  wallet: {
+    provider: {
+      user: { name: string | null; phone: string };
+      category: { nameEn: string } | null;
+    };
+  };
+  recordedBy: { name: string | null; username: string | null } | null;
+}
+
+interface WalletBalances {
+  minBalanceEtb: number;
+  wallets: {
+    id: string;
+    balanceEtb: number;
+    blocked: boolean;
+    technician: string;
+    phone: string;
+    trade: string | null;
+  }[];
 }
 
 interface PendingProvider {
@@ -109,8 +130,12 @@ interface Finance {
   collectedTodayEtb: number;
   commissionTodayEtb: number;
   completedToday: number;
-  payoutsDueEtb: number;
-  payoutsDueCount: number;
+  depositsPendingEtb: number;
+  depositsPendingCount: number;
+  depositsTodayEtb: number;
+  depositsTodayCount: number;
+  arrearsEtb: number;
+  arrearsCount: number;
   exceptions: { unpaidJobs: number; openRefunds: number };
   queue: {
     id: string;
@@ -119,7 +144,7 @@ interface Finance {
     technician: string | null;
     customerPaidEtb: number;
     commissionEtb: number;
-    technicianPayoutEtb: number | null;
+    technicianKeepsEtb: number | null;
     gateway: string | null;
     state: 'READY' | 'PAYMENT_ISSUE';
     completedAt: string | null;
@@ -170,6 +195,7 @@ interface SystemInfo {
     escalateAfterAttempts: number;
     arrivalTargetMinutes: number;
     workingHours: string;
+    minWalletBalanceEtb: number;
   };
   money: { commissionRate: number; supportRefundCapEtb: number };
   pending: { vetting: number; tickets: number };
@@ -184,6 +210,8 @@ interface StaffAccount {
   subCity?: string | null;
   username: string | null;
   role: string;
+  /** set when the account is disabled - kept for the audit trail, cannot sign in */
+  disabledAt: string | null;
   createdAt: string;
 }
 
@@ -217,7 +245,7 @@ type ViewKey =
   | 'system'
   | 'verification'
   | 'tickets'
-  | 'payouts'
+  | 'deposits'
   | 'reviews'
   | 'categories'
   | 'staff'
@@ -233,7 +261,7 @@ const MENU: Record<StaffRole, ViewKey[]> = {
     'finance',
     'verification',
     'tickets',
-    'payouts',
+    'deposits',
     'reviews',
     'categories',
     'staff',
@@ -244,7 +272,7 @@ const MENU: Record<StaffRole, ViewKey[]> = {
   OPS_MANAGER: ['dashboard', 'map', 'bookings', 'technicians', 'reviews', 'categories', 'settings'],
   VERIFICATION_OFFICER: ['dashboard', 'verification', 'technicians'],
   SUPPORT_AGENT: ['dashboard', 'tickets', 'bookings', 'technicians', 'reviews'],
-  FINANCE_OFFICER: ['dashboard', 'finance', 'payouts', 'settings'],
+  FINANCE_OFFICER: ['dashboard', 'finance', 'deposits', 'settings'],
   SUBCITY_COORDINATOR: ['dashboard', 'map', 'bookings', 'technicians'],
 };
 
@@ -257,7 +285,7 @@ const VIEW_LABEL: Record<ViewKey, string> = {
   system: 'Platform controls',
   verification: 'Verification queue',
   tickets: 'Support tickets',
-  payouts: 'Payouts',
+  deposits: 'Deposits',
   reviews: 'Reviews',
   categories: 'Categories & pricing',
   staff: 'Staff & roles',
@@ -268,8 +296,8 @@ const VIEW_LABEL: Record<ViewKey, string> = {
 /** Sidebar grouping - overview, day-to-day queues, platform configuration. */
 const NAV_GROUPS: { label: string; items: ViewKey[] }[] = [
   { label: 'Overview', items: ['dashboard', 'map'] },
-  { label: 'Operations', items: ['bookings', 'technicians', 'verification', 'tickets', 'payouts', 'reviews'] },
-  { label: 'Money', items: ['finance'] },
+  { label: 'Operations', items: ['bookings', 'technicians', 'verification', 'tickets', 'reviews'] },
+  { label: 'Money', items: ['finance', 'deposits'] },
   { label: 'Platform', items: ['categories', 'staff', 'system', 'audit', 'settings'] },
 ];
 
@@ -286,7 +314,7 @@ const ICONS: Record<ViewKey, React.ReactNode> = (() => {
     technicians: I(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5" /><path d="M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20c-.6-2.6-2.2-4.1-4.3-4.7" /></>),
     verification: I(<><path d="M12 2.5 20 6v5.5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3.5Z" /><path d="m8.7 11.7 2.3 2.3 4.3-4.5" /></>),
     tickets: I(<><path d="M21 11.5c0 4.1-4 7.5-9 7.5-1 0-2-.1-2.9-.4L3 20l1.5-3.6C3.5 15.1 3 13.4 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5Z" /></>),
-    payouts: I(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5h.01M18 14.5h.01" /></>),
+    deposits: I(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5h.01M18 14.5h.01" /></>),
     reviews: I(<path d="m12 3 2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9l-5.4 2.9 1.1-6.1L3.2 9.4l6.1-.8L12 3Z" />),
     categories: I(<><path d="M3 10.5V4.8C3 3.8 3.8 3 4.8 3h5.7c.5 0 .9.2 1.3.5l8.7 8.7c.7.7.7 1.8 0 2.6l-5.7 5.7c-.7.7-1.8.7-2.6 0l-8.7-8.7a1.8 1.8 0 0 1-.5-1.3Z" /><circle cx="7.5" cy="7.5" r="1.2" /></>),
     staff: I(<><circle cx="10" cy="8" r="3.5" /><path d="M3.5 20c.8-3.4 3.4-5 6.5-5 1.7 0 3.2.5 4.4 1.4" /><path d="M18.5 14v6M15.5 17h6" /></>),
@@ -321,7 +349,7 @@ const ROLE_TITLES: Record<StaffRole, { en: string; am: string; sub: string }> = 
   FINANCE_OFFICER: {
     en: 'Finance desk',
     am: 'የፋይናንስ ክፍል',
-    sub: 'Technician payouts, platform commission and revenue oversight.',
+    sub: 'Technician deposits, platform commission and revenue oversight.',
   },
   SUBCITY_COORDINATOR: {
     en: 'Sub-city operations',
@@ -367,7 +395,8 @@ export default function AdminPage() {
   const [ticketHistory, setTicketHistory] = useState<Ticket[] | null>(null);
   const [refundCap, setRefundCap] = useState<number | null>(null);
   const [ops, setOps] = useState<{ escalated: OpsBooking[]; stalled: OpsBooking[] } | null>(null);
-  const [payouts, setPayouts] = useState<AdminPayout[]>([]);
+  const [deposits, setDeposits] = useState<AdminDeposit[]>([]);
+  const [balances, setBalances] = useState<WalletBalances | null>(null);
   const [reviews, setReviews] = useState<PendingReview[]>([]);
   const [cats, setCats] = useState<(Category & { isActive?: boolean })[]>([]);
   const [catEdit, setCatEdit] = useState<Record<string, string>>({});
@@ -389,7 +418,12 @@ export default function AdminPage() {
   const [finance, setFinance] = useState<Finance | null>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [context, setContext] = useState<CustomerContext | null>(null);
-  const [rules, setRules] = useState({ offerWindowMinutes: '', escalateAfterAttempts: '', arrivalTargetMinutes: '' });
+  const [rules, setRules] = useState({
+    offerWindowMinutes: '',
+    escalateAfterAttempts: '',
+    arrivalTargetMinutes: '',
+    minWalletBalanceEtb: '',
+  });
   const [newCase, setNewCase] = useState({ bookingId: '', type: 'DISPUTE', note: '' });
   const [newBooking, setNewBooking] = useState({
     phone: '',
@@ -414,6 +448,26 @@ export default function AdminPage() {
     role: 'SUPPORT_AGENT',
     subCity: '',
   });
+  const [newDeposit, setNewDeposit] = useState({
+    providerId: '',
+    amountEtb: '',
+    method: 'BANK_TRANSFER',
+    reference: '',
+    note: '',
+    confirmNow: true,
+  });
+  /** staff row currently open for editing, keyed by id */
+  const [editStaff, setEditStaff] = useState<{
+    id: string;
+    name: string;
+    phone: string;
+    role: string;
+    subCity: string;
+    password: string;
+  } | null>(null);
+  /** technician whose paperwork the desk is uploading, and the chosen type */
+  const [docUpload, setDocUpload] = useState<{ providerId: string; type: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const can = useCallback((v: ViewKey, r: StaffRole | null = role) => (r ? MENU[r].includes(v) : false), [role]);
 
@@ -451,7 +505,10 @@ export default function AdminPage() {
           })
           .catch(() => {});
       }
-      if (has('payouts')) api<AdminPayout[]>('/admin/payouts').then(setPayouts).catch(() => {});
+      if (has('deposits')) {
+        api<AdminDeposit[]>('/admin/deposits').then(setDeposits).catch(() => {});
+        api<WalletBalances>('/admin/wallets').then(setBalances).catch(() => {});
+      }
       if (has('reviews')) api<PendingReview[]>('/admin/reviews').then(setReviews).catch(() => {});
       if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
       if (has('audit')) api<AuditEntry[]>('/admin/audit').then(setAudit).catch(() => {});
@@ -533,6 +590,100 @@ export default function AdminPage() {
       await api('/admin/staff', { method: 'POST', body: JSON.stringify(newStaff) });
       setNotice(`Staff account "${newStaff.username}" created (${newStaff.role}).`);
       setNewStaff({ name: '', phone: '', username: '', password: '', role: 'SUPPORT_AGENT', subCity: '' });
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function updateStaff(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editStaff) return;
+    setError('');
+    try {
+      // only send what actually changed - password stays untouched when blank
+      const body: Record<string, unknown> = {
+        name: editStaff.name,
+        phone: editStaff.phone,
+        role: editStaff.role,
+      };
+      if (editStaff.role === 'SUBCITY_COORDINATOR') body.subCity = editStaff.subCity;
+      if (editStaff.password) body.password = editStaff.password;
+      await api(`/admin/staff/${editStaff.id}`, { method: 'PUT', body: JSON.stringify(body) });
+      setNotice(`Saved changes to ${editStaff.name || 'the account'}.`);
+      setEditStaff(null);
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function toggleStaff(m: StaffAccount) {
+    const disabling = !m.disabledAt;
+    if (disabling && !confirm(`Disable ${m.name ?? m.username}? They will not be able to sign in.`)) {
+      return;
+    }
+    await act(`/admin/staff/${m.id}/${disabling ? 'disable' : 'enable'}`);
+  }
+
+  /**
+   * Upload a technician's paperwork from the console. Most applicants bring the
+   * Fayda ID and CoC certificate to the office or send a photo, so the desk
+   * files it for them: the file goes to object storage first, then we record
+   * what it is against the technician.
+   */
+  async function uploadDocumentFor(file: File, providerId: string, type: string) {
+    setError('');
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      // no content-type header - the browser sets the multipart boundary itself
+      const res = await authorizedFetch('/uploads', { method: 'POST', body });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+      const { objectKey } = (await res.json()) as { objectKey: string };
+      await api(`/admin/providers/${providerId}/documents`, {
+        method: 'POST',
+        body: JSON.stringify({ type, objectKey }),
+      });
+      setNotice(`${type.replace(/_/g, ' ').toLowerCase()} uploaded.`);
+      setDocUpload(null);
+      reload();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function recordDeposit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      await api('/admin/deposits', {
+        method: 'POST',
+        body: JSON.stringify({
+          providerId: newDeposit.providerId,
+          amountEtb: Number(newDeposit.amountEtb),
+          method: newDeposit.method,
+          reference: newDeposit.reference.trim(),
+          note: newDeposit.note.trim() || undefined,
+          confirmNow: newDeposit.confirmNow,
+        }),
+      });
+      setNotice(
+        newDeposit.confirmNow
+          ? `${newDeposit.amountEtb} ETB credited.`
+          : `${newDeposit.amountEtb} ETB recorded, waiting for confirmation.`,
+      );
+      setNewDeposit({
+        providerId: '',
+        amountEtb: '',
+        method: 'BANK_TRANSFER',
+        reference: '',
+        note: '',
+        confirmNow: true,
+      });
       reload();
     } catch (err) {
       setError((err as Error).message);
@@ -635,9 +786,16 @@ export default function AdminPage() {
       if (rules.offerWindowMinutes) body.offerWindowMinutes = Number(rules.offerWindowMinutes);
       if (rules.escalateAfterAttempts) body.escalateAfterAttempts = Number(rules.escalateAfterAttempts);
       if (rules.arrivalTargetMinutes) body.arrivalTargetMinutes = Number(rules.arrivalTargetMinutes);
+      if (rules.minWalletBalanceEtb)
+        body.minWalletBalanceEtb = Number(rules.minWalletBalanceEtb);
       await api('/admin/config/dispatch', { method: 'PUT', body: JSON.stringify(body) });
       setNotice('Dispatch rules updated - they apply to new jobs within a minute.');
-      setRules({ offerWindowMinutes: '', escalateAfterAttempts: '', arrivalTargetMinutes: '' });
+      setRules({
+        offerWindowMinutes: '',
+        escalateAfterAttempts: '',
+        arrivalTargetMinutes: '',
+        minWalletBalanceEtb: '',
+      });
       api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
     } catch (err) {
       setError((err as Error).message);
@@ -698,7 +856,7 @@ export default function AdminPage() {
     if (v === 'tickets') return overview.support.openTickets || null;
     if (v === 'map') return overview.ops.activeJobs + overview.ops.awaitingDispatch || null;
     if (v === 'reviews') return reviews.length || null;
-    if (v === 'payouts') return payouts.length || null;
+    if (v === 'deposits') return deposits.filter((d) => d.status === 'PENDING').length || null;
     return null;
   };
 
@@ -1021,6 +1179,56 @@ export default function AdminPage() {
                           </span>
                         ))}
                       </div>
+
+                      {/* Applicants usually bring their ID and CoC certificate to
+                          the office or send a photo, so the desk files it here
+                          rather than waiting for them to use the app. */}
+                      {docUpload?.providerId === p.id ? (
+                        <div className="row" style={{ gap: '0.4rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+                          <select
+                            className="input"
+                            style={{ maxWidth: 175, fontSize: '0.78rem' }}
+                            value={docUpload.type}
+                            onChange={(e) => setDocUpload({ ...docUpload, type: e.target.value })}
+                          >
+                            {REQUIRED_DOCS.map((r) => (
+                              <option key={r.type} value={r.type}>
+                                {r.label}
+                              </option>
+                            ))}
+                            <option value="OTHER">Other</option>
+                          </select>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            disabled={uploading}
+                            style={{ fontSize: '0.75rem', maxWidth: 190 }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) uploadDocumentFor(file, p.id, docUpload.type);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => setDocUpload(null)}
+                          >
+                            cancel
+                          </button>
+                          {uploading && <span className="hint">uploading…</span>}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="link-btn"
+                          style={{ marginTop: '0.4rem' }}
+                          onClick={() =>
+                            setDocUpload({ providerId: p.id, type: REQUIRED_DOCS[0].type })
+                          }
+                        >
+                          + upload a document
+                        </button>
+                      )}
                     </td>
                     <td className="hint">{fmtDate(p.createdAt)}</td>
                     <td>
@@ -1536,31 +1744,179 @@ export default function AdminPage() {
                 </>
               )}
 
-              {view === 'payouts' && can('payouts') && (
-                <div className="panel">
-                  <h2>Payout queue ({payouts.length})</h2>
-                  {payouts.length === 0 && <p className="hint">No payouts waiting.</p>}
-                  {payouts.map((p) => (
-                    <div key={p.id} className="booking-row" style={{ cursor: 'default' }}>
-                      <span>
-                        <span className="what">
-                          {p.amountEtb} ETB - {p.wallet.provider.user.name ?? p.wallet.provider.user.phone}
+              {view === 'deposits' && can('deposits') && (
+                <>
+                  <div className="panel mb">
+                    <h2>Record a deposit</h2>
+                    <p className="hint mb">
+                      The technician keeps the customer cash at the door, so what they owe us is
+                      commission. They pay it into the company account and we credit it here. Check
+                      the reference against the bank statement first - confirming moves the balance
+                      straight away.
+                    </p>
+                    <form onSubmit={recordDeposit} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <select
+                        className="input"
+                        style={{ maxWidth: 230 }}
+                        value={newDeposit.providerId}
+                        onChange={(e) => setNewDeposit({ ...newDeposit, providerId: e.target.value })}
+                      >
+                        <option value="">Technician…</option>
+                        {technicians.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name ?? t.phone} · {t.category.nameEn}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className="input"
+                        style={{ maxWidth: 120 }}
+                        placeholder="amount ETB"
+                        inputMode="numeric"
+                        value={newDeposit.amountEtb}
+                        onChange={(e) => setNewDeposit({ ...newDeposit, amountEtb: e.target.value })}
+                      />
+                      <select
+                        className="input"
+                        style={{ maxWidth: 165 }}
+                        value={newDeposit.method}
+                        onChange={(e) => setNewDeposit({ ...newDeposit, method: e.target.value })}
+                      >
+                        <option value="BANK_TRANSFER">Bank transfer</option>
+                        <option value="TELEBIRR">Telebirr</option>
+                        <option value="CBE_BIRR">CBE Birr</option>
+                        <option value="CASH_OFFICE">Cash at office</option>
+                      </select>
+                      <input
+                        className="input"
+                        style={{ maxWidth: 190 }}
+                        placeholder="bank reference"
+                        value={newDeposit.reference}
+                        onChange={(e) => setNewDeposit({ ...newDeposit, reference: e.target.value })}
+                      />
+                      <input
+                        className="input"
+                        style={{ flex: 1, minWidth: 160 }}
+                        placeholder="note (optional)"
+                        value={newDeposit.note}
+                        onChange={(e) => setNewDeposit({ ...newDeposit, note: e.target.value })}
+                      />
+                      <label className="row" style={{ gap: '0.35rem', fontSize: '0.82rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={newDeposit.confirmNow}
+                          onChange={(e) =>
+                            setNewDeposit({ ...newDeposit, confirmNow: e.target.checked })
+                          }
+                        />
+                        credit now
+                      </label>
+                      <button
+                        className="btn btn-dark btn-sm"
+                        disabled={
+                          !newDeposit.providerId ||
+                          Number(newDeposit.amountEtb) < 1 ||
+                          newDeposit.reference.trim().length < 3
+                        }
+                      >
+                        + Record
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="panel mb">
+                    <h2>Deposits ({deposits.filter((d) => d.status === 'PENDING').length} waiting)</h2>
+                    {deposits.length === 0 && <p className="hint">No deposits recorded yet.</p>}
+                    {deposits.map((d) => (
+                      <div key={d.id} className="booking-row" style={{ cursor: 'default' }}>
+                        <span>
+                          <span className="what">
+                            {MONEY(Number(d.amountEtb))} ETB ·{' '}
+                            {d.wallet.provider.user.name ?? d.wallet.provider.user.phone}{' '}
+                            <span
+                              className={`pill ${
+                                d.status === 'CONFIRMED'
+                                  ? 'ok'
+                                  : d.status === 'REJECTED'
+                                    ? 'danger'
+                                    : 'warn'
+                              }`}
+                            >
+                              {d.status.toLowerCase()}
+                            </span>
+                          </span>
+                          <span className="when" style={{ display: 'block' }}>
+                            {d.method.replace(/_/g, ' ').toLowerCase()} · ref {d.reference} ·{' '}
+                            {fmtDate(d.createdAt)}
+                            {d.recordedBy ? ` · by ${d.recordedBy.name ?? d.recordedBy.username}` : ''}
+                          </span>
+                          {d.note && (
+                            <span className="hint" style={{ display: 'block' }}>
+                              {d.note}
+                            </span>
+                          )}
                         </span>
-                        <span className="when" style={{ display: 'block' }}>
-                          → {p.destination} · {fmtDate(p.requestedAt)}
-                        </span>
-                      </span>
-                      <span className="row">
-                        <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/payouts/${p.id}/process`)}>
-                          Process ✓
-                        </button>
-                        <button className="btn btn-line btn-sm" onClick={() => act(`/admin/payouts/${p.id}/reject`)}>
-                          Reject
-                        </button>
-                      </span>
+                        {d.status === 'PENDING' && (
+                          <span className="row">
+                            <button
+                              className="btn btn-teal btn-sm"
+                              onClick={() => act(`/admin/deposits/${d.id}/confirm`)}
+                            >
+                              Confirm ✓
+                            </button>
+                            <button
+                              className="btn btn-line btn-sm"
+                              onClick={() => act(`/admin/deposits/${d.id}/reject`)}
+                            >
+                              Reject
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="panel">
+                    <h2>Commission balances</h2>
+                    <p className="hint mb">
+                      Lowest first. Dispatch stops offering jobs below{' '}
+                      {MONEY(balances?.minBalanceEtb ?? 0)} ETB, so anyone marked blocked has to top
+                      up before they can work again.
+                    </p>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Technician</th>
+                            <th>Trade</th>
+                            <th>Balance</th>
+                            <th>Dispatch</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(balances?.wallets ?? []).map((w) => (
+                            <tr key={w.id}>
+                              <td>
+                                {w.technician}
+                                <div className="hint">{w.phone}</div>
+                              </td>
+                              <td>{w.trade ?? '-'}</td>
+                              <td>{MONEY(w.balanceEtb)} ETB</td>
+                              <td>
+                                <span className={`pill ${w.blocked ? 'danger' : 'ok'}`}>
+                                  {w.blocked ? 'blocked' : 'active'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                </div>
+                    {!balances?.wallets.length && (
+                      <p className="hint">No technician has a commission account yet.</p>
+                    )}
+                  </div>
+                </>
               )}
 
               {view === 'reviews' && can('reviews') && (
@@ -1715,10 +2071,24 @@ export default function AdminPage() {
                       finance ? `${finance.completedToday} paid jobs` : undefined,
                     )}
                     {tile(
-                      `${MONEY(finance?.payoutsDueEtb ?? 0)} ETB`,
-                      'technician payouts',
+                      `${MONEY(finance?.commissionTodayEtb ?? 0)} ETB`,
+                      'commission earned today',
                       false,
-                      finance ? `${finance.payoutsDueCount} ready for processing` : undefined,
+                      'from jobs settled today',
+                    )}
+                    {tile(
+                      `${MONEY(finance?.depositsTodayEtb ?? 0)} ETB`,
+                      'deposits confirmed today',
+                      false,
+                      finance
+                        ? `${finance.depositsPendingCount} waiting \u00b7 ${MONEY(finance.depositsPendingEtb)} ETB`
+                        : undefined,
+                    )}
+                    {tile(
+                      `${MONEY(finance?.arrearsEtb ?? 0)} ETB`,
+                      'commission in arrears',
+                      false,
+                      finance ? `${finance.arrearsCount} technicians in the red` : undefined,
                     )}
                     {tile(
                       (finance?.exceptions.unpaidJobs ?? 0) + (finance?.exceptions.openRefunds ?? 0),
@@ -1738,8 +2108,9 @@ export default function AdminPage() {
                       </button>
                     </div>
                     <p className="hint mb">
-                      Commission of {system ? Math.round(system.money.commissionRate * 100) : 14}% is
-                      taken from each completed job; the remainder is what the technician is owed.
+                      The technician collects the full amount from the customer in cash. We take{' '}
+                      {system ? Math.round(system.money.commissionRate * 100) : 14}% commission from
+                      their deposit balance when the job settles.
                     </p>
                     <div style={{ overflowX: 'auto' }}>
                       <table className="table">
@@ -1747,8 +2118,9 @@ export default function AdminPage() {
                           <tr>
                             <th>Booking</th>
                             <th>Technician</th>
-                            <th>Customer payment</th>
-                            <th>Payout</th>
+                            <th>Customer paid</th>
+                            <th>Commission to us</th>
+                            <th>Technician keeps</th>
                             <th>Status</th>
                           </tr>
                         </thead>
@@ -1765,8 +2137,11 @@ export default function AdminPage() {
                                 {r.gateway && <div className="hint">{r.gateway.toLowerCase()}</div>}
                               </td>
                               <td>
-                                {r.technicianPayoutEtb !== null
-                                  ? `${MONEY(r.technicianPayoutEtb)} ETB`
+                                {r.commissionEtb ? `${MONEY(r.commissionEtb)} ETB` : '-'}
+                              </td>
+                              <td>
+                                {r.technicianKeepsEtb !== null
+                                  ? `${MONEY(r.technicianKeepsEtb)} ETB`
                                   : '-'}
                               </td>
                               <td>
@@ -1847,6 +2222,8 @@ export default function AdminPage() {
                     <p className="hint mb">
                       These drive live dispatch. The offer window is how long the closest technician
                       has to accept before the job escalates to the Ops queue for manual assignment.
+                      The minimum deposit balance is the commission credit a technician must still
+                      hold to keep being offered work.
                     </p>
                     <form onSubmit={saveRules} className="row" style={{ flexWrap: 'wrap', gap: '0.6rem' }}>
                       <div className="field" style={{ maxWidth: 190 }}>
@@ -1882,6 +2259,21 @@ export default function AdminPage() {
                           value={rules.arrivalTargetMinutes}
                           onChange={(e) =>
                             setRules({ ...rules, arrivalTargetMinutes: e.target.value.replace(/\D/g, '') })
+                          }
+                        />
+                      </div>
+                      <div className="field" style={{ maxWidth: 210 }}>
+                        <label>Minimum deposit balance (ETB)</label>
+                        <input
+                          className="input"
+                          inputMode="numeric"
+                          placeholder={String(system?.dispatch.minWalletBalanceEtb ?? 0)}
+                          value={rules.minWalletBalanceEtb}
+                          onChange={(e) =>
+                            setRules({
+                              ...rules,
+                              minWalletBalanceEtb: e.target.value.replace(/\D/g, ''),
+                            })
                           }
                         />
                       </div>
@@ -1954,17 +2346,129 @@ export default function AdminPage() {
                 <div className="panel">
                   <h2>Staff accounts ({staff.length})</h2>
                   {staff.map((m) => (
-                    <div key={m.id} className="booking-row" style={{ cursor: 'default' }}>
-                      <span>
-                        <span className="what">
-                          {m.name ?? m.username} · <code>{m.username}</code>
+                    <div key={m.id}>
+                      <div className="booking-row" style={{ cursor: 'default' }}>
+                        <span>
+                          <span className="what">
+                            {m.name ?? m.username} · <code>{m.username}</code>{' '}
+                            {m.disabledAt && <span className="pill danger">disabled</span>}
+                          </span>
+                          <span className="when" style={{ display: 'block' }}>
+                            {m.role.replace(/_/g, ' ').toLowerCase()}
+                            {m.subCity ? ` · ${m.subCity}` : ''} · {m.phone} · since{' '}
+                            {fmtDate(m.createdAt)}
+                          </span>
                         </span>
-                        <span className="when" style={{ display: 'block' }}>
-                          {m.role.replace(/_/g, ' ').toLowerCase()}
-                          {m.subCity ? ` · ${m.subCity}` : ''} · {m.phone} · since{' '}
-                          {fmtDate(m.createdAt)}
+                        <span className="row">
+                          <button
+                            className="btn btn-line btn-sm"
+                            onClick={() =>
+                              setEditStaff(
+                                editStaff?.id === m.id
+                                  ? null
+                                  : {
+                                      id: m.id,
+                                      name: m.name ?? '',
+                                      phone: m.phone,
+                                      role: m.role,
+                                      subCity: m.subCity ?? '',
+                                      password: '',
+                                    },
+                              )
+                            }
+                          >
+                            {editStaff?.id === m.id ? 'Cancel' : 'Edit'}
+                          </button>
+                          <button
+                            className={m.disabledAt ? 'btn btn-teal btn-sm' : 'btn btn-line btn-sm'}
+                            onClick={() => toggleStaff(m)}
+                          >
+                            {m.disabledAt ? 'Enable' : 'Disable'}
+                          </button>
                         </span>
-                      </span>
+                      </div>
+
+                      {editStaff?.id === m.id && (
+                        <form
+                          onSubmit={updateStaff}
+                          className="row"
+                          style={{
+                            flexWrap: 'wrap',
+                            gap: '0.5rem',
+                            padding: '0.7rem 0 1rem',
+                            borderBottom: '1px solid var(--line)',
+                          }}
+                        >
+                          <input
+                            className="input"
+                            style={{ maxWidth: 160 }}
+                            placeholder="Full name"
+                            value={editStaff.name}
+                            onChange={(e) => setEditStaff({ ...editStaff, name: e.target.value })}
+                          />
+                          <input
+                            className="input"
+                            style={{ maxWidth: 140 }}
+                            placeholder="09… phone"
+                            value={editStaff.phone}
+                            onChange={(e) => setEditStaff({ ...editStaff, phone: e.target.value })}
+                          />
+                          <select
+                            className="input"
+                            style={{ maxWidth: 190 }}
+                            value={editStaff.role}
+                            onChange={(e) => setEditStaff({ ...editStaff, role: e.target.value })}
+                          >
+                            <option value="OPS_MANAGER">Operations Manager</option>
+                            <option value="VERIFICATION_OFFICER">Verification Officer</option>
+                            <option value="SUPPORT_AGENT">Support Agent</option>
+                            <option value="FINANCE_OFFICER">Finance Officer</option>
+                            <option value="SUBCITY_COORDINATOR">Sub-city Coordinator</option>
+                            <option value="ADMIN">Super Admin</option>
+                          </select>
+                          {editStaff.role === 'SUBCITY_COORDINATOR' && (
+                            <select
+                              className="input"
+                              style={{ maxWidth: 170 }}
+                              value={editStaff.subCity}
+                              onChange={(e) =>
+                                setEditStaff({ ...editStaff, subCity: e.target.value })
+                              }
+                            >
+                              <option value="">Sub-city…</option>
+                              {SUB_CITIES.map((sc) => (
+                                <option key={sc.name} value={sc.name}>
+                                  {sc.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <input
+                            className="input"
+                            style={{ maxWidth: 190 }}
+                            type="password"
+                            placeholder="new password (optional)"
+                            value={editStaff.password}
+                            onChange={(e) =>
+                              setEditStaff({ ...editStaff, password: e.target.value })
+                            }
+                          />
+                          <button
+                            className="btn btn-dark btn-sm"
+                            disabled={
+                              editStaff.name.trim().length < 2 ||
+                              editStaff.phone.trim().length < 9 ||
+                              (editStaff.password.length > 0 && editStaff.password.length < 8) ||
+                              (editStaff.role === 'SUBCITY_COORDINATOR' && !editStaff.subCity)
+                            }
+                          >
+                            Save changes
+                          </button>
+                          <span className="hint" style={{ alignSelf: 'center' }}>
+                            leave the password blank to keep the current one
+                          </span>
+                        </form>
+                      )}
                     </div>
                   ))}
                   <form onSubmit={createStaff} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}>

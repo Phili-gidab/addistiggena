@@ -20,9 +20,17 @@ import {
   SendMessageDto,
 } from './bookings.dto';
 
-/** Defaults agreed with the client; a Super Admin can override both from the
- *  console (AppConfig offer_window_minutes / escalate_after_attempts). */
+/** Defaults agreed with the client; a Super Admin can override all three from
+ *  the console (AppConfig offer_window_minutes / escalate_after_attempts /
+ *  min_wallet_balance_etb). */
 const DEFAULT_OFFER_WINDOW_MS = 5 * 60_000; // 5 minutes to respond (2026-08-24)
+
+/**
+ * Deposit balance a technician must still hold to be offered work. Zero means
+ * one job of credit: they can take a job at exactly 0, the commission pushes
+ * them negative, and no further job is offered until they top up.
+ */
+const DEFAULT_MIN_WALLET_BALANCE_ETB = 0;
 
 /** Settings are read at most once a minute - dispatch runs on every booking. */
 const CONFIG_TTL_MS = 60_000;
@@ -93,6 +101,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   private rules = {
     offerWindowMs: DEFAULT_OFFER_WINDOW_MS,
     escalateAfter: DEFAULT_ESCALATE_AFTER_ATTEMPTS,
+    minBalanceEtb: DEFAULT_MIN_WALLET_BALANCE_ETB,
     readAt: 0,
   };
 
@@ -101,15 +110,24 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
    * high-traffic dispatch path does not hit the config table on every call, and
    * always falls back to the agreed defaults if the row is missing or invalid.
    */
-  private async dispatchRules(): Promise<{ offerWindowMs: number; escalateAfter: number }> {
+  private async dispatchRules(): Promise<{
+    offerWindowMs: number;
+    escalateAfter: number;
+    minBalanceEtb: number;
+  }> {
     if (Date.now() - this.rules.readAt < CONFIG_TTL_MS) return this.rules;
     try {
       const rows = await this.prisma.appConfig.findMany({
-        where: { key: { in: ['offer_window_minutes', 'escalate_after_attempts'] } },
+        where: {
+          key: {
+            in: ['offer_window_minutes', 'escalate_after_attempts', 'min_wallet_balance_etb'],
+          },
+        },
       });
       const cfg = Object.fromEntries(rows.map((r) => [r.key, Number(r.value)]));
       const minutes = cfg.offer_window_minutes;
       const attempts = cfg.escalate_after_attempts;
+      const minBalance = cfg.min_wallet_balance_etb;
       this.rules = {
         offerWindowMs:
           Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : DEFAULT_OFFER_WINDOW_MS,
@@ -117,6 +135,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
           Number.isFinite(attempts) && attempts > 0
             ? attempts
             : DEFAULT_ESCALATE_AFTER_ATTEMPTS,
+        minBalanceEtb: Number.isFinite(minBalance)
+          ? minBalance
+          : DEFAULT_MIN_WALLET_BALANCE_ETB,
         readAt: Date.now(),
       };
     } catch (err) {
@@ -334,6 +355,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       booking.lng,
       booking.categoryId,
       exclude,
+      rules.minBalanceEtb,
     );
 
     if (!next) {

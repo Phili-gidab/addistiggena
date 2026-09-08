@@ -139,12 +139,18 @@ export class ProvidersService {
    * Dispatch candidates, closest first (client decision 2026-08-29: proximity
    * alone decides who is offered a job - no rating weighting). Verified, available,
    * in-radius, minus technicians the booking was already offered to.
+   *
+   * A technician whose prepaid commission wallet has run below the floor is
+   * skipped: commission is drawn from that balance when the job settles, so
+   * offering work we cannot charge for just builds up bad debt. A technician
+   * with no wallet row yet has never taken a job and is still eligible.
    */
   candidates(
     lat: number,
     lng: number,
     categoryId: string,
     excludeIds: string[],
+    minBalanceEtb = 0,
   ): Promise<DispatchCandidate[]> {
     const exclusion = excludeIds.length
       ? Prisma.sql`AND p."id" NOT IN (${Prisma.join(excludeIds)})`
@@ -158,10 +164,13 @@ export class ProvidersService {
              ST_Distance(p."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography) AS "distanceM"
       FROM "ProviderProfile" p
       JOIN "User" u ON u."id" = p."userId"
+      LEFT JOIN "Wallet" w ON w."providerId" = p."id"
       WHERE p."verificationStatus" = 'VERIFIED'
         AND p."isAvailable" = true
         AND p."categoryId" = ${categoryId}
         AND p."location" IS NOT NULL
+        AND u."disabledAt" IS NULL
+        AND COALESCE(w."balanceEtb", 0) >= ${minBalanceEtb}
         AND ST_DWithin(
               p."location",
               ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,

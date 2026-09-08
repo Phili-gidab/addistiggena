@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { RequestPayoutDto } from './wallet.dto';
+import { DeclareDepositDto } from './wallet.dto';
+
+/** Balance floor a technician must stay above to keep receiving job offers. */
+export const DEFAULT_MIN_WALLET_BALANCE_ETB = 0;
 
 @Injectable()
 export class WalletService {
@@ -24,44 +27,32 @@ export class WalletService {
       where: { id: wallet.id },
       include: {
         transactions: { orderBy: { createdAt: 'desc' }, take: 30 },
-        payouts: { orderBy: { requestedAt: 'desc' }, take: 10 },
+        deposits: { orderBy: { createdAt: 'desc' }, take: 10 },
       },
     });
   }
 
   /**
-   * Funds are reserved (deducted) at request time so a provider cannot queue
-   * overlapping payouts against the same balance; a rejection refunds them.
+   * The technician has paid into the company account and is telling us so. No
+   * money moves here - finance confirms it against the bank statement first,
+   * otherwise anyone could credit themselves by filling in a form.
    */
-  async requestPayout(userId: string, dto: RequestPayoutDto) {
+  async declareDeposit(userId: string, dto: DeclareDepositDto) {
     const wallet = await this.walletByUser(userId);
-    return this.prisma.$transaction(async (tx) => {
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
-      if (fresh.balanceEtb.lessThan(dto.amountEtb)) {
-        throw new BadRequestException(
-          `Insufficient balance - available ${fresh.balanceEtb.toString()} ETB`,
-        );
-      }
-      const payout = await tx.payout.create({
-        data: {
-          walletId: wallet.id,
-          amountEtb: new Prisma.Decimal(dto.amountEtb),
-          destination: dto.destination,
-        },
-      });
-      await tx.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          type: 'PAYOUT',
-          amountEtb: new Prisma.Decimal(-dto.amountEtb),
-          note: `Payout requested to ${dto.destination}`,
-        },
-      });
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balanceEtb: { decrement: dto.amountEtb } },
-      });
-      return payout;
+    const duplicate = await this.prisma.deposit.findFirst({
+      where: { walletId: wallet.id, reference: dto.reference.trim(), status: { not: 'REJECTED' } },
+    });
+    if (duplicate) {
+      throw new BadRequestException('That reference has already been submitted');
+    }
+    return this.prisma.deposit.create({
+      data: {
+        walletId: wallet.id,
+        amountEtb: new Prisma.Decimal(dto.amountEtb),
+        method: dto.method,
+        reference: dto.reference.trim(),
+        note: dto.note?.trim() || null,
+      },
     });
   }
 }

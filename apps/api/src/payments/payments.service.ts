@@ -147,8 +147,12 @@ export class PaymentsService {
   }
 
   /**
-   * Idempotent settlement: confirm payment, mark booking PAID, split commission,
-   * credit provider wallet - all in one transaction (money invariants, doc 04).
+   * Idempotent settlement: confirm payment, mark booking PAID, debit the
+   * technician's commission - all in one transaction (money invariants, doc 04).
+   *
+   * The technician collects the customer's cash directly, so the platform never
+   * holds their earnings. What it does hold is a prepaid commission wallet, and
+   * settling a job draws this job's commission down from it.
    */
   private async settle(gatewayRef: string, success: boolean, bookingIdForCash?: string) {
     const payment = bookingIdForCash
@@ -191,21 +195,18 @@ export class PaymentsService {
           update: {},
           create: { providerId: booking.providerId },
         });
-        await tx.walletTransaction.createMany({
-          data: [
-            { walletId: wallet.id, type: 'JOB_CREDIT', amountEtb: gross, bookingId: booking.id },
-            {
-              walletId: wallet.id,
-              type: 'COMMISSION',
-              amountEtb: commission.neg(),
-              bookingId: booking.id,
-              note: `Platform commission @ ${(rate * 100).toFixed(1)}%`,
-            },
-          ],
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: 'COMMISSION',
+            amountEtb: commission.neg(),
+            bookingId: booking.id,
+            note: `Platform commission @ ${(rate * 100).toFixed(1)}% of ${gross.toString()} ETB`,
+          },
         });
         await tx.wallet.update({
           where: { id: wallet.id },
-          data: { balanceEtb: { increment: net } },
+          data: { balanceEtb: { decrement: commission } },
         });
       }
       return true;
@@ -213,14 +214,18 @@ export class PaymentsService {
     if (!claimed) return { ok: true, idempotent: true };
 
     this.logger.log(`Payment ${payment.id} settled: gross=${gross} commission=${commission}`);
-    this.sendReceipts(payment.bookingId, gross, net).catch((err) =>
+    this.sendReceipts(payment.bookingId, gross, commission).catch((err) =>
       this.logger.warn(`Receipt dispatch failed: ${(err as Error).message}`),
     );
     return { ok: true };
   }
 
   /** E-receipt mirrors to both parties (proposal §4.4 step 06). */
-  private async sendReceipts(bookingId: string, gross: Prisma.Decimal, net: Prisma.Decimal) {
+  private async sendReceipts(
+    bookingId: string,
+    gross: Prisma.Decimal,
+    commission: Prisma.Decimal,
+  ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -238,7 +243,7 @@ export class PaymentsService {
     if (booking.provider) {
       this.notifications.notify(
         booking.provider.user,
-        `Addis Tiggena: ክፍያ ተቀብለዋል · job #${jobRef} paid - ETB ${net.toFixed(2)} credited to your wallet`,
+        `Addis Tiggena: ክፍያ ተቀብለዋል · job #${jobRef} - you keep ETB ${gross.toFixed(2)} in cash. ETB ${commission.toFixed(2)} commission was taken from your deposit balance.`,
       );
     }
   }

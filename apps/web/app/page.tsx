@@ -1,3 +1,4 @@
+import { SessionRedirect } from '../components/SessionRedirect';
 import { Coverage } from '../components/home/Coverage';
 import { Hero } from '../components/home/Hero';
 import { ImageBand } from '../components/home/ImageBand';
@@ -30,6 +31,7 @@ export default async function HomePage() {
 
   return (
     <main>
+      <SessionRedirect />
       <Hero categories={categories} t={t} lang={lang} />
       <Marquee />
       <Services categories={categories} t={t} />

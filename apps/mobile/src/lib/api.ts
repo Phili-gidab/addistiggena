@@ -126,6 +126,15 @@ export interface ProviderProfile {
 export interface Wallet {
   balanceEtb: string;
   transactions?: { id: string; amountEtb: string; type: string; note: string | null; createdAt: string }[];
+  /** top-ups the technician has declared, newest first */
+  deposits?: {
+    id: string;
+    amountEtb: string;
+    method: string;
+    reference: string;
+    status: string;
+    createdAt: string;
+  }[];
 }
 
 export class ApiError extends Error {

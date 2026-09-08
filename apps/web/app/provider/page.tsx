@@ -41,7 +41,14 @@ interface Profile {
 interface WalletDetail {
   balanceEtb: string;
   transactions: { id: string; type: string; amountEtb: string; note: string | null; createdAt: string }[];
-  payouts: { id: string; amountEtb: string; destination: string; status: string; requestedAt: string }[];
+  deposits: {
+    id: string;
+    amountEtb: string;
+    method: string;
+    reference: string;
+    status: string;
+    createdAt: string;
+  }[];
 }
 
 // Official vetting checklist (technician registration & vetting document):
@@ -78,8 +85,9 @@ export default function ProviderPage() {
 
   // wallet + documents
   const [walletDetail, setWalletDetail] = useState<WalletDetail | null>(null);
-  const [payoutAmount, setPayoutAmount] = useState('');
-  const [payoutDest, setPayoutDest] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositMethod, setDepositMethod] = useState('BANK_TRANSFER');
+  const [depositRef, setDepositRef] = useState('');
   const [docType, setDocType] = useState('NATIONAL_ID');
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState('');
@@ -102,17 +110,28 @@ export default function ProviderPage() {
       });
   }, []);
 
-  async function requestPayout(e: React.FormEvent) {
+  /**
+   * You keep the customer cash at the door, so nothing is ever paid out to you
+   * - what you owe is commission. Pay it into the company account, then enter
+   * the reference here. Finance checks it against the bank statement before
+   * your balance moves.
+   */
+  async function declareDeposit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setNotice('');
     try {
-      await api('/wallet/payouts', {
+      await api('/wallet/deposits', {
         method: 'POST',
-        body: JSON.stringify({ amountEtb: Number(payoutAmount), destination: payoutDest }),
+        body: JSON.stringify({
+          amountEtb: Number(depositAmount),
+          method: depositMethod,
+          reference: depositRef.trim(),
+        }),
       });
-      setNotice(`Payout of ${payoutAmount} ETB requested - processed same-day.`);
-      setPayoutAmount('');
+      setNotice(`${depositAmount} ETB submitted - finance will confirm it shortly.`);
+      setDepositAmount('');
+      setDepositRef('');
       load();
     } catch (err) {
       setError((err as Error).message);
@@ -348,7 +367,7 @@ export default function ProviderPage() {
                 <div className="v">
                   {profile.wallet?.balanceEtb ?? '0'} <small>ETB</small>
                 </div>
-                <div className="k">platform wallet · records &amp; payouts</div>
+                <div className="k">platform wallet · deposit balance &middot; commission credit</div>
               </div>
               <div className="tile">
                 <div className="v">{profile.jobsCompleted}</div>
@@ -386,41 +405,67 @@ export default function ProviderPage() {
               </div>
             </div>
 
-            {/* ── wallet & payouts ──────────────────────────────────────── */}
+            {/* deposit balance: commission credit the technician pre-funds */}
             <div className="panel">
-              <h2>Wallet · ቦርሳ</h2>
-              <form className="row mb" onSubmit={requestPayout}>
+              <h2>Deposit balance</h2>
+              <p className="hint mb">
+                You collect the full price from the customer in cash. Our commission comes out of
+                this balance when a job completes, so keep it topped up - jobs stop being offered
+                to you once it runs out. Pay into the company account, then enter the bank
+                reference below.
+              </p>
+              <form className="row mb" onSubmit={declareDeposit}>
                 <input
                   className="input"
                   style={{ maxWidth: 150 }}
                   placeholder="Amount (ETB)"
                   inputMode="numeric"
-                  value={payoutAmount}
-                  onChange={(e) => setPayoutAmount(e.target.value.replace(/[^\d.]/g, ''))}
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value.replace(/[^\d.]/g, ''))}
                 />
+                <select
+                  className="input"
+                  style={{ maxWidth: 170 }}
+                  value={depositMethod}
+                  onChange={(e) => setDepositMethod(e.target.value)}
+                >
+                  <option value="BANK_TRANSFER">Bank transfer</option>
+                  <option value="TELEBIRR">Telebirr</option>
+                  <option value="CBE_BIRR">CBE Birr</option>
+                  <option value="CASH_OFFICE">Cash at office</option>
+                </select>
                 <input
                   className="input"
-                  style={{ maxWidth: 240 }}
-                  placeholder="Telebirr no. or bank account"
-                  value={payoutDest}
-                  onChange={(e) => setPayoutDest(e.target.value)}
+                  style={{ maxWidth: 220 }}
+                  placeholder="Bank reference / receipt no."
+                  value={depositRef}
+                  onChange={(e) => setDepositRef(e.target.value)}
                 />
-                <button className="btn btn-teal btn-sm" disabled={!payoutAmount || !payoutDest}>
-                  Withdraw · ወጪ
+                <button
+                  className="btn btn-teal btn-sm"
+                  disabled={Number(depositAmount) < 50 || depositRef.trim().length < 3}
+                >
+                  Submit deposit
                 </button>
-                <span className="hint">min 100 ETB · same-day</span>
+                <span className="hint">min 50 ETB</span>
               </form>
-              {walletDetail && walletDetail.payouts.length > 0 && (
+              {walletDetail && walletDetail.deposits.length > 0 && (
                 <>
-                  <h2 style={{ marginTop: '1rem' }}>Payout requests</h2>
-                  {walletDetail.payouts.map((p) => (
-                    <div key={p.id} className="booking-row" style={{ cursor: 'default' }}>
+                  <h2 style={{ marginTop: '1rem' }}>Your deposits</h2>
+                  {walletDetail.deposits.map((d) => (
+                    <div key={d.id} className="booking-row" style={{ cursor: 'default' }}>
                       <span>
-                        <span className="what">{p.amountEtb} ETB → {p.destination}</span>
-                        <span className="when" style={{ display: 'block' }}>{fmtDate(p.requestedAt)}</span>
+                        <span className="what">
+                          {d.amountEtb} ETB - {d.method.replace(/_/g, ' ').toLowerCase()}
+                        </span>
+                        <span className="when" style={{ display: 'block' }}>
+                          ref {d.reference} - {fmtDate(d.createdAt)}
+                        </span>
                       </span>
-                      <span className={`doc-state ${p.status === 'PROCESSED' ? 'APPROVED' : p.status === 'REJECTED' ? 'REJECTED' : 'PENDING'}`}>
-                        {p.status}
+                      <span
+                        className={`doc-state ${d.status === 'CONFIRMED' ? 'APPROVED' : d.status === 'REJECTED' ? 'REJECTED' : 'PENDING'}`}
+                      >
+                        {d.status}
                       </span>
                     </div>
                   ))}
