@@ -270,7 +270,7 @@ const NAV_GROUPS: { label: string; items: ViewKey[] }[] = [
   { label: 'Overview', items: ['dashboard', 'map'] },
   { label: 'Operations', items: ['bookings', 'technicians', 'verification', 'tickets', 'payouts', 'reviews'] },
   { label: 'Money', items: ['finance'] },
-  { label: 'Platform', items: ['categories', 'staff', 'audit', 'settings'] },
+  { label: 'Platform', items: ['categories', 'staff', 'system', 'audit', 'settings'] },
 ];
 
 const ICONS: Record<ViewKey, React.ReactNode> = (() => {
