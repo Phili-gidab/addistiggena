@@ -1172,11 +1172,20 @@ export default function AdminPage() {
                           {d.type.replace(/_/g, ' ').toLowerCase()}
                         </button>
                       ))}
-                      {/* wraps onto two lines - on one it makes the table wider
-                          than the panel and pushes verify/reject out of reach */}
-                      <div className="hint" style={{ marginTop: '0.3rem', maxWidth: 230 }}>
+                      {/* wraps onto several lines - on one it runs past the cell
+                          and over the next column */}
+                      <div
+                        className="hint"
+                        style={{
+                          marginTop: '0.3rem',
+                          maxWidth: 230,
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          columnGap: '0.6rem',
+                        }}
+                      >
                         {REQUIRED_DOCS.map((r) => (
-                          <span key={r.type} style={{ marginRight: '0.6rem', whiteSpace: 'nowrap' }}>
+                          <span key={r.type} style={{ whiteSpace: 'nowrap' }}>
                             {p.documents.some((d) => d.type === r.type) ? '✓' : '✗'} {r.label}
                           </span>
                         ))}
