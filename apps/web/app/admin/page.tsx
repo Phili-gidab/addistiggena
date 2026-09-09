@@ -1522,76 +1522,57 @@ export default function AdminPage() {
                       moment you save. Drag the pin on the map below first if the caller is not near
                       Meskel Square.
                     </p>
-                    <form
-                      onSubmit={createBookingForCaller}
-                      className="row"
-                      style={{ flexWrap: 'wrap', gap: '0.5rem' }}
-                    >
-                      <input
-                        className="input"
-                        style={{ maxWidth: 150 }}
-                        placeholder="09… phone"
-                        value={newBooking.phone}
-                        onChange={(e) => setNewBooking({ ...newBooking, phone: e.target.value })}
-                      />
-                      <input
-                        className="input"
-                        style={{ maxWidth: 160 }}
-                        placeholder="caller name"
-                        value={newBooking.customerName}
-                        onChange={(e) =>
-                          setNewBooking({ ...newBooking, customerName: e.target.value })
-                        }
-                      />
-                      <select
-                        className="input"
-                        style={{ maxWidth: 200 }}
-                        value={newBooking.categoryId}
-                        onChange={(e) => setNewBooking({ ...newBooking, categoryId: e.target.value })}
-                      >
-                        <option value="">Service…</option>
-                        {cats
-                          .filter((c) => c.isActive !== false)
-                          .map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.nameEn}
-                            </option>
-                          ))}
-                      </select>
-                      <input
-                        className="input"
-                        style={{ maxWidth: 200 }}
-                        placeholder="landmark"
-                        value={newBooking.landmark}
-                        onChange={(e) => setNewBooking({ ...newBooking, landmark: e.target.value })}
-                      />
-                      <input
-                        className="input"
-                        style={{ flex: 1, minWidth: 200 }}
-                        placeholder="what is broken?"
-                        value={newBooking.description}
-                        onChange={(e) =>
-                          setNewBooking({ ...newBooking, description: e.target.value })
-                        }
-                      />
-                      <button
-                        className="btn btn-dark btn-sm"
-                        disabled={newBooking.phone.trim().length < 9 || !newBooking.categoryId}
-                      >
-                        + Create booking
-                      </button>
+                    <form onSubmit={createBookingForCaller}>
+                      <div className="form-grid">
+                        <div className="field">
+                          <label>Caller phone</label>
+                          <input className="input" placeholder="09…" inputMode="tel"
+                            value={newBooking.phone}
+                            onChange={(e) => setNewBooking({ ...newBooking, phone: e.target.value })} />
+                        </div>
+                        <div className="field">
+                          <label>Caller name</label>
+                          <input className="input" placeholder="who is calling"
+                            value={newBooking.customerName}
+                            onChange={(e) => setNewBooking({ ...newBooking, customerName: e.target.value })} />
+                        </div>
+                        <div className="field span-2">
+                          <label>Service</label>
+                          <select className="input" value={newBooking.categoryId}
+                            onChange={(e) => setNewBooking({ ...newBooking, categoryId: e.target.value })}>
+                            <option value="">Choose…</option>
+                            {cats.filter((c) => c.isActive !== false).map((c) => (
+                              <option key={c.id} value={c.id}>{c.nameEn}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field span-2">
+                          <label>Landmark</label>
+                          <input className="input" placeholder="e.g. behind Edna Mall"
+                            value={newBooking.landmark}
+                            onChange={(e) => setNewBooking({ ...newBooking, landmark: e.target.value })} />
+                        </div>
+                        <div className="field span-full">
+                          <label>What is broken?</label>
+                          <input className="input" placeholder="in the caller's words"
+                            value={newBooking.description}
+                            onChange={(e) => setNewBooking({ ...newBooking, description: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="form-actions">
+                        <button className="btn btn-dark btn-sm"
+                          disabled={newBooking.phone.trim().length < 9 || !newBooking.categoryId}>
+                          + Create booking
+                        </button>
+                        <span className="hint">
+                          pin {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
+                        </span>
+                        <button type="button" className="link-btn"
+                          onClick={() => setPin({ lat: 9.0108, lng: 38.7613 })}>
+                          reset pin
+                        </button>
+                      </div>
                     </form>
-                    <p className="hint">
-                      pin {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
-                      <button
-                        type="button"
-                        className="link-btn"
-                        style={{ marginLeft: '0.5rem' }}
-                        onClick={() => setPin({ lat: 9.0108, lng: 38.7613 })}
-                      >
-                        reset
-                      </button>
-                    </p>
                   </div>
 
                 <div className="panel">
@@ -1665,129 +1646,213 @@ export default function AdminPage() {
                     (one-time code) - no password is issued. Dispatch can only reach them once
                     they go online in the app, which shares their position.
                   </p>
-                  <form onSubmit={createTechnician} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.4rem' }}>
-                    <input className="input" style={{ maxWidth: 170 }} placeholder="Full name" value={newTech.name}
-                      onChange={(e) => setNewTech({ ...newTech, name: e.target.value })} />
-                    <input className="input" style={{ maxWidth: 140 }} placeholder="09… phone" value={newTech.phone}
-                      onChange={(e) => setNewTech({ ...newTech, phone: e.target.value })} />
-                    <select className="input" style={{ maxWidth: 200 }} value={newTech.categoryId}
-                      onChange={(e) => setNewTech({ ...newTech, categoryId: e.target.value })}>
-                      <option value="">Trade…</option>
-                      {cats.filter((c) => c.isActive !== false).map((c) => (
-                        <option key={c.id} value={c.id}>{c.nameEn}</option>
-                      ))}
-                    </select>
-                    <select className="input" style={{ maxWidth: 170 }} value={newTech.subCity}
-                      onChange={(e) => setNewTech({ ...newTech, subCity: e.target.value })}>
-                      <option value="">Sub-city…</option>
-                      {SUB_CITIES.map((sc) => (
-                        <option key={sc.name} value={sc.name}>{sc.name}</option>
-                      ))}
-                    </select>
-                    <input className="input" style={{ maxWidth: 110 }} placeholder="years exp." inputMode="numeric"
-                      value={newTech.yearsExperience}
-                      onChange={(e) => setNewTech({ ...newTech, yearsExperience: e.target.value.replace(/\D/g, '') })} />
-                    <label className="hint" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <input type="checkbox" checked={newTech.verified}
-                        onChange={(e) => setNewTech({ ...newTech, verified: e.target.checked })} />
-                      documents already vetted
-                    </label>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setFullForm(!fullForm)}
-                    >
-                      {fullForm ? 'hide the rest of the form' : 'fill the whole registration form'}
-                    </button>
-                    <button className="btn btn-dark btn-sm"
-                      disabled={newTech.name.trim().length < 2 || newTech.phone.trim().length < 9 || !newTech.categoryId}>
-                      + Add technician
-                    </button>
+                  <form onSubmit={createTechnician}>
+                    <div className="form-grid">
+                      <div className="field span-2">
+                        <label>Full name</label>
+                        <input className="input" placeholder="e.g. Abebe Tesfaye" value={newTech.name}
+                          onChange={(e) => setNewTech({ ...newTech, name: e.target.value })} />
+                      </div>
+                      <div className="field">
+                        <label>Phone</label>
+                        <input className="input" placeholder="09…" inputMode="tel" value={newTech.phone}
+                          onChange={(e) => setNewTech({ ...newTech, phone: e.target.value })} />
+                      </div>
+                      <div className="field span-2">
+                        <label>Trade</label>
+                        <select className="input" value={newTech.categoryId}
+                          onChange={(e) => setNewTech({ ...newTech, categoryId: e.target.value })}>
+                          <option value="">Choose…</option>
+                          {cats.filter((c) => c.isActive !== false).map((c) => (
+                            <option key={c.id} value={c.id}>{c.nameEn}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Service sub-city</label>
+                        <select className="input" value={newTech.subCity}
+                          onChange={(e) => setNewTech({ ...newTech, subCity: e.target.value })}>
+                          <option value="">Choose…</option>
+                          {SUB_CITIES.map((sc) => (
+                            <option key={sc.name} value={sc.name}>{sc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Years of experience</label>
+                        <input className="input" placeholder="e.g. 6" inputMode="numeric"
+                          value={newTech.yearsExperience}
+                          onChange={(e) => setNewTech({ ...newTech, yearsExperience: e.target.value.replace(/\D/g, '') })} />
+                      </div>
+                    </div>
 
                     {fullForm && (
-                      <div style={{ width: '100%' }}>
-                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Personal details</div>
-                        <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <select className="input" style={{ maxWidth: 120 }} value={newTech.gender}
-                            onChange={(e) => setNewTech({ ...newTech, gender: e.target.value })}>
-                            <option value="">Gender…</option>
-                            <option value="MALE">Male</option>
-                            <option value="FEMALE">Female</option>
-                          </select>
-                          <select className="input" style={{ maxWidth: 150 }} value={newTech.idType}
-                            onChange={(e) => setNewTech({ ...newTech, idType: e.target.value })}>
-                            <option value="FAYDA">Fayda / National ID</option>
-                            <option value="KEBELE">Kebele ID</option>
-                          </select>
-                          <input className="input" style={{ maxWidth: 170 }} placeholder="ID number" value={newTech.idNumber}
-                            onChange={(e) => setNewTech({ ...newTech, idNumber: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 190 }} placeholder="email (optional)" value={newTech.email}
-                            onChange={(e) => setNewTech({ ...newTech, email: e.target.value })} />
-                          <select className="input" style={{ maxWidth: 170 }} value={newTech.residentialSubCity}
-                            onChange={(e) => setNewTech({ ...newTech, residentialSubCity: e.target.value })}>
-                            <option value="">Lives in…</option>
-                            {SUB_CITIES.map((sc) => (
-                              <option key={sc.name} value={sc.name}>{sc.name}</option>
-                            ))}
-                          </select>
-                          <input className="input" style={{ maxWidth: 100 }} placeholder="woreda" value={newTech.residentialWoreda}
-                            onChange={(e) => setNewTech({ ...newTech, residentialWoreda: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 110 }} placeholder="house no." value={newTech.houseNumber}
-                            onChange={(e) => setNewTech({ ...newTech, houseNumber: e.target.value })} />
+                      <>
+                        <div className="form-section">
+                          <div className="sub-h">Personal details</div>
+                          <div className="form-grid">
+                            <div className="field">
+                              <label>Gender</label>
+                              <select className="input" value={newTech.gender}
+                                onChange={(e) => setNewTech({ ...newTech, gender: e.target.value })}>
+                                <option value="">Choose…</option>
+                                <option value="MALE">Male</option>
+                                <option value="FEMALE">Female</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label>ID type</label>
+                              <select className="input" value={newTech.idType}
+                                onChange={(e) => setNewTech({ ...newTech, idType: e.target.value })}>
+                                <option value="FAYDA">Fayda / National ID</option>
+                                <option value="KEBELE">Kebele ID</option>
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label>ID number</label>
+                              <input className="input" placeholder="ID number" value={newTech.idNumber}
+                                onChange={(e) => setNewTech({ ...newTech, idNumber: e.target.value })} />
+                            </div>
+                            <div className="field span-2">
+                              <label>Email (optional)</label>
+                              <input className="input" type="email" placeholder="name@example.com" value={newTech.email}
+                                onChange={(e) => setNewTech({ ...newTech, email: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Lives in</label>
+                              <select className="input" value={newTech.residentialSubCity}
+                                onChange={(e) => setNewTech({ ...newTech, residentialSubCity: e.target.value })}>
+                                <option value="">Choose…</option>
+                                {SUB_CITIES.map((sc) => (
+                                  <option key={sc.name} value={sc.name}>{sc.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label>Woreda</label>
+                              <input className="input" placeholder="e.g. 04" value={newTech.residentialWoreda}
+                                onChange={(e) => setNewTech({ ...newTech, residentialWoreda: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>House no.</label>
+                              <input className="input" placeholder="e.g. 453" value={newTech.houseNumber}
+                                onChange={(e) => setNewTech({ ...newTech, houseNumber: e.target.value })} />
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Skills and service area</div>
-                        <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <input className="input" style={{ maxWidth: 220 }} placeholder="specialization" value={newTech.specialization}
-                            onChange={(e) => setNewTech({ ...newTech, specialization: e.target.value })} />
-                          <select className="input" style={{ maxWidth: 160 }} value={newTech.educationLevel}
-                            onChange={(e) => setNewTech({ ...newTech, educationLevel: e.target.value })}>
-                            <option value="">Education…</option>
-                            <option value="TVET">TVET</option>
-                            <option value="DIPLOMA">Diploma</option>
-                            <option value="DEGREE">Degree</option>
-                            <option value="ABOVE_DEGREE">Above degree</option>
-                          </select>
-                          <input className="input" style={{ flex: 1, minWidth: 200 }} placeholder="certificates / licences"
-                            value={newTech.certifications}
-                            onChange={(e) => setNewTech({ ...newTech, certifications: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 130 }} placeholder="service woreda" value={newTech.woreda}
-                            onChange={(e) => setNewTech({ ...newTech, woreda: e.target.value })} />
+                        <div className="form-section">
+                          <div className="sub-h">Skills and service area</div>
+                          <div className="form-grid">
+                            <div className="field span-2">
+                              <label>Specialization</label>
+                              <input className="input" placeholder="e.g. house wiring and breaker panels"
+                                value={newTech.specialization}
+                                onChange={(e) => setNewTech({ ...newTech, specialization: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Education</label>
+                              <select className="input" value={newTech.educationLevel}
+                                onChange={(e) => setNewTech({ ...newTech, educationLevel: e.target.value })}>
+                                <option value="">Choose…</option>
+                                <option value="TVET">TVET</option>
+                                <option value="DIPLOMA">Diploma</option>
+                                <option value="DEGREE">Degree</option>
+                                <option value="ABOVE_DEGREE">Above degree</option>
+                              </select>
+                            </div>
+                            <div className="field span-2">
+                              <label>Certificates or licences</label>
+                              <input className="input" placeholder="e.g. CoC Level III, TVET electrical"
+                                value={newTech.certifications}
+                                onChange={(e) => setNewTech({ ...newTech, certifications: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Service woreda</label>
+                              <input className="input" placeholder="e.g. 04" value={newTech.woreda}
+                                onChange={(e) => setNewTech({ ...newTech, woreda: e.target.value })} />
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Guarantor</div>
-                        <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <input className="input" style={{ maxWidth: 160 }} placeholder="name" value={newTech.guarantorName}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorName: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 150 }} placeholder="relationship" value={newTech.guarantorRelation}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorRelation: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 140 }} placeholder="09… phone" value={newTech.guarantorPhone}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorPhone: e.target.value })} />
-                          <select className="input" style={{ maxWidth: 160 }} value={newTech.guarantorSubCity}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorSubCity: e.target.value })}>
-                            <option value="">Sub-city…</option>
-                            {SUB_CITIES.map((sc) => (
-                              <option key={sc.name} value={sc.name}>{sc.name}</option>
-                            ))}
-                          </select>
-                          <input className="input" style={{ maxWidth: 100 }} placeholder="woreda" value={newTech.guarantorWoreda}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorWoreda: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 110 }} placeholder="house no." value={newTech.guarantorHouseNo}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorHouseNo: e.target.value })} />
-                          <input className="input" style={{ maxWidth: 150 }} placeholder="their ID number" value={newTech.guarantorIdNumber}
-                            onChange={(e) => setNewTech({ ...newTech, guarantorIdNumber: e.target.value })} />
+                        <div className="form-section">
+                          <div className="sub-h">Guarantor</div>
+                          <div className="form-grid">
+                            <div className="field span-2">
+                              <label>Full name</label>
+                              <input className="input" placeholder="Full name" value={newTech.guarantorName}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorName: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Relationship</label>
+                              <input className="input" placeholder="e.g. brother" value={newTech.guarantorRelation}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorRelation: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Phone</label>
+                              <input className="input" placeholder="09…" inputMode="tel" value={newTech.guarantorPhone}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorPhone: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Sub-city</label>
+                              <select className="input" value={newTech.guarantorSubCity}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorSubCity: e.target.value })}>
+                                <option value="">Choose…</option>
+                                {SUB_CITIES.map((sc) => (
+                                  <option key={sc.name} value={sc.name}>{sc.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="field">
+                              <label>Woreda</label>
+                              <input className="input" placeholder="e.g. 02" value={newTech.guarantorWoreda}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorWoreda: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>House no.</label>
+                              <input className="input" placeholder="e.g. 117" value={newTech.guarantorHouseNo}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorHouseNo: e.target.value })} />
+                            </div>
+                            <div className="field">
+                              <label>Their ID number</label>
+                              <input className="input" placeholder="ID number" value={newTech.guarantorIdNumber}
+                                onChange={(e) => setNewTech({ ...newTech, guarantorIdNumber: e.target.value })} />
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="sub-h" style={{ marginTop: '0.9rem' }}>Declaration</div>
-                        <p className="hint mb">
-                          Type the name the applicant signed the paper form under. Your own account
-                          is recorded as the registrar automatically.
-                        </p>
-                        <input className="input" style={{ maxWidth: 240 }} placeholder="name on the signature line"
-                          value={newTech.declarationName}
-                          onChange={(e) => setNewTech({ ...newTech, declarationName: e.target.value })} />
-                      </div>
+                        <div className="form-section">
+                          <div className="sub-h">Declaration</div>
+                          <p className="hint mb">
+                            Type the name the applicant signed the paper form under. Your own account
+                            is recorded as the registrar automatically.
+                          </p>
+                          <div className="form-grid">
+                            <div className="field span-2">
+                              <label>Name on the signature line</label>
+                              <input className="input" placeholder="Full name as signed"
+                                value={newTech.declarationName}
+                                onChange={(e) => setNewTech({ ...newTech, declarationName: e.target.value })} />
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     )}
+
+                    <div className="form-actions">
+                      <button className="btn btn-dark btn-sm"
+                        disabled={newTech.name.trim().length < 2 || newTech.phone.trim().length < 9 || !newTech.categoryId}>
+                        + Add technician
+                      </button>
+                      <label className="check">
+                        <input type="checkbox" checked={newTech.verified}
+                          onChange={(e) => setNewTech({ ...newTech, verified: e.target.checked })} />
+                        documents already vetted
+                      </label>
+                      <button type="button" className="link-btn" onClick={() => setFullForm(!fullForm)}>
+                        {fullForm ? 'hide the rest of the form' : 'fill the whole registration form'}
+                      </button>
+                    </div>
                   </form>
 
                   <h2>Technicians ({technicians.length})</h2>
@@ -1844,37 +1909,36 @@ export default function AdminPage() {
                       out - the six characters after the # - or open a booking below to load their
                       whole history first.
                     </p>
-                    <form onSubmit={createCase} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <input
-                        className="input"
-                        style={{ maxWidth: 260 }}
-                        placeholder="booking id"
-                        value={newCase.bookingId}
-                        onChange={(e) => setNewCase({ ...newCase, bookingId: e.target.value })}
-                      />
-                      <select
-                        className="input"
-                        style={{ maxWidth: 190 }}
-                        value={newCase.type}
-                        onChange={(e) => setNewCase({ ...newCase, type: e.target.value })}
-                      >
-                        <option value="DISPUTE">Dispute</option>
-                        <option value="GUARANTEE_CLAIM">Guarantee claim</option>
-                        <option value="SAFETY">Safety</option>
-                      </select>
-                      <input
-                        className="input"
-                        style={{ flex: 1, minWidth: 220 }}
-                        placeholder="what did the customer report?"
-                        value={newCase.note}
-                        onChange={(e) => setNewCase({ ...newCase, note: e.target.value })}
-                      />
-                      <button
-                        className="btn btn-dark btn-sm"
-                        disabled={newCase.bookingId.trim().length < 6 || newCase.note.trim().length < 5}
-                      >
-                        + Open case
-                      </button>
+                    <form onSubmit={createCase}>
+                      <div className="form-grid">
+                        <div className="field span-2">
+                          <label>Booking reference</label>
+                          <input className="input" placeholder="the six characters after the #"
+                            value={newCase.bookingId}
+                            onChange={(e) => setNewCase({ ...newCase, bookingId: e.target.value })} />
+                        </div>
+                        <div className="field">
+                          <label>Case type</label>
+                          <select className="input" value={newCase.type}
+                            onChange={(e) => setNewCase({ ...newCase, type: e.target.value })}>
+                            <option value="DISPUTE">Dispute</option>
+                            <option value="GUARANTEE_CLAIM">Guarantee claim</option>
+                            <option value="SAFETY">Safety</option>
+                          </select>
+                        </div>
+                        <div className="field span-full">
+                          <label>What did the customer report?</label>
+                          <input className="input" placeholder="in their words"
+                            value={newCase.note}
+                            onChange={(e) => setNewCase({ ...newCase, note: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="form-actions">
+                        <button className="btn btn-dark btn-sm"
+                          disabled={newCase.bookingId.trim().length < 6 || newCase.note.trim().length < 5}>
+                          + Open case
+                        </button>
+                      </div>
                     </form>
                   </div>
 
@@ -1993,73 +2057,64 @@ export default function AdminPage() {
                       the reference against the bank statement first - confirming moves the balance
                       straight away.
                     </p>
-                    <form onSubmit={recordDeposit} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <select
-                        className="input"
-                        style={{ maxWidth: 230 }}
-                        value={newDeposit.providerId}
-                        onChange={(e) => setNewDeposit({ ...newDeposit, providerId: e.target.value })}
-                      >
-                        <option value="">Technician…</option>
-                        {technicians.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name ?? t.phone} · {t.category.nameEn}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        className="input"
-                        style={{ maxWidth: 120 }}
-                        placeholder="amount ETB"
-                        inputMode="numeric"
-                        value={newDeposit.amountEtb}
-                        onChange={(e) => setNewDeposit({ ...newDeposit, amountEtb: e.target.value })}
-                      />
-                      <select
-                        className="input"
-                        style={{ maxWidth: 165 }}
-                        value={newDeposit.method}
-                        onChange={(e) => setNewDeposit({ ...newDeposit, method: e.target.value })}
-                      >
-                        <option value="BANK_TRANSFER">Bank transfer</option>
-                        <option value="TELEBIRR">Telebirr</option>
-                        <option value="CBE_BIRR">CBE Birr</option>
-                        <option value="CASH_OFFICE">Cash at office</option>
-                      </select>
-                      <input
-                        className="input"
-                        style={{ maxWidth: 190 }}
-                        placeholder="bank reference"
-                        value={newDeposit.reference}
-                        onChange={(e) => setNewDeposit({ ...newDeposit, reference: e.target.value })}
-                      />
-                      <input
-                        className="input"
-                        style={{ flex: 1, minWidth: 160 }}
-                        placeholder="note (optional)"
-                        value={newDeposit.note}
-                        onChange={(e) => setNewDeposit({ ...newDeposit, note: e.target.value })}
-                      />
-                      <label className="row" style={{ gap: '0.35rem', fontSize: '0.82rem' }}>
-                        <input
-                          type="checkbox"
-                          checked={newDeposit.confirmNow}
-                          onChange={(e) =>
-                            setNewDeposit({ ...newDeposit, confirmNow: e.target.checked })
-                          }
-                        />
-                        credit now
-                      </label>
-                      <button
-                        className="btn btn-dark btn-sm"
-                        disabled={
-                          !newDeposit.providerId ||
-                          Number(newDeposit.amountEtb) < 1 ||
-                          newDeposit.reference.trim().length < 3
-                        }
-                      >
-                        + Record
-                      </button>
+                    <form onSubmit={recordDeposit}>
+                      <div className="form-grid">
+                        <div className="field span-2">
+                          <label>Technician</label>
+                          <select className="input" value={newDeposit.providerId}
+                            onChange={(e) => setNewDeposit({ ...newDeposit, providerId: e.target.value })}>
+                            <option value="">Choose…</option>
+                            {technicians.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name ?? t.phone} · {t.category.nameEn}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>Amount (ETB)</label>
+                          <input className="input" placeholder="e.g. 1500" inputMode="numeric"
+                            value={newDeposit.amountEtb}
+                            onChange={(e) => setNewDeposit({ ...newDeposit, amountEtb: e.target.value })} />
+                        </div>
+                        <div className="field">
+                          <label>Paid by</label>
+                          <select className="input" value={newDeposit.method}
+                            onChange={(e) => setNewDeposit({ ...newDeposit, method: e.target.value })}>
+                            <option value="BANK_TRANSFER">Bank transfer</option>
+                            <option value="TELEBIRR">Telebirr</option>
+                            <option value="CBE_BIRR">CBE Birr</option>
+                            <option value="CASH_OFFICE">Cash at office</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>Bank reference</label>
+                          <input className="input" placeholder="e.g. FT25091234567"
+                            value={newDeposit.reference}
+                            onChange={(e) => setNewDeposit({ ...newDeposit, reference: e.target.value })} />
+                        </div>
+                        <div className="field span-2">
+                          <label>Note (optional)</label>
+                          <input className="input" placeholder="anything finance should know"
+                            value={newDeposit.note}
+                            onChange={(e) => setNewDeposit({ ...newDeposit, note: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="form-actions">
+                        <button className="btn btn-dark btn-sm"
+                          disabled={
+                            !newDeposit.providerId ||
+                            Number(newDeposit.amountEtb) < 1 ||
+                            newDeposit.reference.trim().length < 3
+                          }>
+                          + Record deposit
+                        </button>
+                        <label className="check">
+                          <input type="checkbox" checked={newDeposit.confirmNow}
+                            onChange={(e) => setNewDeposit({ ...newDeposit, confirmNow: e.target.checked })} />
+                          credit the balance now
+                        </label>
+                      </div>
                     </form>
                   </div>
 
@@ -2712,45 +2767,69 @@ export default function AdminPage() {
                       )}
                     </div>
                   ))}
-                  <form onSubmit={createStaff} className="row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}>
-                    <input className="input" style={{ maxWidth: 160 }} placeholder="Full name" value={newStaff.name}
-                      onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
-                    <input className="input" style={{ maxWidth: 140 }} placeholder="09… phone" value={newStaff.phone}
-                      onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} />
-                    <input className="input" style={{ maxWidth: 130 }} placeholder="username" value={newStaff.username}
-                      onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })} />
-                    <input className="input" style={{ maxWidth: 140 }} placeholder="password (8+)" type="password" value={newStaff.password}
-                      onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
-                    <select className="input" style={{ maxWidth: 190 }} value={newStaff.role}
-                      onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}>
-                      <option value="OPS_MANAGER">Operations Manager</option>
-                      <option value="VERIFICATION_OFFICER">Verification Officer</option>
-                      <option value="SUPPORT_AGENT">Support Agent</option>
-                      <option value="FINANCE_OFFICER">Finance Officer</option>
-                      <option value="SUBCITY_COORDINATOR">Sub-city Coordinator</option>
-                      <option value="ADMIN">Super Admin</option>
-                    </select>
-                    {newStaff.role === 'SUBCITY_COORDINATOR' && (
-                      <select className="input" style={{ maxWidth: 170 }} value={newStaff.subCity}
-                        onChange={(e) => setNewStaff({ ...newStaff, subCity: e.target.value })}>
-                        <option value="">Sub-city…</option>
-                        {SUB_CITIES.map((sc) => (
-                          <option key={sc.name} value={sc.name}>{sc.name}</option>
-                        ))}
-                      </select>
-                    )}
-                    <button
-                      className="btn btn-dark btn-sm"
-                      disabled={
-                        newStaff.name.length < 2 ||
-                        newStaff.phone.length < 9 ||
-                        newStaff.username.length < 3 ||
-                        newStaff.password.length < 8 ||
-                        (newStaff.role === 'SUBCITY_COORDINATOR' && !newStaff.subCity)
-                      }
-                    >
-                      + Create account
-                    </button>
+                  <form onSubmit={createStaff} style={{ marginTop: '1.2rem' }}>
+                    <div className="sub-h">Create an account</div>
+                    <div className="form-grid">
+                      <div className="field span-2">
+                        <label>Full name</label>
+                        <input className="input" placeholder="e.g. Selam Abraha" value={newStaff.name}
+                          onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} />
+                      </div>
+                      <div className="field">
+                        <label>Phone</label>
+                        <input className="input" placeholder="09…" inputMode="tel" value={newStaff.phone}
+                          onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} />
+                      </div>
+                      <div className="field">
+                        <label>Username</label>
+                        <input className="input" placeholder="sign-in name" value={newStaff.username}
+                          onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })} />
+                      </div>
+                      <div className="field">
+                        <label>Password</label>
+                        <input className="input" type="password" placeholder="8 characters or more"
+                          value={newStaff.password}
+                          onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
+                      </div>
+                      <div className="field span-2">
+                        <label>Role</label>
+                        <select className="input" value={newStaff.role}
+                          onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}>
+                          <option value="OPS_MANAGER">Operations Manager</option>
+                          <option value="VERIFICATION_OFFICER">Verification Officer</option>
+                          <option value="SUPPORT_AGENT">Support Agent</option>
+                          <option value="FINANCE_OFFICER">Finance Officer</option>
+                          <option value="SUBCITY_COORDINATOR">Sub-city Coordinator</option>
+                          <option value="ADMIN">Super Admin</option>
+                        </select>
+                      </div>
+                      {newStaff.role === 'SUBCITY_COORDINATOR' && (
+                        <div className="field">
+                          <label>Sub-city</label>
+                          <select className="input" value={newStaff.subCity}
+                            onChange={(e) => setNewStaff({ ...newStaff, subCity: e.target.value })}>
+                            <option value="">Choose…</option>
+                            {SUB_CITIES.map((sc) => (
+                              <option key={sc.name} value={sc.name}>{sc.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    <div className="form-actions">
+                      <button
+                        className="btn btn-dark btn-sm"
+                        disabled={
+                          newStaff.name.length < 2 ||
+                          newStaff.phone.length < 9 ||
+                          newStaff.username.length < 3 ||
+                          newStaff.password.length < 8 ||
+                          (newStaff.role === 'SUBCITY_COORDINATOR' && !newStaff.subCity)
+                        }
+                      >
+                        + Create account
+                      </button>
+                    </div>
                   </form>
                 </div>
               )}

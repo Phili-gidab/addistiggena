@@ -1805,3 +1805,50 @@ body.scroll-locked .site-header { transform: none; }
   white-space: normal; overflow: visible; text-overflow: clip;
   line-height: 1.3; font-size: 0.84rem;
 }
+
+/* ══ console forms ═════════════════════════════════════════════════════════
+   The console used wrapping flex rows of placeholder-only inputs with
+   hand-picked widths: labels vanished the moment you typed, nothing lined up
+   column to column, and the last control on a row got clipped. A grid with
+   real labels fixes all three, and reflows without any media queries. */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.85rem 0.75rem;
+  align-items: start;
+}
+.form-grid .field { margin-bottom: 0; gap: 0.32rem; min-width: 0; }
+.form-grid .field label {
+  font-size: 0.67rem; letter-spacing: 0.08em; color: var(--muted);
+}
+.form-grid .field .input { width: 100%; min-width: 0; }
+/* wide values - names, addresses, free text - get more room than a stub field */
+.form-grid .span-2 { grid-column: span 2; }
+.form-grid .span-full { grid-column: 1 / -1; }
+@media (max-width: 560px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid .span-2, .form-grid .span-full { grid-column: auto; }
+}
+
+/* sections inside one long form */
+.form-section { margin-top: 1.5rem; }
+.form-section .sub-h { margin-bottom: 0.7rem; }
+
+/* the row that actually submits - separated from the fields by a rule so the
+   eye can find it at the bottom of a twenty-field form */
+.form-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+  margin-top: 1.2rem; padding-top: 0.95rem; border-top: 1px solid var(--line);
+}
+.form-actions .check {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-size: 0.83rem; color: var(--muted); cursor: pointer; white-space: nowrap;
+}
+.form-actions .check input[type='checkbox'] {
+  width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer;
+}
+.form-actions .hint { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* select arrows were colliding with long option text in narrow columns */
+.form-grid select.input { padding-right: 2rem; }
