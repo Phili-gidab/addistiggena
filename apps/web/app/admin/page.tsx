@@ -1,15 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { CategoryBars, DailyBars } from '../../components/charts';
+import { ConsoleBar } from '../../components/ConsoleBar';
 import { StatusBadge } from '../../components/StatusBadge';
 import {
   api,
   authorizedFetch,
-  clearSession,
   Booking,
   Category,
   fmtDate,
@@ -1458,33 +1457,9 @@ export default function AdminPage() {
       sub: `${t.category.nameEn} · online`,
     }));
 
-  const me = getUser();
-
   return (
     <main className="console">
-      <header className="console-bar">
-        <Link href="/" className="console-brand">
-          <span className="mark">AT</span>
-          <span className="words">
-            Addis Tiggena<b>Staff console</b>
-          </span>
-        </Link>
-        <div className="console-bar-end">
-          <span className="who">
-            {me?.name ?? me?.phone?.replace('+251', '0')}
-            <small>{role ? role.replace(/_/g, ' ').toLowerCase() : ''}</small>
-          </span>
-          <button
-            className="btn btn-line btn-sm"
-            onClick={() => {
-              clearSession();
-              router.replace('/login');
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      <ConsoleBar subtitle="Staff console" />
 
       <div className="container console-container">
         <h1 className="page-title">{titles ? `${titles.en} · ${titles.am}` : 'Staff console'}</h1>

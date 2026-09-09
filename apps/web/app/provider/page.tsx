@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { ConsoleBar } from '../../components/ConsoleBar';
 import { Stars } from '../../components/Stars';
 import { StatusBadge } from '../../components/StatusBadge';
 import { api, API_URL, ApiError, Booking, Category, fmtDate, getToken, getUser, isStaff } from '../../lib/api';
@@ -287,8 +288,9 @@ export default function ProviderPage() {
   const history = jobs.filter((j) => !offers.includes(j) && !actionable.includes(j));
 
   return (
-    <main className="page">
-      <div className="container" style={{ maxWidth: 760 }}>
+    <main className="console">
+      <ConsoleBar subtitle="Technician workspace" />
+      <div className="container console-container" style={{ maxWidth: 760 }}>
         <h1 className="page-title">የባለሙያ ሰሌዳ · Technician dashboard</h1>
         <p className="page-sub">Jobs, earnings, and your public profile.</p>
 
