@@ -1859,7 +1859,7 @@ export default function AdminPage() {
 
                   <div className="panel">
                   <h2>Technicians ({technicians.length})</h2>
-                  <div className="table-scroll-y" style={{ overflowX: 'auto' }}>
+                  <div className="table-scroll-y scroll-cap" style={{ overflowX: 'auto' }}>
                     <table className="table">
                       <thead>
                         <tr>
@@ -2125,7 +2125,7 @@ export default function AdminPage() {
                   <div className="panel mb">
                     <h2>Deposits ({deposits.filter((d) => d.status === 'PENDING').length} waiting)</h2>
                     {deposits.length === 0 && <p className="hint">No deposits recorded yet.</p>}
-                    <div className="list-scroll">
+                    <div className="list-scroll scroll-cap">
                     {deposits.map((d) => (
                       <div key={d.id} className="booking-row" style={{ cursor: 'default' }}>
                         <span>
@@ -2183,7 +2183,7 @@ export default function AdminPage() {
                       {MONEY(balances?.minBalanceEtb ?? 0)} ETB, so anyone marked blocked has to top
                       up before they can work again.
                     </p>
-                    <div className="table-scroll-y" style={{ overflowX: 'auto' }}>
+                    <div className="table-scroll-y scroll-cap" style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
                           <tr>

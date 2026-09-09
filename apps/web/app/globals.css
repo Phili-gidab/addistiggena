@@ -1852,3 +1852,14 @@ body.scroll-locked .site-header { transform: none; }
 
 /* select arrows were colliding with long option text in narrow columns */
 .form-grid select.input { padding-right: 2rem; }
+
+/* A capped list ends mid-row, which reads as broken rather than scrollable.
+   A soft fade at the foot says there is more below. */
+.list-scroll, .table-scroll-y { position: relative; }
+.scroll-cap { position: relative; }
+.scroll-cap::after {
+  content: ''; position: absolute; left: 1px; right: 1px; bottom: 1px; height: 34px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), var(--card));
+  pointer-events: none; border-radius: 0 0 12px 12px;
+}
+@media (max-width: 900px) { .scroll-cap::after { display: none; } }
