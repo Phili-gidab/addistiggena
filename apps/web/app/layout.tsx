@@ -5,6 +5,7 @@ import './globals.css';
 import { ChatWidget } from '../components/ChatWidget';
 import { Footer } from '../components/Footer';
 import { Header } from '../components/Header';
+import { SiteChrome } from '../components/SiteChrome';
 import { currentLang } from '../lib/lang';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -36,10 +37,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} ${montserrat.variable} ${sansEthiopic.variable}`}
     >
       <body>
-        <Header lang={lang} />
+        <SiteChrome>
+          <Header lang={lang} />
+        </SiteChrome>
         {children}
-        <Footer lang={lang} />
-        <ChatWidget />
+        <SiteChrome>
+          <Footer lang={lang} />
+          <ChatWidget />
+        </SiteChrome>
       </body>
     </html>
   );

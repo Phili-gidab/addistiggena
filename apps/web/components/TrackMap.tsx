@@ -31,8 +31,8 @@ export default function TrackMap({
     <div className="map-wrap" style={{ marginBottom: '1rem' }}>
       <MapContainer center={center} zoom={14} scrollWheelZoom style={{ height: 300 }}>
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <Marker position={[booking.lat, booking.lng]} icon={customerIcon} />
         {tech && <Marker position={[tech.lat, tech.lng]} icon={techIcon} />}

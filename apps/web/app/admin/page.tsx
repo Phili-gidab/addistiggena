@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { CategoryBars, DailyBars } from '../../components/charts';
@@ -8,6 +9,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import {
   api,
   authorizedFetch,
+  clearSession,
   Booking,
   Category,
   fmtDate,
@@ -1456,9 +1458,35 @@ export default function AdminPage() {
       sub: `${t.category.nameEn} · online`,
     }));
 
+  const me = getUser();
+
   return (
-    <main className="page">
-      <div className="container" style={{ maxWidth: 1180 }}>
+    <main className="console">
+      <header className="console-bar">
+        <Link href="/" className="console-brand">
+          <span className="mark">AT</span>
+          <span className="words">
+            Addis Tiggena<b>Staff console</b>
+          </span>
+        </Link>
+        <div className="console-bar-end">
+          <span className="who">
+            {me?.name ?? me?.phone?.replace('+251', '0')}
+            <small>{role ? role.replace(/_/g, ' ').toLowerCase() : ''}</small>
+          </span>
+          <button
+            className="btn btn-line btn-sm"
+            onClick={() => {
+              clearSession();
+              router.replace('/login');
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <div className="container console-container">
         <h1 className="page-title">{titles ? `${titles.en} · ${titles.am}` : 'Staff console'}</h1>
         <p className="page-sub">{titles?.sub ?? ''}</p>
 
@@ -2063,6 +2091,7 @@ export default function AdminPage() {
                   <div className="panel mb">
                     <h2>Deposits ({deposits.filter((d) => d.status === 'PENDING').length} waiting)</h2>
                     {deposits.length === 0 && <p className="hint">No deposits recorded yet.</p>}
+                    <div className="list-scroll">
                     {deposits.map((d) => (
                       <div key={d.id} className="booking-row" style={{ cursor: 'default' }}>
                         <span>
@@ -2110,6 +2139,7 @@ export default function AdminPage() {
                         )}
                       </div>
                     ))}
+                    </div>
                   </div>
 
                   <div className="panel">
@@ -2119,7 +2149,7 @@ export default function AdminPage() {
                       {MONEY(balances?.minBalanceEtb ?? 0)} ETB, so anyone marked blocked has to top
                       up before they can work again.
                     </p>
-                    <div style={{ overflowX: 'auto' }}>
+                    <div className="table-scroll-y" style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
                           <tr>
