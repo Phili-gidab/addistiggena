@@ -11,6 +11,8 @@ const DEMO_PASSWORDS: Record<string, string> = {
   ops: 'ops12345',
   verifier: 'verify1234',
   support: 'support1234',
+  finance: 'finance1234',
+  coordinator: 'coord1234',
 };
 const hash = (u: string) => hashSync(DEMO_PASSWORDS[u], 10);
 
@@ -77,16 +79,26 @@ async function main() {
 
   // Day-1 staff roles (roles/workflow spec section 2): Ops Manager,
   // Verification Officer, Support Agent - one demo account each.
-  const staff: [string, string, string, 'OPS_MANAGER' | 'VERIFICATION_OFFICER' | 'SUPPORT_AGENT'][] = [
-    ['+251900000004', 'Operations Manager', 'ops', 'OPS_MANAGER'],
-    ['+251900000005', 'Verification Officer', 'verifier', 'VERIFICATION_OFFICER'],
-    ['+251900000006', 'Support Agent', 'support', 'SUPPORT_AGENT'],
+  type StaffRole =
+    | 'OPS_MANAGER'
+    | 'VERIFICATION_OFFICER'
+    | 'SUPPORT_AGENT'
+    | 'FINANCE_OFFICER'
+    | 'SUBCITY_COORDINATOR';
+  /** phone, display name, username, role, sub-city (coordinators only) */
+  const staff: [string, string, string, StaffRole, string | null][] = [
+    ['+251900000004', 'Operations Manager', 'ops', 'OPS_MANAGER', null],
+    ['+251900000005', 'Verification Officer', 'verifier', 'VERIFICATION_OFFICER', null],
+    ['+251900000006', 'Support Agent', 'support', 'SUPPORT_AGENT', null],
+    ['+251900000007', 'Finance Officer', 'finance', 'FINANCE_OFFICER', null],
+    ['+251900000008', 'Bole Coordinator', 'coordinator', 'SUBCITY_COORDINATOR', 'Bole'],
   ];
-  for (const [phone, name, username, role] of staff) {
+  for (const [phone, name, username, role, subCity] of staff) {
+    // the password is reset on every seed so the demo logins never drift
     await prisma.user.upsert({
       where: { phone },
-      update: { role, username, passwordHash: hash(username) },
-      create: { phone, name, role, language: 'EN', username, passwordHash: hash(username) },
+      update: { role, username, subCity, passwordHash: hash(username) },
+      create: { phone, name, role, subCity, language: 'EN', username, passwordHash: hash(username) },
     });
   }
 
