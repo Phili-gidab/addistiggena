@@ -1639,7 +1639,8 @@ export default function AdminPage() {
               )}
 
               {view === 'technicians' && (
-                <div className="panel">
+                <>
+                  <div className="panel">
                   <h2>Add a technician</h2>
                   <p className="hint" style={{ marginBottom: '0.7rem' }}>
                     For professionals onboarded in person. They sign in with this phone number
@@ -1704,7 +1705,7 @@ export default function AdminPage() {
                               <label>ID type</label>
                               <select className="input" value={newTech.idType}
                                 onChange={(e) => setNewTech({ ...newTech, idType: e.target.value })}>
-                                <option value="FAYDA">Fayda / National ID</option>
+                                <option value="FAYDA">Fayda / National</option>
                                 <option value="KEBELE">Kebele ID</option>
                               </select>
                             </div>
@@ -1854,7 +1855,9 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </form>
+                  </div>
 
+                  <div className="panel">
                   <h2>Technicians ({technicians.length})</h2>
                   <div className="table-scroll-y" style={{ overflowX: 'auto' }}>
                     <table className="table">
@@ -1888,7 +1891,8 @@ export default function AdminPage() {
                       </tbody>
                     </table>
                   </div>
-                </div>
+                  </div>
+                </>
               )}
 
               {view === 'verification' && can('verification') && verificationTable(verifRows)}
