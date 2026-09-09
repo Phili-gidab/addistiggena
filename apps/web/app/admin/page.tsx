@@ -1816,7 +1816,7 @@ export default function AdminPage() {
                   </form>
 
                   <h2>Technicians ({technicians.length})</h2>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="table-scroll-y" style={{ overflowX: 'auto' }}>
                     <table className="table">
                       <thead>
                         <tr>

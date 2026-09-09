@@ -1797,3 +1797,11 @@ body.scroll-locked .site-header { transform: none; }
   .console .admin-side { position: static; }
   .list-scroll { max-height: none; }
 }
+
+/* Category names are bilingual ("ቧንቧ እና ሳኒተሪ · Plumbing & Sanitary") and were
+   being cut to "Plumbi…". Give them room and let them use a second line. */
+.admin-main .bar-list .row { grid-template-columns: minmax(180px, 300px) 1fr 52px; align-items: center; }
+.admin-main .bar-list .name {
+  white-space: normal; overflow: visible; text-overflow: clip;
+  line-height: 1.3; font-size: 0.84rem;
+}
