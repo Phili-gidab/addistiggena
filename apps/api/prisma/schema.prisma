@@ -167,12 +167,40 @@ model ServiceCategory {
   nameEn        String
   nameAm        String
   icon          String?
+  /// the "from ETB..." shown before booking - the lowest per-job price in
+  /// the category's published list
   priceFloorEtb Decimal?          @db.Decimal(12, 2)
-  /// named sub-services shown in search and pricing (e.g. "Mitad repair", "Socket fix")
+  /// named sub-services shown in search (derived from the price list)
   subServices   String[]          @default([])
   isActive      Boolean           @default(true)
+  /// position in the company's official price list (1-11)
+  sortOrder     Int               @default(0)
   providers     ProviderProfile[]
   bookings      Booking[]
+  prices        ServicePrice[]
+}
+
+/// Whether a published price is for the job or per square metre (በካሬ).
+enum PriceUnit {
+  JOB
+  SQM
+}
+
+/// One line of the company's published service price list. This is the single
+/// source for every price the web and the app show - nothing hard-codes a
+/// range any more, so a new price list is a seed run, not a code change.
+model ServicePrice {
+  id         String          @id @default(cuid())
+  categoryId String
+  category   ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  nameEn     String
+  nameAm     String
+  minEtb     Int
+  maxEtb     Int
+  unit       PriceUnit       @default(JOB)
+  sortOrder  Int             @default(0)
+
+  @@index([categoryId, sortOrder])
 }
 
 model ProviderProfile {

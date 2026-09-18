@@ -5,11 +5,22 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CatalogController {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Active categories in the order of the company's price list, each with its
+   * published price lines. Every price a customer sees - web or app - comes
+   * from here, so a new price list is a seed run rather than a code change.
+   */
   @Get('categories')
   categories() {
     return this.prisma.serviceCategory.findMany({
       where: { isActive: true },
-      orderBy: { nameEn: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { nameEn: 'asc' }],
+      include: {
+        prices: {
+          orderBy: { sortOrder: 'asc' },
+          select: { id: true, nameEn: true, nameAm: true, minEtb: true, maxEtb: true, unit: true },
+        },
+      },
     });
   }
 

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
+import { PRICE_LIST } from './price-list';
 
 const prisma = new PrismaClient();
 
@@ -16,40 +17,78 @@ const DEMO_PASSWORDS: Record<string, string> = {
 };
 const hash = (u: string) => hashSync(DEMO_PASSWORDS[u], 10);
 
-// The 11 official service categories from the company "Service Catalog"
-// document. priceFloorEtb doubles as the "from ETB…" estimate shown at booking
-// time and is the minimum of the category's documented standard price ranges
-// (250 ETB - the diagnostic/call-out floor - where no range is documented yet).
+// The 11 categories of the company's official service and price list
+// (2026-09-18), in the document's order. Display names are the short forms the
+// product has always used; the prices come from ./price-list.ts, and each
+// category's "from ETB..." floor is derived from them below.
 const categories = [
-  { slug: 'electrical', nameEn: 'Electrical', nameAm: 'ኤሌክትሪክ', icon: 'zap', priceFloorEtb: 250 },
-  { slug: 'plumbing', nameEn: 'Plumbing & Sanitary', nameAm: 'ቧንቧ እና ሳኒተሪ', icon: 'wrench', priceFloorEtb: 550 },
-  { slug: 'electronics', nameEn: 'Electronics & Entertainment', nameAm: 'ኤሌክትሮኒክስ እና መዝናኛ', icon: 'tv', priceFloorEtb: 250 },
-  { slug: 'it-office', nameEn: 'IT & Office Equipment', nameAm: 'አይቲ እና የቢሮ መሣሪያ', icon: 'monitor', priceFloorEtb: 400 },
-  { slug: 'appliances', nameEn: 'Kitchen & Domestic Appliances', nameAm: 'የወጥ ቤት እና የቤት እቃዎች', icon: 'refrigerator', priceFloorEtb: 400 },
-  { slug: 'gas-heating', nameEn: 'Gas & Heating Systems', nameAm: 'ጋዝ እና ማሞቂያ', icon: 'flame', priceFloorEtb: 250 },
-  { slug: 'carpentry', nameEn: 'Carpentry & Fixtures', nameAm: 'አናጢነት', icon: 'hammer', priceFloorEtb: 400 },
-  { slug: 'painting', nameEn: 'Painting & Finishing', nameAm: 'ቀለም ቅብ', icon: 'paint-roller', priceFloorEtb: 250 },
-  { slug: 'general', nameEn: 'General Handyman', nameAm: 'አጠቃላይ ጥገና', icon: 'toolbox', priceFloorEtb: 350 },
-  { slug: 'outdoor', nameEn: 'Outdoor & Compound Maintenance', nameAm: 'የግቢ ጥገና', icon: 'fence', priceFloorEtb: 250 },
-  { slug: 'automotive', nameEn: 'Light Automotive Assistance', nameAm: 'ቀላል የመኪና ጥገና', icon: 'car', priceFloorEtb: 250 },
+  { slug: 'electrical', nameEn: 'Electrical', nameAm: 'ኤሌክትሪክ', icon: 'zap' },
+  { slug: 'appliances', nameEn: 'Kitchen & Domestic Appliances', nameAm: 'የወጥ ቤት እና የቤት እቃዎች', icon: 'refrigerator' },
+  { slug: 'plumbing', nameEn: 'Plumbing & Sanitary', nameAm: 'ቧንቧ እና ሳኒተሪ', icon: 'wrench' },
+  { slug: 'electronics', nameEn: 'Electronics & Entertainment', nameAm: 'ኤሌክትሮኒክስ እና መዝናኛ', icon: 'tv' },
+  { slug: 'it-office', nameEn: 'IT & Office Equipment', nameAm: 'አይቲ እና የቢሮ መሣሪያ', icon: 'monitor' },
+  { slug: 'gas-heating', nameEn: 'Gas & Heating Systems', nameAm: 'ጋዝ እና ማሞቂያ', icon: 'flame' },
+  { slug: 'carpentry', nameEn: 'Carpentry & Fixtures', nameAm: 'አናጢነት', icon: 'hammer' },
+  { slug: 'painting', nameEn: 'Painting & Finishing', nameAm: 'ቀለም ቅብ', icon: 'paint-roller' },
+  { slug: 'outdoor', nameEn: 'Outdoor & Compound Maintenance', nameAm: 'የግቢ ጥገና', icon: 'fence' },
+  { slug: 'automotive', nameEn: 'Light Automotive Assistance', nameAm: 'ቀላል የመኪና ጥገና', icon: 'car' },
+  { slug: 'apparel', nameEn: 'Apparel & Clothing', nameAm: 'የጨርቃጨርቅ ማስተካከል', icon: 'shirt' },
 ];
 
-// Superseded pre-launch categories folded into the official catalog
-// (AC/refrigeration → appliances, locksmith → carpentry & fixtures).
-const retiredSlugs = ['ac-repair', 'locksmith'];
+// Categories no longer in the official list. Kept, not deleted - old bookings
+// still point at them - but hidden from customers and from dispatch.
+// General Handyman was dropped from the 2026-09-18 price list; its work now
+// sits under carpentry (TV stands, mirrors, shelves) and painting (curtains).
+const retiredSlugs = ['ac-repair', 'locksmith', 'general'];
 
 async function main() {
-  for (const c of categories) {
+  for (const [i, c] of categories.entries()) {
     await prisma.serviceCategory.upsert({
       where: { slug: c.slug },
-      update: { nameEn: c.nameEn, nameAm: c.nameAm, icon: c.icon, priceFloorEtb: c.priceFloorEtb, isActive: true },
-      create: c,
+      update: { nameEn: c.nameEn, nameAm: c.nameAm, icon: c.icon, isActive: true, sortOrder: i + 1 },
+      create: { ...c, sortOrder: i + 1 },
     });
   }
   await prisma.serviceCategory.updateMany({
     where: { slug: { in: retiredSlugs } },
     data: { isActive: false },
   });
+
+  // Load the published price list. Each category's lines are replaced
+  // wholesale, so a line dropped from the document disappears too.
+  let priceLines = 0;
+  for (const group of PRICE_LIST) {
+    const category = await prisma.serviceCategory.findUnique({ where: { slug: group.slug } });
+    if (!category) throw new Error(`price list names unknown category "${group.slug}"`);
+
+    await prisma.servicePrice.deleteMany({ where: { categoryId: category.id } });
+    await prisma.servicePrice.createMany({
+      data: group.items.map((item, i) => ({
+        categoryId: category.id,
+        nameEn: item.en,
+        nameAm: item.am,
+        minEtb: item.min,
+        maxEtb: item.max,
+        unit: item.sqm ? ('SQM' as const) : ('JOB' as const),
+        sortOrder: i + 1,
+      })),
+    });
+    priceLines += group.items.length;
+
+    // "from ETB..." is the cheapest per-job line. A per-m² rate is not a
+    // floor for a whole job, so it only counts when a category has nothing
+    // else (painting is priced entirely per m²).
+    const perJob = group.items.filter((item) => !item.sqm);
+    const floor = Math.min(...(perJob.length ? perJob : group.items).map((item) => item.min));
+    await prisma.serviceCategory.update({
+      where: { id: category.id },
+      data: {
+        priceFloorEtb: floor,
+        // search finds a category by any of its line items
+        subServices: group.items.map((item) => item.en),
+      },
+    });
+  }
 
   // Platform fee ≈ 14% of the base labor minimum (official price list column).
   await prisma.appConfig.upsert({
@@ -228,8 +267,8 @@ async function main() {
     { phone: '+251911000117', name: 'Henok Desta', img: 'photo-1601576084861-5de423553c0f', slug: 'painting', bio: 'Interior/exterior painting, crack repair and clean edges.', subCity: 'Bole', years: 8, rating: 4.7, ratings: 41, jobs: 118, lat: 9.02, lng: 38.83 },
     { phone: '+251911000118', name: 'Rahel Solomon', img: 'photo-1589317621382-0cbef7ffcc4c', slug: 'painting', bio: 'Feature walls and ceiling refresh - dust-free process.', subCity: 'Arada', years: 4, rating: 4.5, ratings: 17, jobs: 43, lat: 9.033, lng: 38.763 },
     // general (2)
-    { phone: '+251911000119', name: 'Robel Kebede', img: 'photo-1615813967515-e1838c1c5116', slug: 'general', bio: 'TV mounting, curtains, drilling - the everything handyman.', subCity: 'Lemi Kura', years: 5, rating: 4.8, ratings: 49, jobs: 126, lat: 9.033, lng: 38.872 },
-    { phone: '+251911000120', name: 'Selam Abraha', img: 'photo-1611432579699-484f7990b127', slug: 'general', bio: 'Furniture assembly and mirror/frame fixing - careful and quick.', subCity: 'Kolfe Keranio', years: 3, rating: 4.6, ratings: 21, jobs: 55, lat: 8.982, lng: 38.71 },
+    { phone: '+251911000119', name: 'Robel Kebede', img: 'photo-1615813967515-e1838c1c5116', slug: 'carpentry', bio: 'TV stands, mirrors and shelves - neat, careful fitting.', subCity: 'Lemi Kura', years: 5, rating: 4.8, ratings: 49, jobs: 126, lat: 9.033, lng: 38.872 },
+    { phone: '+251911000120', name: 'Selam Abraha', img: 'photo-1611432579699-484f7990b127', slug: 'carpentry', bio: 'Furniture assembly and mirror/frame fixing - careful and quick.', subCity: 'Kolfe Keranio', years: 3, rating: 4.6, ratings: 21, jobs: 55, lat: 8.982, lng: 38.71 },
     // outdoor (2)
     { phone: '+251911000121', name: 'Tesfahun Molla', img: 'photo-1779469392752-c53bbf07eb66', slug: 'outdoor', bio: 'Water tank cleaning, gates and compound lighting.', subCity: 'Akaky Kaliti', years: 7, rating: 4.6, ratings: 24, jobs: 63, lat: 8.9, lng: 38.75 },
     { phone: '+251911000122', name: 'Marta Yohannes', img: 'photo-1598122666068-59b41e0a3193', slug: 'outdoor', bio: 'Drainage clearing and fence repair - rainy-season ready.', subCity: 'Gullele', years: 4, rating: 4.5, ratings: 15, jobs: 39, lat: 9.055, lng: 38.74 },
@@ -318,6 +357,8 @@ async function main() {
     admin: admin.phone,
     demoProvider: providerUser.phone,
     fleet: FLEET.length,
+    categories: categories.length,
+    priceLines,
   });
 }
 

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { API_URL, Category } from '../../../lib/api';
 import { catalogBySlug, iconFor } from '../../../lib/catalog';
 import { tradeImg } from '../../../lib/images';
-import { DIAGNOSTIC, fmtRange, rateGroupFor } from '../../../lib/pricing';
+import { DIAGNOSTIC, floorUnit, fmtPrice, fmtRange } from '../../../lib/pricing';
 
 async function getCategories(): Promise<Category[]> {
   try {
@@ -39,11 +39,16 @@ export default async function ServicePage({ params }: { params: { slug: string }
   if (!category) notFound();
 
   const entry = catalogBySlug(category.slug);
-  const services = [...(category.subServices ?? []), ...(entry?.services ?? [])].filter(
-    (s, i, arr) => arr.indexOf(s) === i,
-  );
-
-  const rateGroup = rateGroupFor(category.slug);
+  const prices = category.prices ?? [];
+  // A category with a published price list books from that list. Only an
+  // unpriced category falls back to the plain service names.
+  const services =
+    prices.length > 0
+      ? []
+      : [...(category.subServices ?? []), ...(entry?.services ?? [])].filter(
+          (s, i, arr) => arr.indexOf(s) === i,
+        );
+  const bookable = prices.length > 0 || services.length > 0;
 
   return (
     <main>
@@ -66,11 +71,14 @@ export default async function ServicePage({ params }: { params: { slug: string }
           </h1>
           {entry?.scope && <p className="svc-hero-lede">{entry.scope}</p>}
           <div className="svc-hero-cta">
-            <Link href={services.length > 0 ? '#pick' : `/book?category=${category.id}`} className="btn btn-primary btn-lg">
-              {services.length > 0 ? 'Choose a service · አገልግሎት ይምረጡ' : 'Book this service · ይዘዙ'}
+            <Link href={bookable ? '#pick' : `/book?category=${category.id}`} className="btn btn-primary btn-lg">
+              {bookable ? 'Choose a service · አገልግሎት ይምረጡ' : 'Book this service · ይዘዙ'}
             </Link>
             {category.priceFloorEtb && (
-              <span className="svc-from">from ETB {category.priceFloorEtb}</span>
+              <span className="svc-from">
+                from ETB {Number(category.priceFloorEtb).toLocaleString()}
+                {floorUnit(category)}
+              </span>
             )}
           </div>
         </div>
@@ -98,35 +106,33 @@ export default async function ServicePage({ params }: { params: { slug: string }
             </section>
           )}
 
-          {/* published rates */}
-          {rateGroup ? (
-            <section className="panel mb">
-              <h2>Standard rates · ግልፅ የዋጋ ተመን</h2>
+          {/* published rates - each line is a bookable service */}
+          {prices.length > 0 ? (
+            <section className="panel mb" id="pick">
+              <h2>Services and prices · አገልግሎቶችና ዋጋ</h2>
+              <p className="hint" style={{ marginBottom: '0.7rem' }}>
+                Pick the exact job you need - the booking is made for that service.
+              </p>
               <div className="table-scroll">
                 <table className="price-table">
                   <thead>
                     <tr>
-                      <th>Service item</th>
-                      <th>Description / scope</th>
+                      <th>Service</th>
                       <th>Price range</th>
                       <th aria-label="Book" />
                     </tr>
                   </thead>
                   <tbody>
-                    {rateGroup.items.map((i) => (
-                      <tr key={i.name}>
+                    {prices.map((p) => (
+                      <tr key={p.id}>
                         <td style={{ fontWeight: 600 }}>
-                          {i.name}
-                          <span className="am-cell">{i.nameAm}</span>
+                          {p.nameEn}
+                          <span className="am-cell">{p.nameAm}</span>
                         </td>
-                        <td className="scope">
-                          {i.scope}
-                          <span className="am-cell">{i.scopeAm}</span>
-                        </td>
-                        <td className="range">{fmtRange(i)}</td>
+                        <td className="range">{fmtPrice(p)}</td>
                         <td className="range">
                           <Link
-                            href={`/book?category=${category.id}&service=${encodeURIComponent(i.name)}`}
+                            href={`/book?category=${category.id}&service=${encodeURIComponent(p.nameEn)}`}
                             className="btn btn-primary btn-sm"
                           >
                             Book

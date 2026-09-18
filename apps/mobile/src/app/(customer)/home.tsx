@@ -18,8 +18,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, CatIcon, Hint, Row, StatusPill } from '../../components/ui';
-import { api, Booking, Category } from '../../lib/api';
-import { POPULAR } from '../../lib/catalog';
+import { api, Booking, Category, fmtPrice } from '../../lib/api';
+import { popularFrom } from '../../lib/catalog';
 import {
   BAND_IMG,
   SLIDE_GUARANTEE_IMG,
@@ -312,30 +312,27 @@ export default function Home() {
           </View>
         </Row>
         <View style={{ paddingHorizontal: S.lg, gap: S.sm }}>
-          {POPULAR.map((s) => {
-            const cat = categories.find((c) => c.slug === s.slug);
-            return (
-              <Pressable
-                key={s.name}
-                style={({ pressed }) => [st.popRow, pressed && { opacity: 0.85 }]}
-                onPress={() => cat && goCategory(cat.id, s.name)}
-              >
-                <Image source={{ uri: tradeImg(s.slug) }} style={st.popThumb} resizeMode="cover" />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={st.popName} numberOfLines={1}>
-                    {s.name}
-                  </Text>
-                  <Am style={{ fontSize: 11 }} numberOfLines={1}>
-                    {s.nameAm}
-                  </Am>
-                  <Text style={st.popPrice} numberOfLines={1}>
-                    {s.min.toLocaleString()} - {s.max.toLocaleString()} ETB
-                  </Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={C.muted} />
-              </Pressable>
-            );
-          })}
+          {popularFrom(categories).map((s) => (
+            <Pressable
+              key={s.id}
+              style={({ pressed }) => [st.popRow, pressed && { opacity: 0.85 }]}
+              onPress={() => goCategory(s.category.id, s.nameEn)}
+            >
+              <Image source={{ uri: tradeImg(s.category.slug) }} style={st.popThumb} resizeMode="cover" />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={st.popName} numberOfLines={1}>
+                  {s.nameEn}
+                </Text>
+                <Am style={{ fontSize: 11 }} numberOfLines={1}>
+                  {s.nameAm}
+                </Am>
+                <Text style={st.popPrice} numberOfLines={1}>
+                  {fmtPrice(s)}
+                </Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={C.muted} />
+            </Pressable>
+          ))}
         </View>
 
         {/* ── trust band ─────────────────────────────────────────────────── */}

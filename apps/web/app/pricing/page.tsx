@@ -1,101 +1,64 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CATALOG, PACKAGES } from '../../lib/catalog';
-import { DIAGNOSTIC, fmtRange, PRICE_GROUPS } from '../../lib/pricing';
+import { API_URL, Category } from '../../lib/api';
+import { catalogBySlug, iconFor, PACKAGES } from '../../lib/catalog';
+import { DIAGNOSTIC, fmtPrice, fmtRange } from '../../lib/pricing';
 
 export const metadata: Metadata = {
   title: 'Price list - Addis Tiggena',
   description:
-    'Standard base service price ranges (inspection + labor) in ETB for repairs on Addis Tiggena - fair, transparent reference rates for clients and technicians.',
+    'Standard service price ranges (inspection + labor) in ETB for every repair on Addis Tiggena - fair, transparent reference rates for clients and technicians.',
 };
 
-export default function PricingPage() {
+async function getCategories(): Promise<Category[]> {
+  try {
+    const res = await fetch(`${API_URL}/catalog/categories`, { next: { revalidate: 120 } });
+    if (!res.ok) return [];
+    return (await res.json()) as Category[];
+  } catch {
+    return [];
+  }
+}
+
+export default async function PricingPage() {
+  const categories = (await getCategories()).filter((c) => c.prices?.length);
+  const lines = categories.reduce((n, c) => n + (c.prices?.length ?? 0), 0);
+
   return (
     <main className="page">
       <div className="container" style={{ maxWidth: 880 }}>
         <span className="sec-no">Pricing · ግልፅ የዋጋ ተመን</span>
-        <h1 className="page-title">Initial base service price list</h1>
+        <h1 className="page-title">Service price list</h1>
         <p className="page-sub" style={{ maxWidth: '64ch' }}>
-          All payments are made directly to technicians, and final charges depend on job complexity
-          and required spare parts. These rates are <strong>standard price ranges</strong>{' '}
-          (inspection + base labor) in Ethiopian Birr - a fair reference for both clients and
-          technicians. Spare parts / materials are recommended to be purchased by the client.
+          {lines} services across {categories.length} categories. All payments are made directly to
+          technicians, and final charges depend on job complexity and required spare parts. These
+          are <strong>standard price ranges</strong> (inspection + base labor) in Ethiopian Birr -
+          a fair reference for both clients and technicians. Spare parts and materials are
+          recommended to be purchased by the client.
         </p>
 
-        {PRICE_GROUPS.map((g, gi) => (
-          <div key={g.title} className="panel" style={{ marginBottom: '1.1rem' }}>
-            <h2>
-              {gi + 1}. {g.title}
-              <span
-                style={{
-                  display: 'block',
-                  fontFamily: 'var(--font-am)',
-                  fontSize: '0.85rem',
-                  color: 'var(--muted)',
-                  marginTop: '0.25rem',
-                }}
-              >
-                {g.titleAm}
-              </span>
-            </h2>
-            <div className="table-scroll">
-              <table className="price-table">
-                <thead>
-                  <tr>
-                    <th>Service item</th>
-                    <th>Description / scope</th>
-                    <th>Price range</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.items.map((i) => (
-                    <tr key={i.name}>
-                      <td style={{ fontWeight: 600 }}>
-                        {i.name}
-                        <span className="am-cell">{i.nameAm}</span>
-                      </td>
-                      <td className="scope">
-                        {i.scope}
-                        <span className="am-cell">{i.scopeAm}</span>
-                      </td>
-                      <td className="range">{fmtRange(i)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {categories.length > 0 && (
+          <nav className="price-jump" aria-label="Jump to a category">
+            {categories.map((c) => (
+              <a key={c.slug} href={`#${c.slug}`}>
+                {iconFor(c.slug)} {c.nameEn}
+              </a>
+            ))}
+          </nav>
+        )}
+
+        {categories.length === 0 && (
+          <div className="panel">
+            <p className="hint">
+              The price list could not be loaded just now. Please refresh in a moment.
+            </p>
           </div>
-        ))}
+        )}
 
-        <div className="panel" style={{ marginBottom: '1.1rem' }}>
-          <h2>{PRICE_GROUPS.length + 1}. Diagnostic &amp; call-out fee</h2>
-          <p className="hint">
-            <strong style={{ color: 'var(--navy)' }}>
-              {DIAGNOSTIC.name} · {DIAGNOSTIC.nameAm}: {fmtRange(DIAGNOSTIC)}
-            </strong>
-            <br />
-            Applicable only if the technician arrives and diagnoses the issue, but you choose not
-            to proceed with the repair at that time.
-          </p>
-        </div>
-
-        {/* ── every service, category by category ──────────────────────────── */}
-        <span className="sec-no" style={{ marginTop: '2.4rem' }}>
-          Full catalog · ሙሉ የአገልግሎት ዝርዝር
-        </span>
-        <h2 className="page-title" style={{ fontSize: '1.5rem' }}>
-          All services by category
-        </h2>
-        <p className="page-sub" style={{ maxWidth: '64ch' }}>
-          Every service line we dispatch for, by category. Where a standard range is not yet
-          published, the category base rate applies and the technician quotes on inspection -
-          specific prices for each item are being finalized and will appear here.
-        </p>
-
-        {CATALOG.map((c) => (
+        {categories.map((c, ci) => (
           <div key={c.slug} id={c.slug} className="panel" style={{ marginBottom: '1.1rem' }}>
             <h2>
-              {c.icon} {c.nameEn}
+              {ci + 1}. {iconFor(c.slug)} {c.nameEn}
               <span
                 style={{
                   display: 'block',
@@ -108,23 +71,53 @@ export default function PricingPage() {
                 {c.nameAm}
               </span>
             </h2>
-            <p className="hint" style={{ marginBottom: '0.7rem' }}>{c.scope}</p>
+            {catalogBySlug(c.slug)?.scope && (
+              <p className="hint" style={{ marginBottom: '0.6rem' }}>
+                {catalogBySlug(c.slug)?.scope}
+              </p>
+            )}
             <div className="table-scroll">
-              <table className="price-table" style={{ margin: '0.2rem 0 0.4rem' }}>
+              <table className="price-table">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Price range</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {c.services.map((s) => (
-                    <tr key={s}>
-                      <td>{s}</td>
-                      <td className="range" style={{ width: '38%' }}>
-                        Standard rate - quoted on inspection
+                  {c.prices!.map((p) => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 600 }}>
+                        {p.nameEn}
+                        <span className="am-cell">{p.nameAm}</span>
                       </td>
+                      <td className="range">{fmtPrice(p)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <Link href={`/services/${c.slug}`} className="see-all">
+              Book a {c.nameEn.toLowerCase()} service →
+            </Link>
           </div>
         ))}
+
+        <div className="panel" style={{ marginBottom: '1.1rem' }}>
+          <h2>Diagnostic &amp; call-out fee</h2>
+          <p className="hint">
+            <strong style={{ color: 'var(--navy)' }}>
+              {DIAGNOSTIC.name} · {DIAGNOSTIC.nameAm}: {fmtRange(DIAGNOSTIC)}
+            </strong>
+            <br />
+            Applicable only if the technician arrives and diagnoses the issue, but you choose not
+            to proceed with the repair at that time.
+          </p>
+          <p className="hint" style={{ marginTop: '0.6rem' }}>
+            Prices marked <strong style={{ color: 'var(--navy)' }}>/ m²</strong> are per square
+            metre (በካሬ).
+          </p>
+        </div>
 
         <div className="panel">
           <h2>Service packages · የአገልግሎት ፓኬጆች</h2>

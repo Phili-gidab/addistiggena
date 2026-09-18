@@ -35,7 +35,7 @@ export default async function HomePage() {
       <Hero categories={categories} t={t} lang={lang} />
       <Marquee />
       <Services categories={categories} t={t} />
-      <PopularServices t={t} lang={lang} />
+      <PopularServices t={t} lang={lang} categories={categories} />
       <Steps t={t} />
       <ImageBand t={t} />
       <Trust t={t} />

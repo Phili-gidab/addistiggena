@@ -24,6 +24,17 @@ export interface User {
   username?: string | null;
 }
 
+/** One line of the published price list (GET /catalog/categories). */
+export interface PriceLine {
+  id: string;
+  nameEn: string;
+  nameAm: string;
+  minEtb: number;
+  maxEtb: number;
+  /** SQM = priced per square metre (በካሬ) rather than per job */
+  unit: 'JOB' | 'SQM';
+}
+
 export interface Category {
   id: string;
   slug: string;
@@ -31,7 +42,13 @@ export interface Category {
   nameAm: string;
   priceFloorEtb: string | null;
   subServices?: string[];
+  /** the company's published prices for this category, in list order */
+  prices?: PriceLine[];
 }
+
+/** "600 - 800 ETB", or "400 - 500 ETB / m²" for work priced by area. */
+export const fmtPrice = (p: PriceLine) =>
+  `${p.minEtb.toLocaleString()} - ${p.maxEtb.toLocaleString()} ETB${p.unit === 'SQM' ? ' / m²' : ''}`;
 
 /**
  * GET /providers/availability - identity-free. Client rule 2026-08-29: the

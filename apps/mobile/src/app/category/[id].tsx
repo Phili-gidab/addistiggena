@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, CatIcon, Hint } from '../../components/ui';
-import { api, Category } from '../../lib/api';
-import { POPULAR } from '../../lib/catalog';
+import { api, Category, fmtPrice } from '../../lib/api';
 import { tradeImg } from '../../lib/images';
 import { C, F, R, S, SHADOW } from '../../lib/theme';
 
@@ -52,10 +51,11 @@ export default function CategoryPage() {
     );
   }
 
-  const rates = POPULAR.filter((p) => p.slug === category.slug);
-  /** every bookable service on this page - if there are none, a general
-   *  request for the trade is allowed */
-  const choices = [...(category.subServices ?? []), ...rates.map((r) => r.name)];
+  const rates = category.prices ?? [];
+  /** every bookable service on this page - the published price list, or the
+   *  plain service names for a category with no prices yet. If there are
+   *  none at all, a general request for the trade is allowed. */
+  const choices = rates.length > 0 ? rates.map((r) => r.nameEn) : category.subServices ?? [];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['bottom']}>
@@ -75,7 +75,10 @@ export default function CategoryPage() {
             <Text style={st.heroAm}>{category.nameAm}</Text>
             {category.priceFloorEtb && (
               <View style={st.fromChip}>
-                <Text style={st.fromChipText}>from {Number(category.priceFloorEtb)} ETB</Text>
+                <Text style={st.fromChipText}>
+                  from {Number(category.priceFloorEtb).toLocaleString()} ETB
+                  {rates.length > 0 && rates.every((r) => r.unit === 'SQM') ? ' / m²' : ''}
+                </Text>
               </View>
             )}
           </View>
@@ -83,7 +86,7 @@ export default function CategoryPage() {
 
         <View style={{ padding: S.lg, gap: S.lg }}>
           {/* what's included */}
-          {(category.subServices?.length ?? 0) > 0 && (
+          {rates.length === 0 && (category.subServices?.length ?? 0) > 0 && (
             <View>
               <Text style={st.section}>What we fix</Text>
               <Am style={{ fontSize: 11.5, marginBottom: S.md }}>የምንሰራቸው ስራዎች</Am>
@@ -111,25 +114,23 @@ export default function CategoryPage() {
           {/* standard rates */}
           {rates.length > 0 && (
             <View>
-              <Text style={st.section}>Standard rates</Text>
+              <Text style={st.section}>Services and prices</Text>
               <Am style={{ fontSize: 11.5, marginBottom: S.md }}>ግልፅ የዋጋ ተመን</Am>
               {rates.map((r) => (
                 <Pressable
-                  key={r.name}
-                  style={[st.rateRow, picked === r.name && st.rateRowOn]}
-                  onPress={() => setPicked(picked === r.name ? '' : r.name)}
+                  key={r.id}
+                  style={[st.rateRow, picked === r.nameEn && st.rateRowOn]}
+                  onPress={() => setPicked(picked === r.nameEn ? '' : r.nameEn)}
                 >
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={st.rateName} numberOfLines={1}>
-                      {r.name}
+                    <Text style={st.rateName} numberOfLines={2}>
+                      {r.nameEn}
                     </Text>
                     <Am style={{ fontSize: 11 }} numberOfLines={1}>
                       {r.nameAm}
                     </Am>
                   </View>
-                  <Text style={st.ratePrice}>
-                    {r.min.toLocaleString()} - {r.max.toLocaleString()} ETB
-                  </Text>
+                  <Text style={st.ratePrice}>{fmtPrice(r)}</Text>
                 </Pressable>
               ))}
             </View>

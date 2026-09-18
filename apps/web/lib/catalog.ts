@@ -158,6 +158,20 @@ export const CATALOG: CatalogEntry[] = [
     scope: 'Basic household vehicle support.',
     services: ['Tyre air pumping', 'Battery jump-start', 'Basic vehicle checks'],
   },
+  {
+    // added with the 2026-09-18 price list
+    slug: 'apparel',
+    icon: '🧵',
+    nameEn: 'Apparel & Clothing',
+    nameAm: 'የጨርቃጨርቅ ማስተካከል',
+    scope: 'Tailoring, alterations and soft-furnishing renewal.',
+    services: [
+      'Clothes size fitting and resizing',
+      'Suit and jacket fitting',
+      'Zipper replacement and repair',
+      'Mattress and cushion renewal',
+    ],
+  },
 ];
 
 export const catalogBySlug = (slug: string): CatalogEntry | undefined =>

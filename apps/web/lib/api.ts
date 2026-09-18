@@ -20,6 +20,17 @@ export interface User {
   language: 'AM' | 'EN';
 }
 
+/** One line of the published price list (GET /catalog/categories). */
+export interface PriceLine {
+  id: string;
+  nameEn: string;
+  nameAm: string;
+  minEtb: number;
+  maxEtb: number;
+  /** SQM = priced per square metre (በካሬ) rather than per job */
+  unit: 'JOB' | 'SQM';
+}
+
 export interface Category {
   id: string;
   slug: string;
@@ -27,8 +38,10 @@ export interface Category {
   nameAm: string;
   /** Prisma Decimal serialises as string - the "from ETB…" estimate */
   priceFloorEtb: string | null;
-  /** named sub-services managed in the admin console */
+  /** named sub-services, used by search */
   subServices?: string[];
+  /** the company's published prices for this category, in list order */
+  prices?: PriceLine[];
 }
 
 /**

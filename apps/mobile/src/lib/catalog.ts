@@ -1,5 +1,6 @@
 /** Category icons + Addis sub-cities - mirrors the web lib. */
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import type { Category, PriceLine } from './api';
 
 export type MCIName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -19,6 +20,7 @@ const ICONS: Record<string, MCIName> = {
   general: 'toolbox-outline',
   outdoor: 'tree-outline',
   automotive: 'car-wrench',
+  apparel: 'tshirt-crew-outline',
 };
 
 export const iconFor = (slug: string): MCIName => ICONS[slug] ?? 'wrench';
@@ -37,22 +39,30 @@ export const SUB_CITIES = [
   'Yeka',
 ];
 
-/** Popular repairs with the official standard rate ranges (mirrors
- *  apps/web/lib/pricing.ts) - home-screen booking shortcuts. */
-export const POPULAR: {
-  slug: string;
-  name: string;
-  nameAm: string;
-  min: number;
-  max: number;
-}[] = [
-  { slug: 'electrical', name: 'Electric Mitad Repair', nameAm: 'የኤሌክትሪክ ምጣድ ጥገና', min: 500, max: 800 },
-  { slug: 'plumbing', name: 'Faucet / Tap Repair', nameAm: 'የቧንቧ ራስ ጥገና', min: 550, max: 750 },
-  { slug: 'electrical', name: 'Socket & Switch Fix', nameAm: 'የሶኬትና ማብሪያ ጥገና', min: 250, max: 450 },
-  { slug: 'it-office', name: 'Wi-Fi Router Fix', nameAm: 'የዋይ-ፋይ ራውተር ጥገና', min: 400, max: 600 },
-  { slug: 'carpentry', name: 'Door Lock Repair', nameAm: 'የበር ቁልፍ ጥገና', min: 400, max: 800 },
-  { slug: 'plumbing', name: 'Toilet & Sink Unclogging', nameAm: 'የሽንት ቤትና ገንዳ መክፈት', min: 950, max: 1100 },
+/**
+ * Everyday jobs featured on the home screen - the same picks as the website.
+ * Named by category and line item only: the price is looked up in the live
+ * price list, so the app never ships a stale figure, and a line the list has
+ * dropped is simply skipped.
+ */
+const POPULAR_PICKS: [slug: string, item: string][] = [
+  ['appliances', 'Injera mitad electrical problem'],
+  ['plumbing', 'Tap and mixer of hand washes'],
+  ['electrical', 'Socket & switch fixing'],
+  ['it-office', 'Computer repair'],
+  ['carpentry', 'Door lock installation and repair'],
+  ['plumbing', 'Toilet pot blockage'],
 ];
+
+export function popularFrom(categories: Category[]): (PriceLine & { category: Category })[] {
+  const out: (PriceLine & { category: Category })[] = [];
+  for (const [slug, item] of POPULAR_PICKS) {
+    const category = categories.find((c) => c.slug === slug);
+    const line = category?.prices?.find((p) => p.nameEn === item);
+    if (category && line) out.push({ ...line, category });
+  }
+  return out;
+}
 
 /** Booking flow copy - bilingual, matching the web. */
 export const STATUS_FLOW: { key: string; t: string; s: string }[] = [
