@@ -98,7 +98,7 @@ export default async function PricingPage() {
               </table>
             </div>
             <Link href={`/services/${c.slug}`} className="see-all">
-              Book a {c.nameEn.toLowerCase()} service →
+              Book {c.nameEn} →
             </Link>
           </div>
         ))}

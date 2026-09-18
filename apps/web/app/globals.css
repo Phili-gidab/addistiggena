@@ -1863,3 +1863,19 @@ body.scroll-locked .site-header { transform: none; }
   pointer-events: none; border-radius: 0 0 12px 12px;
 }
 @media (max-width: 900px) { .scroll-cap::after { display: none; } }
+
+/* price list: jump straight to a category - eleven tables is a long scroll */
+.price-jump {
+  display: flex; flex-wrap: wrap; gap: 0.45rem;
+  margin: 0.4rem 0 1.6rem;
+}
+.price-jump a {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.38rem 0.8rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card);
+  font-size: 0.82rem; font-weight: 600; color: var(--navy); white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s;
+}
+.price-jump a:hover { border-color: var(--blue); background: var(--blue-tint); }
+/* land a jumped-to category below the fixed header, not under it */
+.page .panel[id] { scroll-margin-top: 90px; }
