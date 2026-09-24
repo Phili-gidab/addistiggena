@@ -30,10 +30,28 @@ export class NotificationsService {
     config: ConfigService,
   ) {
     this.botToken = config.get<string>('BOT_TOKEN', '');
-    // Every notify() below is a paid SMS once a gateway is live. Set
-    // SMS_NOTIFICATIONS=off to keep the credit for login OTPs only (auth sends
-    // those directly, so they are unaffected); Telegram pushes still go out.
+    // Every notify() below is a paid SMS once a gateway is live. The env var is
+    // only the default now - the Super Admin turns it on and off from Platform
+    // controls, because it costs money and sometimes needs stopping quickly.
+    // Login OTPs are sent by auth directly and are never affected.
     this.smsNotifications = config.get<string>('SMS_NOTIFICATIONS', 'on') !== 'off';
+  }
+
+  /** Cached briefly - notify() runs on every dispatch, accept or complete. */
+  private smsSetting = { on: true, readAt: 0 };
+
+  private async smsEnabled(): Promise<boolean> {
+    if (Date.now() - this.smsSetting.readAt < 30_000) return this.smsSetting.on;
+    try {
+      const row = await this.prisma.appConfig.findUnique({ where: { key: 'sms_notifications' } });
+      this.smsSetting = {
+        on: row ? row.value !== 'off' : this.smsNotifications,
+        readAt: Date.now(),
+      };
+    } catch {
+      this.smsSetting = { on: this.smsNotifications, readAt: Date.now() };
+    }
+    return this.smsSetting.on;
   }
 
   /**
@@ -68,10 +86,15 @@ export class NotificationsService {
 
   notify(target: NotifyTarget, text: string, data?: PushData): void {
     this.push(target.phone, text, data);
-    if (target.phone && this.smsNotifications) {
-      this.sms.send(target.phone, text).catch((err) => {
-        this.logger.warn(`SMS to ${target.phone} failed: ${(err as Error).message}`);
-      });
+    if (target.phone) {
+      this.smsEnabled()
+        .then((on) => {
+          if (!on) return;
+          return this.sms.send(target.phone!, text);
+        })
+        .catch((err) => {
+          this.logger.warn(`SMS to ${target.phone} failed: ${(err as Error).message}`);
+        });
     }
     if (target.telegramChatId && this.botToken) {
       fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {

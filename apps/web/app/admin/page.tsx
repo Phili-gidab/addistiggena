@@ -208,6 +208,7 @@ interface SystemInfo {
   services: {
     sms: string;
     smsNotifications: boolean;
+    smsSender?: string | null;
     telegramBot: boolean;
     payments: { cash: boolean; chapa: boolean; telebirr: boolean };
   };
@@ -219,6 +220,8 @@ interface SystemInfo {
     minWalletBalanceEtb: number;
   };
   money: { commissionRate: number; supportRefundCapEtb: number };
+  /** the approved sender name, when a gateway is configured */
+  smsSender?: string | null;
   pending: { vetting: number; tickets: number };
   scale: { staff: number; technicians: number; customers: number; bookings: number };
   lastAuditEntry: string | null;
@@ -993,6 +996,25 @@ export default function AdminPage() {
   }
 
   /** Dispatch rules the platform actually runs on. */
+  /** 48 - notification SMS costs money per message, so it is switchable */
+  async function setSmsNotifications(on: boolean) {
+    setError('');
+    try {
+      await api('/admin/config/sms', {
+        method: 'PUT',
+        body: JSON.stringify({ notifications: on }),
+      });
+      setNotice(
+        on
+          ? 'Notification SMS is on - offers, acceptances and receipts will be texted.'
+          : 'Notification SMS is off. Login codes are unaffected.',
+      );
+      api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function saveRules(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -2777,6 +2799,16 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  <div className="tiles">
+                    {tile(tickets.length, 'open cases')}
+                    {tile(
+                      tickets.filter((t) => t.status === 'RE_INSPECTION').length,
+                      're-inspections',
+                    )}
+                    {tile(overview?.support.resolvedToday ?? '…', 'resolved today')}
+                    {tile(overview?.support.activeClaims ?? '…', 'guarantee claims')}
+                  </div>
+
                   <div className="panel">
                     <h2>Open tickets ({tickets.length})</h2>
                     {refundCap != null && role === 'SUPPORT_AGENT' && (
@@ -2789,7 +2821,9 @@ export default function AdminPage() {
                     {tickets.map((t) => ticketRow(t))}
                   </div>
                   <div className="panel">
-                    <h2>Resolved history</h2>
+                    <h2>
+                      Resolved history{ticketHistory ? ` (${ticketHistory.length})` : ''}
+                    </h2>
                     {ticketHistory === null ? (
                       <button className="btn btn-line btn-sm" onClick={loadTicketHistory}>
                         Load history
@@ -3439,6 +3473,61 @@ export default function AdminPage() {
                   </div>
 
                   <div className="panel mb">
+                    <h2>Messaging · መልእክት</h2>
+                    <p className="hint mb">
+                      Every job offer, acceptance and receipt is one paid SMS. Login codes are sent
+                      separately and are never affected by this switch.
+                    </p>
+                    <div className="sys-grid">
+                      <div className="sys-card">
+                        <span
+                          className={system?.services.smsNotifications ? 'dot on' : 'dot off'}
+                          aria-hidden
+                        />
+                        <span>
+                          <b>Notification SMS</b>
+                          <span className={`pill ${system?.services.smsNotifications ? 'ok' : 'warn'}`}>
+                            {system?.services.smsNotifications ? 'On · በስራ ላይ' : 'Off · ጠፍቷል'}
+                          </span>
+                          <small>
+                            {system?.services.smsNotifications
+                              ? 'Technicians and customers are being texted.'
+                              : 'Nothing is being texted except login codes.'}
+                          </small>
+                        </span>
+                      </div>
+                      <div className="sys-card">
+                        <span className="dot on" aria-hidden />
+                        <span>
+                          <b>Gateway</b>
+                          <small>
+                            {system?.services.sms === 'console'
+                              ? 'console only - nothing reaches a handset'
+                              : `${system?.services.sms}${system?.services.smsSender ? ` · sender "${system.services.smsSender}"` : ''}`}
+                          </small>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="form-actions">
+                      <button
+                        className={
+                          system?.services.smsNotifications
+                            ? 'btn btn-line btn-sm'
+                            : 'btn btn-dark btn-sm'
+                        }
+                        onClick={() => setSmsNotifications(!system?.services.smsNotifications)}
+                      >
+                        {system?.services.smsNotifications
+                          ? 'Turn notification SMS off'
+                          : 'Turn notification SMS on'}
+                      </button>
+                      <span className="hint">
+                        The API key and sender name live on the server and are not editable here.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="panel mb">
                     <h2>Dispatch rules</h2>
                     <p className="hint mb">
                       These drive live dispatch. The offer window is how long the closest technician
@@ -3556,6 +3645,59 @@ export default function AdminPage() {
                           </small>
                         </span>
                       </button>
+                    </div>
+                  </div>
+
+                  <div className="panel mb">
+                    <h2>Backup &amp; security · ደህንነት</h2>
+                    <p className="hint mb">
+                      What protects the data today, and what still needs doing. Anything marked
+                      pending is a decision for Amnen, not a code change.
+                    </p>
+                    <div className="sys-grid">
+                      {[
+                        {
+                          label: 'Traffic encrypted',
+                          on: true,
+                          detail: 'HTTPS on every page and API call, certificate renewed automatically',
+                        },
+                        {
+                          label: 'Passwords hashed',
+                          on: true,
+                          detail: 'bcrypt - staff passwords are never stored or shown in readable form',
+                        },
+                        {
+                          label: 'Role limits enforced',
+                          on: true,
+                          detail: 'Checked on the server for every request, not just hidden in the menu',
+                        },
+                        {
+                          label: 'Every override logged',
+                          on: true,
+                          detail: 'Who, what, when and why - exportable from the audit log',
+                        },
+                        {
+                          label: 'Database backups',
+                          on: false,
+                          detail: 'Not scheduled yet - needs an off-server destination and a retention period',
+                        },
+                        {
+                          label: 'Two-step sign-in for staff',
+                          on: false,
+                          detail: 'Staff sign in with a password only; a code on top is not built yet',
+                        },
+                      ].map((x) => (
+                        <div key={x.label} className="sys-card">
+                          <span className={x.on ? 'dot on' : 'dot off'} aria-hidden />
+                          <span>
+                            <b>{x.label}</b>
+                            <span className={`pill ${x.on ? 'ok' : 'warn'}`}>
+                              {x.on ? 'In place' : 'Pending'}
+                            </span>
+                            <small>{x.detail}</small>
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 

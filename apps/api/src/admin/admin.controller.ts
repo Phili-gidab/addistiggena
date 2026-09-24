@@ -323,6 +323,13 @@ class DispatchRulesDto {
   minWalletBalanceEtb?: number;
 }
 
+/** What the Super Admin may change about messaging. Never the API key - that
+ *  stays in the server environment. */
+class SmsSettingsDto {
+  @IsBoolean()
+  notifications: boolean;
+}
+
 class CategoryUpdateDto {
   @IsOptional()
   @IsNumber()
@@ -1744,7 +1751,10 @@ export class AdminController {
       services: {
         // a console SMS provider means OTP codes reach the log, not the customer
         sms: process.env.SMS_PROVIDER ?? 'console',
-        smsNotifications: (process.env.SMS_NOTIFICATIONS ?? 'on') !== 'off',
+        smsNotifications: cfg.sms_notifications
+          ? cfg.sms_notifications !== 'off'
+          : (process.env.SMS_NOTIFICATIONS ?? 'on') !== 'off',
+        smsSender: process.env.AFRO_SENDER_NAME ?? null,
         telegramBot: !!process.env.BOT_TOKEN,
         payments: {
           cash: true,
@@ -1770,6 +1780,25 @@ export class AdminController {
   }
 
   /** Tune dispatch behaviour without a redeploy - every change is audited. */
+  /**
+   * Turn notification SMS on or off. Job offers, acceptances and receipts all
+   * cost a message each; login codes are separate and always sent.
+   */
+  @Put('config/sms')
+  @Roles('ADMIN')
+  async setSmsSettings(@CurrentUser() actor: AuthUser, @Body() dto: SmsSettingsDto) {
+    const value = dto.notifications ? 'on' : 'off';
+    await this.prisma.appConfig.upsert({
+      where: { key: 'sms_notifications' },
+      update: { value },
+      create: { key: 'sms_notifications', value },
+    });
+    this.audit.log(actor, 'SMS_SETTINGS_UPDATE', 'AppConfig', 'sms', undefined, {
+      notifications: value,
+    });
+    return { notifications: dto.notifications };
+  }
+
   @Put('config/dispatch')
   @Roles('ADMIN')
   async setDispatchRules(@CurrentUser() actor: AuthUser, @Body() dto: DispatchRulesDto) {
