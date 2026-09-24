@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsIn,
@@ -409,6 +410,17 @@ class ProviderQueueQuery {
   @IsOptional()
   @IsEnum(VerificationStatus)
   status?: VerificationStatus;
+}
+
+/** Any window the finance desk wants to look at - defaults to today. */
+class FinanceRangeQuery {
+  @IsOptional()
+  @IsDateString({}, { message: 'from must be a date like 2026-09-01' })
+  from?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'to must be a date like 2026-09-30' })
+  to?: string;
 }
 
 class DepositQueueQuery {
@@ -1185,18 +1197,28 @@ export class AdminController {
 
   // -- Finance workspace (spec section 2: Finance Officer) --------------------
 
-  /** Today's money in one call: what customers paid, the commission we earned,
-   *  the deposits waiting to be checked, and the exceptions a human has to chase. */
+  /** The money for a window - what customers paid, the commission we earned,
+   *  the deposits waiting to be checked, and the exceptions a human has to
+   *  chase. Defaults to today; the desk can ask for any range. */
   @Get('finance')
   @Roles('ADMIN', 'FINANCE_OFFICER')
-  async finance() {
-    const dayStart = new Date();
+  async finance(@Query() query: FinanceRangeQuery) {
+    const dayStart = query.from ? new Date(query.from) : new Date();
     dayStart.setHours(0, 0, 0, 0);
+    // "to" is inclusive: the whole of that day counts
+    const dayEnd = query.to ? new Date(query.to) : null;
+    if (dayEnd) dayEnd.setHours(23, 59, 59, 999);
+    if (dayEnd && dayEnd < dayStart) {
+      throw new BadRequestException('The end of the range is before the start');
+    }
+    const within = (field: string) => ({
+      [field]: dayEnd ? { gte: dayStart, lte: dayEnd } : { gte: dayStart },
+    });
 
     const [collected, depositsPending, depositsToday, arrears, unpaidJobs, openRefunds, queue] =
       await Promise.all([
       this.prisma.payment.aggregate({
-        where: { status: 'CONFIRMED', confirmedAt: { gte: dayStart } },
+        where: { status: 'CONFIRMED', ...within('confirmedAt') },
         _sum: { amountEtb: true, commissionEtb: true },
         _count: { _all: true },
       }),
@@ -1206,7 +1228,7 @@ export class AdminController {
         _count: { _all: true },
       }),
       this.prisma.deposit.aggregate({
-        where: { status: 'CONFIRMED', settledAt: { gte: dayStart } },
+        where: { status: 'CONFIRMED', ...within('settledAt') },
         _sum: { amountEtb: true },
         _count: { _all: true },
       }),
@@ -1224,7 +1246,7 @@ export class AdminController {
         where: { status: { in: ['OPEN', 'RE_INSPECTION'] }, refundEtb: { not: null } },
       }),
       this.prisma.booking.findMany({
-        where: { OR: [{ status: 'PAID', paidAt: { gte: dayStart } }, { status: 'COMPLETED' }] },
+        where: { OR: [{ status: 'PAID', ...within('paidAt') }, { status: 'COMPLETED' }] },
         include: {
           category: { select: { nameEn: true } },
           payment: { select: { amountEtb: true, commissionEtb: true, gateway: true, status: true } },
@@ -1236,6 +1258,11 @@ export class AdminController {
     ]);
 
     return {
+      range: {
+        from: dayStart.toISOString(),
+        to: (dayEnd ?? new Date()).toISOString(),
+        isToday: !query.from && !query.to,
+      },
       collectedTodayEtb: Number(collected._sum.amountEtb ?? 0),
       commissionTodayEtb: Number(collected._sum.commissionEtb ?? 0),
       completedToday: collected._count._all,
@@ -1269,11 +1296,19 @@ export class AdminController {
   /** The same day's rows as a CSV the finance desk can file or import. */
   @Get('finance/export')
   @Roles('ADMIN', 'FINANCE_OFFICER')
-  async financeExport(@Res({ passthrough: true }) res: Response) {
-    const dayStart = new Date();
+  async financeExport(
+    @Res({ passthrough: true }) res: Response,
+    @Query() query: FinanceRangeQuery,
+  ) {
+    const dayStart = query.from ? new Date(query.from) : new Date();
     dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = query.to ? new Date(query.to) : null;
+    if (dayEnd) dayEnd.setHours(23, 59, 59, 999);
     const rows = await this.prisma.booking.findMany({
-      where: { status: { in: ['PAID', 'COMPLETED'] }, completedAt: { gte: dayStart } },
+      where: {
+        status: { in: ['PAID', 'COMPLETED'] },
+        completedAt: dayEnd ? { gte: dayStart, lte: dayEnd } : { gte: dayStart },
+      },
       include: {
         category: { select: { nameEn: true } },
         payment: true,

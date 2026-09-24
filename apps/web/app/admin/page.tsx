@@ -146,6 +146,7 @@ interface OpsBooking extends Booking {
 }
 
 interface Finance {
+  range?: { from: string; to: string; isToday: boolean };
   collectedTodayEtb: number;
   commissionTodayEtb: number;
   completedToday: number;
@@ -507,6 +508,15 @@ export default function AdminPage() {
   /** the booking whose full detail is open underneath its row */
   const [openBooking, setOpenBooking] = useState<string | null>(null);
   const [openTech, setOpenTech] = useState<string | null>(null);
+  /** finance window - empty means today */
+  const [range, setRange] = useState({ from: '', to: '' });
+  const [ledgerFilter, setLedgerFilter] = useState('');
+  const [depositFilter, setDepositFilter] = useState('');
+  const [balanceFilter, setBalanceFilter] = useState('');
+  /** show only technicians in the red, from the arrears tile */
+  const [arrearsOnly, setArrearsOnly] = useState(false);
+  /** what the officer has typed into the technician picker on the deposit form */
+  const [techQuery, setTechQuery] = useState('');
   const [techFilter, setTechFilter] = useState('');
   const [techGrouped, setTechGrouped] = useState(true);
   const [newStaff, setNewStaff] = useState({
@@ -553,7 +563,14 @@ export default function AdminPage() {
         api<OpsBooking[]>('/admin/bookings').then(setBookings).catch(() => {});
       }
       api<Technician[]>('/admin/technicians').then(setTechnicians).catch(() => {});
-      if (MENU[r].includes('finance')) api<Finance>('/admin/finance').then(setFinance).catch(() => {});
+      if (MENU[r].includes('finance')) {
+        const qs = new URLSearchParams();
+        if (range.from) qs.set('from', range.from);
+        if (range.to) qs.set('to', range.to);
+        api<Finance>(`/admin/finance${qs.toString() ? `?${qs}` : ''}`)
+          .then(setFinance)
+          .catch(() => {});
+      }
       if (r === 'ADMIN') api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
       if (r === 'ADMIN' || r === 'OPS_MANAGER') {
         api<Analytics>('/admin/analytics').then(setAnalytics).catch(() => {});
@@ -590,7 +607,7 @@ export default function AdminPage() {
       if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
       if (has('audit')) api<AuditEntry[]>('/admin/audit').then(setAudit).catch(() => {});
     },
-    [verifStatus],
+    [verifStatus, range],
   );
 
   useEffect(() => {
@@ -761,6 +778,7 @@ export default function AdminPage() {
         note: '',
         confirmNow: true,
       });
+      setTechQuery('');
       reload();
     } catch (err) {
       setError((err as Error).message);
@@ -902,7 +920,10 @@ export default function AdminPage() {
   async function exportFinance() {
     setError('');
     try {
-      const res = await authorizedFetch('/admin/finance/export');
+      const qs = new URLSearchParams();
+      if (range.from) qs.set('from', range.from);
+      if (range.to) qs.set('to', range.to);
+      const res = await authorizedFetch(`/admin/finance/export${qs.toString() ? `?${qs}` : ''}`);
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement('a');
@@ -970,6 +991,69 @@ export default function AdminPage() {
     (acc[t.category.nameEn] ??= []).push(t);
     return acc;
   }, {});
+
+  /** a yyyy-mm-dd string for a day N days back, in the operator's own timezone */
+  const dayKey = (back: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - back);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const presetRange = (back: number) =>
+    back === 0 ? { from: '', to: '' } : { from: dayKey(back), to: dayKey(0) };
+  const isRangePreset = (back: number) => {
+    const p = presetRange(back);
+    return range.from === p.from && range.to === p.to;
+  };
+  const financeLabel =
+    !range.from && !range.to
+      ? 'Money today'
+      : `Money ${range.from || 'the beginning'} to ${range.to || 'now'}`;
+
+  const ledgerRows = (finance?.queue ?? []).filter((r) => {
+    const q = ledgerFilter.trim().toLowerCase();
+    if (!q) return true;
+    return [r.technician, r.ref, r.category].filter(Boolean).some((v) =>
+      String(v).toLowerCase().includes(q),
+    );
+  });
+
+  /** one label per technician, so the datalist can match what was typed */
+  const techOptionLabel = (t: Technician) =>
+    `${t.name ?? 'Unnamed'} · ${t.phone} · ${t.category.nameEn}`;
+
+  const depositRows = deposits.filter((d) => {
+    const q = depositFilter.trim().toLowerCase();
+    if (!q) return true;
+    const who = d.wallet.provider.user;
+    return [who.name, who.phone, d.reference, d.method, d.status]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  });
+
+  const balanceRows = (balances?.wallets ?? []).filter((w) => {
+    if (arrearsOnly && w.balanceEtb >= 0) return false;
+    const q = balanceFilter.trim().toLowerCase();
+    if (!q) return true;
+    return [w.technician, w.phone, w.trade]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  });
+
+  /** 34 - top up a blocked technician without hunting for them in the form */
+  const startTopUp = (phone: string) => {
+    const t = technicians.find((x) => x.phone === phone);
+    if (!t) return;
+    setTechQuery(techOptionLabel(t));
+    setNewDeposit({
+      providerId: t.id,
+      amountEtb: '',
+      method: 'BANK_TRANSFER',
+      reference: '',
+      note: '',
+      confirmNow: true,
+    });
+    document.getElementById('record-deposit')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   const tile = (v: string | number, k: string, hi = false, sub?: string) => (
     <div className={`tile${hi ? ' hi' : ''}`} key={k}>
@@ -2341,7 +2425,7 @@ export default function AdminPage() {
 
               {view === 'deposits' && can('deposits') && (
                 <>
-                  <div className="panel mb">
+                  <div className="panel mb" id="record-deposit">
                     <h2>Record a deposit</h2>
                     <p className="hint mb">
                       The technician keeps the customer cash at the door, so what they owe us is
@@ -2353,15 +2437,32 @@ export default function AdminPage() {
                       <div className="form-grid">
                         <div className="field span-2">
                           <label>Technician</label>
-                          <select className="input" value={newDeposit.providerId}
-                            onChange={(e) => setNewDeposit({ ...newDeposit, providerId: e.target.value })}>
-                            <option value="">Choose…</option>
+                          {/* a plain select means scrolling 30 names; this lets
+                              the officer type a name or a phone number */}
+                          <input
+                            className="input"
+                            list="technician-options"
+                            placeholder="Type a name or phone number…"
+                            value={techQuery}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setTechQuery(value);
+                              const picked = technicians.find(
+                                (t) => techOptionLabel(t) === value || t.phone === value.trim(),
+                              );
+                              setNewDeposit({ ...newDeposit, providerId: picked?.id ?? '' });
+                            }}
+                          />
+                          <datalist id="technician-options">
                             {technicians.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name ?? t.phone} · {t.category.nameEn}
-                              </option>
+                              <option key={t.id} value={techOptionLabel(t)} />
                             ))}
-                          </select>
+                          </datalist>
+                          {techQuery && !newDeposit.providerId && (
+                            <span className="field-help" style={{ color: 'var(--err-fg)' }}>
+                              Pick a technician from the list.
+                            </span>
+                          )}
                         </div>
                         <div className="field">
                           <label>Amount (ETB)</label>
@@ -2411,10 +2512,24 @@ export default function AdminPage() {
                   </div>
 
                   <div className="panel mb">
-                    <h2>Deposits ({deposits.filter((d) => d.status === 'PENDING').length} waiting)</h2>
+                    <div className="spread mb">
+                      <h2 style={{ margin: 0 }}>
+                        Deposits ({deposits.filter((d) => d.status === 'PENDING').length} waiting)
+                      </h2>
+                      <input
+                        className="input"
+                        style={{ maxWidth: 260 }}
+                        placeholder="Search technician, reference…"
+                        value={depositFilter}
+                        onChange={(e) => setDepositFilter(e.target.value)}
+                      />
+                    </div>
                     {deposits.length === 0 && <p className="hint">No deposits recorded yet.</p>}
+                    {deposits.length > 0 && depositRows.length === 0 && (
+                      <p className="hint">Nothing matches “{depositFilter}”.</p>
+                    )}
                     <div className="list-scroll scroll-cap">
-                    {deposits.map((d) => (
+                    {depositRows.map((d) => (
                       <div key={d.id} className="booking-row" style={{ cursor: 'default' }}>
                         <span>
                           <span className="what">
@@ -2465,7 +2580,27 @@ export default function AdminPage() {
                   </div>
 
                   <div className="panel">
-                    <h2>Commission balances</h2>
+                    <div className="spread mb">
+                      <h2 style={{ margin: 0 }}>
+                        Commission balances{arrearsOnly ? ' · in the red' : ''}
+                      </h2>
+                      <span className="row" style={{ gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${arrearsOnly ? 'btn-dark' : 'btn-line'}`}
+                          onClick={() => setArrearsOnly(!arrearsOnly)}
+                        >
+                          Only in the red
+                        </button>
+                        <input
+                          className="input"
+                          style={{ maxWidth: 240 }}
+                          placeholder="Search technician, trade…"
+                          value={balanceFilter}
+                          onChange={(e) => setBalanceFilter(e.target.value)}
+                        />
+                      </span>
+                    </div>
                     <p className="hint mb">
                       Lowest first. Dispatch stops offering jobs below{' '}
                       {MONEY(balances?.minBalanceEtb ?? 0)} ETB, so anyone marked blocked has to top
@@ -2479,21 +2614,43 @@ export default function AdminPage() {
                             <th>Trade</th>
                             <th>Balance</th>
                             <th>Dispatch</th>
+                            <th aria-label="Top up" />
                           </tr>
                         </thead>
                         <tbody>
-                          {(balances?.wallets ?? []).map((w) => (
+                          {balanceRows.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="hint">
+                                {arrearsOnly
+                                  ? 'Nobody is in the red.'
+                                  : `Nothing matches “${balanceFilter}”.`}
+                              </td>
+                            </tr>
+                          )}
+                          {balanceRows.map((w) => (
                             <tr key={w.id}>
                               <td>
                                 {w.technician}
                                 <div className="hint">{w.phone}</div>
                               </td>
                               <td>{w.trade ?? '-'}</td>
-                              <td>{MONEY(w.balanceEtb)} ETB</td>
+                              <td className={w.balanceEtb < 0 ? 'owing' : undefined}>
+                                {MONEY(w.balanceEtb)} ETB
+                              </td>
                               <td>
                                 <span className={`pill ${w.blocked ? 'danger' : 'ok'}`}>
                                   {w.blocked ? 'blocked' : 'active'}
                                 </span>
+                              </td>
+                              <td>
+                                {w.blocked && (
+                                  <button
+                                    className="btn btn-teal btn-sm"
+                                    onClick={() => startTopUp(w.phone)}
+                                  >
+                                    Record top-up
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -2651,33 +2808,105 @@ export default function AdminPage() {
 
               {view === 'finance' && can('finance') && (
                 <>
+                  <div className="panel mb">
+                    <div className="spread">
+                      <div>
+                        <h2 style={{ marginBottom: '0.1rem' }}>
+                          {financeLabel}
+                        </h2>
+                        <p className="hint" style={{ margin: 0 }}>
+                          Pick any window - the figures, the table and the export all follow it.
+                        </p>
+                      </div>
+                      <span className="row" style={{ gap: '0.45rem', flexWrap: 'wrap' }}>
+                        {(
+                          [
+                            ['Today', 0],
+                            ['Last 7 days', 6],
+                            ['Last 30 days', 29],
+                          ] as [string, number][]
+                        ).map(([label, back]) => (
+                          <button
+                            key={label}
+                            type="button"
+                            className={`btn btn-sm ${
+                              isRangePreset(back) ? 'btn-dark' : 'btn-line'
+                            }`}
+                            onClick={() => setRange(presetRange(back))}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                        <input
+                          className="input"
+                          type="date"
+                          style={{ maxWidth: 160 }}
+                          value={range.from}
+                          max={range.to || undefined}
+                          onChange={(e) => setRange({ ...range, from: e.target.value })}
+                        />
+                        <span className="hint" style={{ alignSelf: 'center' }}>
+                          to
+                        </span>
+                        <input
+                          className="input"
+                          type="date"
+                          style={{ maxWidth: 160 }}
+                          value={range.to}
+                          min={range.from || undefined}
+                          onChange={(e) => setRange({ ...range, to: e.target.value })}
+                        />
+                        {(range.from || range.to) && (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => setRange({ from: '', to: '' })}
+                          >
+                            back to today
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="tiles">
                     {tile(
                       `${MONEY(finance?.collectedTodayEtb ?? 0)} ETB`,
-                      'collected today',
+                      'collected',
                       false,
                       finance ? `${finance.completedToday} paid jobs` : undefined,
                     )}
                     {tile(
                       `${MONEY(finance?.commissionTodayEtb ?? 0)} ETB`,
-                      'commission earned today',
+                      'commission earned',
                       false,
-                      'from jobs settled today',
+                      'from jobs settled in this window',
                     )}
                     {tile(
                       `${MONEY(finance?.depositsTodayEtb ?? 0)} ETB`,
-                      'deposits confirmed today',
+                      'deposits confirmed',
                       false,
                       finance
                         ? `${finance.depositsPendingCount} waiting \u00b7 ${MONEY(finance.depositsPendingEtb)} ETB`
                         : undefined,
                     )}
-                    {tile(
-                      `${MONEY(finance?.arrearsEtb ?? 0)} ETB`,
-                      'commission in arrears',
-                      false,
-                      finance ? `${finance.arrearsCount} technicians in the red` : undefined,
-                    )}
+                    <button
+                      type="button"
+                      className="tile as-link danger"
+                      key="arrears"
+                      title="See exactly who is in the red"
+                      onClick={() => {
+                        setArrearsOnly(true);
+                        setBalanceFilter('');
+                        setView('deposits');
+                      }}
+                    >
+                      <div className="v">{MONEY(finance?.arrearsEtb ?? 0)} ETB</div>
+                      <div className="k">commission in arrears</div>
+                      <div className="s">
+                        {finance ? `${finance.arrearsCount} technicians in the red - see who` : ''}
+                      </div>
+                    </button>
                     {tile(
                       (finance?.exceptions.unpaidJobs ?? 0) + (finance?.exceptions.openRefunds ?? 0),
                       'exceptions',
@@ -2690,10 +2919,19 @@ export default function AdminPage() {
 
                   <div className="panel">
                     <div className="spread mb">
-                      <h2>Today&rsquo;s payment queue</h2>
-                      <button className="btn btn-primary btn-sm" onClick={exportFinance}>
-                        Export daily report
-                      </button>
+                      <h2 style={{ margin: 0 }}>Payment queue</h2>
+                      <span className="row" style={{ gap: '0.5rem' }}>
+                        <input
+                          className="input"
+                          style={{ maxWidth: 240 }}
+                          placeholder="Search technician, booking, service…"
+                          value={ledgerFilter}
+                          onChange={(e) => setLedgerFilter(e.target.value)}
+                        />
+                        <button className="btn btn-primary btn-sm" onClick={exportFinance}>
+                          Export report
+                        </button>
+                      </span>
                     </div>
                     <p className="hint mb">
                       The technician collects the full amount from the customer in cash. We take{' '}
@@ -2713,7 +2951,14 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {(finance?.queue ?? []).map((r) => (
+                          {ledgerRows.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="hint">
+                                Nothing matches this window{ledgerFilter ? ` and “${ledgerFilter}”` : ''}.
+                              </td>
+                            </tr>
+                          )}
+                          {ledgerRows.map((r) => (
                             <tr key={r.id}>
                               <td>
                                 #{r.ref}

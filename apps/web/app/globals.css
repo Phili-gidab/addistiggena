@@ -1968,3 +1968,7 @@ body.scroll-locked .site-header { transform: none; }
   margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--line);
 }
 .pager .hint { margin: 0; font-variant-numeric: tabular-nums; }
+.tile.as-link.danger .v { color: var(--err-fg); }
+.tile.as-link.danger { border-color: var(--err-bg); }
+.tile.as-link.danger:hover { border-color: var(--err-fg); background: var(--err-bg); }
+.table td.owing { color: var(--err-fg); font-weight: 700; }
