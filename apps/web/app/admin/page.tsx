@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { CategoryBars, DailyBars } from '../../components/charts';
 import { ConsoleBar } from '../../components/ConsoleBar';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -430,6 +430,9 @@ const EMPTY_TECH = {
   declarationName: '',
 };
 
+/** bookings per page - the client could not work through 78 in one scroll */
+const PAGE_SIZE = 20;
+
 const ACTIVE_STATUSES = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
 
 // ── page ─────────────────────────────────────────────────────────────────────
@@ -499,6 +502,13 @@ export default function AdminPage() {
   const [fullForm, setFullForm] = useState(false);
   /** which password fields are currently revealed, by field name */
   const [shownPw, setShownPw] = useState<Record<string, boolean>>({});
+  /** bookings are paged - 78 rows in one scroll is unreadable */
+  const [bookingPage, setBookingPage] = useState(0);
+  /** the booking whose full detail is open underneath its row */
+  const [openBooking, setOpenBooking] = useState<string | null>(null);
+  const [openTech, setOpenTech] = useState<string | null>(null);
+  const [techFilter, setTechFilter] = useState('');
+  const [techGrouped, setTechGrouped] = useState(true);
   const [newStaff, setNewStaff] = useState({
     name: '',
     phone: '',
@@ -947,6 +957,19 @@ export default function AdminPage() {
   };
 
   // ── reusable pieces ────────────────────────────────────────────────────────
+
+  /** technicians, filtered by name/phone/trade and optionally grouped by trade */
+  const techRows = technicians.filter((t) => {
+    const q = techFilter.trim().toLowerCase();
+    if (!q) return true;
+    return [t.name, t.phone, t.category.nameEn, t.category.nameAm, t.subCity]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  });
+  const techByTrade = techRows.reduce<Record<string, Technician[]>>((acc, t) => {
+    (acc[t.category.nameEn] ??= []).push(t);
+    return acc;
+  }, {});
 
   const tile = (v: string | number, k: string, hi = false, sub?: string) => (
     <div className={`tile${hi ? ' hi' : ''}`} key={k}>
@@ -1511,6 +1534,12 @@ export default function AdminPage() {
       .includes(q);
   });
 
+  const bookingPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
+  const pagedBookings = filteredBookings.slice(
+    bookingPage * PAGE_SIZE,
+    (bookingPage + 1) * PAGE_SIZE,
+  );
+
   const mapJobs = bookings
     .filter((b) => ACTIVE_STATUSES.includes(b.status))
     .map((b) => ({
@@ -1675,7 +1704,10 @@ export default function AdminPage() {
                     style={{ maxWidth: 340 }}
                     placeholder="Search ref, customer, phone, technician…"
                     value={bookingFilter}
-                    onChange={(e) => setBookingFilter(e.target.value)}
+                    onChange={(e) => {
+                      setBookingFilter(e.target.value);
+                      setBookingPage(0);
+                    }}
                   />
                   <div style={{ overflowX: 'auto' }}>
                     <table className="table">
@@ -1690,33 +1722,110 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredBookings.slice(0, 25).map((b) => (
-                          <tr key={b.id}>
-                            <td className="hint">
-                              #{b.id.slice(-6).toUpperCase()}
-                              {b.disputedAt && <span title="open ticket"> ⚑</span>}
-                            </td>
-                            <td>{b.category.nameEn}</td>
-                            <td>
-                              {b.customer?.name ?? '-'}
-                              <div className="hint">{b.customer?.phone}</div>
-                            </td>
-                            <td>{b.provider?.user?.name ?? '-'}</td>
-                            <td>
-                              {b.payment
-                                ? `${b.payment.amountEtb} ETB`
-                                : b.finalPriceEtb
-                                  ? `${b.finalPriceEtb} ETB`
-                                  : '-'}
-                            </td>
-                            <td>
-                              <StatusBadge status={b.status} />
-                            </td>
-                          </tr>
+                        {pagedBookings.map((b) => (
+                          <Fragment key={b.id}>
+                            <tr
+                              className={`row-open${openBooking === b.id ? ' on' : ''}`}
+                              onClick={() => setOpenBooking(openBooking === b.id ? null : b.id)}
+                            >
+                              <td className="hint">
+                                #{b.id.slice(-6).toUpperCase()}
+                                {b.disputedAt && <span title="open ticket"> ⚑</span>}
+                              </td>
+                              <td>{b.category.nameEn}</td>
+                              <td>
+                                {b.customer?.name ?? '-'}
+                                <div className="hint">{b.customer?.phone}</div>
+                              </td>
+                              <td>{b.provider?.user?.name ?? '-'}</td>
+                              <td>
+                                {b.payment
+                                  ? `${MONEY(Number(b.payment.amountEtb))} ETB`
+                                  : b.finalPriceEtb
+                                    ? `${MONEY(Number(b.finalPriceEtb))} ETB`
+                                    : '-'}
+                              </td>
+                              <td>
+                                <StatusBadge status={b.status} />
+                              </td>
+                            </tr>
+                            {openBooking === b.id && (
+                              <tr className="row-detail">
+                                <td colSpan={6}>
+                                  <dl>
+                                    <dt>Booked</dt>
+                                    <dd>{fmtDate(b.createdAt)}</dd>
+                                    <dt>Completed</dt>
+                                    <dd>{b.completedAt ? fmtDate(b.completedAt) : '-'}</dd>
+                                    <dt>What is wrong</dt>
+                                    <dd>{b.description || '-'}</dd>
+                                    <dt>Landmark</dt>
+                                    <dd>{b.landmarkNote || '-'}</dd>
+                                    <dt>Technician</dt>
+                                    <dd>
+                                      {b.provider?.user
+                                        ? `${b.provider.user.name ?? 'unnamed'} · ${b.provider.user.phone}`
+                                        : 'not assigned'}
+                                    </dd>
+                                    <dt>Payment</dt>
+                                    <dd>
+                                      {b.payment
+                                        ? `${MONEY(Number(b.payment.amountEtb))} ETB · ${b.payment.gateway.toLowerCase()} · ${b.payment.status.toLowerCase()}`
+                                        : 'not paid'}
+                                    </dd>
+                                    <dt>Commission</dt>
+                                    <dd>
+                                      {b.payment?.commissionEtb
+                                        ? `${MONEY(Number(b.payment.commissionEtb))} ETB`
+                                        : '-'}
+                                    </dd>
+                                    <dt>Rating</dt>
+                                    <dd>{b.review ? `★ ${b.review.stars}` : 'not rated'}</dd>
+                                  </dl>
+                                  {b.customer && (
+                                    <button
+                                      type="button"
+                                      className="link-btn"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        loadContext(b.customer!.id);
+                                        setView('tickets');
+                                      }}
+                                    >
+                                      Open this customer →
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {bookingPages > 1 && (
+                    <div className="pager">
+                      <button
+                        className="btn btn-line btn-sm"
+                        disabled={bookingPage === 0}
+                        onClick={() => setBookingPage((p) => Math.max(0, p - 1))}
+                      >
+                        ← Previous
+                      </button>
+                      <span className="hint">
+                        {bookingPage * PAGE_SIZE + 1}-
+                        {Math.min((bookingPage + 1) * PAGE_SIZE, filteredBookings.length)} of{' '}
+                        {filteredBookings.length}
+                      </span>
+                      <button
+                        className="btn btn-line btn-sm"
+                        disabled={bookingPage >= bookingPages - 1}
+                        onClick={() => setBookingPage((p) => Math.min(bookingPages - 1, p + 1))}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1940,7 +2049,33 @@ export default function AdminPage() {
                   </div>
 
                   <div className="panel">
-                  <h2>Technicians ({technicians.length})</h2>
+                  <div className="spread mb">
+                    <h2 style={{ margin: 0 }}>
+                      Technicians ({techRows.length}
+                      {techRows.length !== technicians.length ? ` of ${technicians.length}` : ''})
+                    </h2>
+                    <span className="row" style={{ gap: '0.5rem' }}>
+                      <input
+                        className="input"
+                        style={{ maxWidth: 260 }}
+                        placeholder="Search name, phone, trade, sub-city…"
+                        value={techFilter}
+                        onChange={(e) => setTechFilter(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${techGrouped ? 'btn-dark' : 'btn-line'}`}
+                        onClick={() => setTechGrouped(!techGrouped)}
+                        title="Group the list by trade"
+                      >
+                        Group by trade
+                      </button>
+                    </span>
+                  </div>
+                  <p className="hint mb">
+                    <span className="dot-on" /> online and taking jobs ·{' '}
+                    <span className="dot-off" /> offline
+                  </p>
                   <div className="table-scroll-y scroll-cap" style={{ overflowX: 'auto' }}>
                     <table className="table">
                       <thead>
@@ -1954,21 +2089,92 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {technicians.map((t) => (
-                          <tr key={t.id}>
-                            <td>
-                              {t.isAvailable && t.verificationStatus === 'VERIFIED' && (
-                                <span style={{ color: 'var(--teal)' }}>● </span>
-                              )}
-                              {t.name ?? '-'}
-                              <div className="hint">{t.phone}</div>
+                        {techRows.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="hint">
+                              No technician matches “{techFilter}”.
                             </td>
-                            <td>{t.category.nameEn}</td>
-                            <td>{t.subCity ?? '-'}</td>
-                            <td className="hint">{t.verificationStatus.toLowerCase()}</td>
-                            <td>{t.ratingCount ? `★ ${t.ratingAvg.toFixed(1)} (${t.ratingCount})` : '-'}</td>
-                            <td>{t.jobs}</td>
                           </tr>
+                        )}
+                        {(techGrouped
+                          ? Object.entries(techByTrade).sort(([a], [b]) => a.localeCompare(b))
+                          : [['', techRows] as [string, Technician[]]]
+                        ).map(([trade, rows]) => (
+                          <Fragment key={trade || 'all'}>
+                            {trade && (
+                              <tr className="group-head">
+                                <td colSpan={6}>
+                                  {trade} <span className="hint">({rows.length})</span>
+                                </td>
+                              </tr>
+                            )}
+                            {rows.map((t) => (
+                              <Fragment key={t.id}>
+                                <tr
+                                  className={`row-open${openTech === t.id ? ' on' : ''}`}
+                                  onClick={() => setOpenTech(openTech === t.id ? null : t.id)}
+                                >
+                                  <td>
+                                    <span
+                                      className={
+                                        t.isAvailable && t.verificationStatus === 'VERIFIED'
+                                          ? 'dot-on'
+                                          : 'dot-off'
+                                      }
+                                      title={
+                                        t.isAvailable && t.verificationStatus === 'VERIFIED'
+                                          ? 'online'
+                                          : 'offline'
+                                      }
+                                    />
+                                    {t.name ?? '-'}
+                                    <div className="hint">{t.phone}</div>
+                                  </td>
+                                  <td>{t.category.nameEn}</td>
+                                  <td>{t.subCity ?? '-'}</td>
+                                  <td className="hint">{t.verificationStatus.toLowerCase()}</td>
+                                  <td>{t.ratingCount ? `★ ${t.ratingAvg.toFixed(1)} (${t.ratingCount})` : '-'}</td>
+                                  <td>{t.jobs}</td>
+                                </tr>
+                                {openTech === t.id && (
+                                  <tr className="row-detail">
+                                    <td colSpan={6}>
+                                      <dl>
+                                        <dt>Phone</dt>
+                                        <dd>{t.phone}</dd>
+                                        <dt>Trade</dt>
+                                        <dd>
+                                          {t.category.nameEn} · {t.category.nameAm}
+                                        </dd>
+                                        <dt>Service area</dt>
+                                        <dd>{t.subCity ?? 'not set'}</dd>
+                                        <dt>Vetting</dt>
+                                        <dd>{t.verificationStatus.toLowerCase()}</dd>
+                                        <dt>Dispatch</dt>
+                                        <dd>
+                                          {t.isAvailable ? 'online - receiving offers' : 'offline'}
+                                        </dd>
+                                        <dt>Jobs done</dt>
+                                        <dd>{t.jobs}</dd>
+                                        <dt>Rating</dt>
+                                        <dd>
+                                          {t.ratingCount
+                                            ? `★ ${t.ratingAvg.toFixed(1)} from ${t.ratingCount} reviews`
+                                            : 'no reviews yet'}
+                                        </dd>
+                                        <dt>Last seen</dt>
+                                        <dd>
+                                          {t.locationUpdatedAt ? fmtDate(t.locationUpdatedAt) : 'never shared GPS'}
+                                        </dd>
+                                        <dt>Joined</dt>
+                                        <dd>{fmtDate(t.createdAt)}</dd>
+                                      </dl>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            ))}
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>

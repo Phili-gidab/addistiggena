@@ -1931,3 +1931,40 @@ body.scroll-locked .site-header { transform: none; }
 }
 .pw-wrap .peek:hover { color: var(--navy); background: var(--surface); }
 .field-help { font-size: 0.75rem; color: var(--muted); line-height: 1.45; margin-top: 0.15rem; }
+
+/* rows that open to show everything that does not fit in the row itself */
+.table tr.row-open { cursor: pointer; }
+.table tr.row-open:hover td { background: var(--blue-tint); }
+.table tr.row-open.on td { background: var(--blue-tint); border-bottom-color: transparent; }
+.table tr.row-detail td { background: var(--surface); padding-top: 0.2rem; }
+.table tr.row-detail dl {
+  display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 0.25rem 1rem;
+  margin: 0 0 0.5rem; font-size: 0.85rem;
+}
+.table tr.row-detail dt { color: var(--muted); font-weight: 600; }
+.table tr.row-detail dd { margin: 0; color: var(--navy); overflow-wrap: anywhere; }
+@media (min-width: 900px) {
+  .table tr.row-detail dl { grid-template-columns: auto 1fr auto 1fr; }
+}
+
+/* a trade heading inside the technician list */
+.table tr.group-head td {
+  background: var(--surface); font-family: var(--font-display); font-weight: 700;
+  font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--navy);
+  padding-top: 0.6rem; padding-bottom: 0.6rem;
+}
+
+/* online / offline, so the two are never guessed from one colour */
+.dot-on, .dot-off {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 0.45rem;
+  vertical-align: middle;
+}
+.dot-on { background: #1d9e6f; box-shadow: 0 0 0 3px rgba(29, 158, 111, 0.16); }
+.dot-off { background: #c2cfdf; }
+
+/* pager under a long table */
+.pager {
+  display: flex; align-items: center; justify-content: center; gap: 1rem;
+  margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--line);
+}
+.pager .hint { margin: 0; font-variant-numeric: tabular-nums; }
