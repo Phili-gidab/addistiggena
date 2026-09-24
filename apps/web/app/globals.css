@@ -2037,3 +2037,39 @@ body.scroll-locked .site-header { transform: none; }
 .pin-warn { font-size: 0.82rem; font-weight: 600; color: var(--warn-fg); }
 /* a technician already on a live job reads apart from a free one */
 .tech-dot.busy { background: #7a4ecb; box-shadow: 0 0 0 2px rgba(122, 78, 203, 0.3); }
+
+/* ── notifications centre ───────────────────────────────────────────────── */
+.bell {
+  position: relative; display: grid; place-items: center; width: 34px; height: 34px;
+  border-radius: 10px; color: #fff; cursor: pointer;
+}
+.bell:hover { background: rgba(255, 255, 255, 0.12); }
+.bell-count {
+  position: absolute; top: 2px; right: 1px; min-width: 16px; height: 16px; padding: 0 3px;
+  display: grid; place-items: center; border-radius: 999px;
+  background: #e2452f; color: #fff; font-size: 0.6rem; font-weight: 800;
+}
+.feed-veil { position: fixed; inset: 0; z-index: 250; background: rgba(7, 20, 41, 0.28); }
+.feed {
+  position: absolute; top: 62px; right: clamp(0.6rem, 3vw, 1.6rem);
+  width: min(420px, calc(100vw - 1.2rem)); max-height: 70vh; overflow-y: auto;
+  background: #fff; border: 1px solid var(--line); border-radius: 14px;
+  padding: 1rem 1.05rem; box-shadow: 0 30px 70px -30px rgba(7, 20, 41, 0.7);
+}
+.feed-row {
+  display: flex; gap: 0.6rem; align-items: flex-start; width: 100%; text-align: left;
+  padding: 0.6rem 0.2rem; border-bottom: 1px solid var(--line); cursor: pointer;
+  font-size: 0.86rem; color: var(--navy);
+}
+.feed-row:hover { background: var(--surface); }
+.feed-row.fresh { font-weight: 600; }
+.feed-row.fresh .feed-kind { box-shadow: 0 0 0 2px var(--blue-tint); }
+.feed-row small { display: block; margin-top: 0.15rem; font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+.feed-kind {
+  flex-shrink: 0; padding: 0.15rem 0.5rem; border-radius: 999px;
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.feed-kind.application { background: var(--blue-tint); color: var(--blue-deep); }
+.feed-kind.payment { background: var(--ok-bg); color: var(--ok-fg); }
+.feed-kind.complaint { background: var(--err-bg); color: var(--err-fg); }
+.feed-kind.deposit { background: var(--warn-bg); color: var(--warn-fg); }

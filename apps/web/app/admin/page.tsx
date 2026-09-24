@@ -248,6 +248,24 @@ interface CallerLookup {
   lastBooking?: { at: string; service: string; status: string } | null;
 }
 
+interface CustomerRow {
+  id: string;
+  name: string | null;
+  phone: string;
+  blocked: boolean;
+  bookings: number;
+  lifetimeSpendEtb: number;
+  customerSince: string;
+  lastBooking: { at: string; service: string; status: string } | null;
+}
+
+interface FeedItem {
+  kind: 'APPLICATION' | 'PAYMENT' | 'COMPLAINT' | 'DEPOSIT';
+  at: string;
+  title: string;
+  view: string;
+}
+
 interface AuditEntry {
   id: string;
   meta?: Record<string, unknown> | null;
@@ -280,6 +298,7 @@ type ViewKey =
   | 'verification'
   | 'tickets'
   | 'deposits'
+  | 'customers'
   | 'reviews'
   | 'categories'
   | 'staff'
@@ -296,6 +315,7 @@ const MENU: Record<StaffRole, ViewKey[]> = {
     'verification',
     'tickets',
     'deposits',
+    'customers',
     'reviews',
     'categories',
     'staff',
@@ -303,9 +323,9 @@ const MENU: Record<StaffRole, ViewKey[]> = {
     'system',
     'settings',
   ],
-  OPS_MANAGER: ['dashboard', 'map', 'bookings', 'technicians', 'reviews', 'categories', 'settings'],
+  OPS_MANAGER: ['dashboard', 'map', 'bookings', 'customers', 'technicians', 'reviews', 'categories', 'settings'],
   VERIFICATION_OFFICER: ['dashboard', 'verification', 'technicians'],
-  SUPPORT_AGENT: ['dashboard', 'tickets', 'bookings', 'technicians', 'reviews'],
+  SUPPORT_AGENT: ['dashboard', 'tickets', 'customers', 'bookings', 'technicians', 'reviews'],
   FINANCE_OFFICER: ['dashboard', 'finance', 'deposits', 'settings'],
   SUBCITY_COORDINATOR: ['dashboard', 'map', 'bookings', 'technicians'],
 };
@@ -320,6 +340,7 @@ const VIEW_LABEL: Record<ViewKey, string> = {
   verification: 'Verification queue',
   tickets: 'Support tickets',
   deposits: 'Deposits',
+  customers: 'Customers',
   reviews: 'Reviews',
   categories: 'Categories & pricing',
   staff: 'Staff & roles',
@@ -330,7 +351,7 @@ const VIEW_LABEL: Record<ViewKey, string> = {
 /** Sidebar grouping - overview, day-to-day queues, platform configuration. */
 const NAV_GROUPS: { label: string; items: ViewKey[] }[] = [
   { label: 'Overview', items: ['dashboard', 'map'] },
-  { label: 'Operations', items: ['bookings', 'technicians', 'verification', 'tickets', 'reviews'] },
+  { label: 'Operations', items: ['bookings', 'customers', 'technicians', 'verification', 'tickets', 'reviews'] },
   { label: 'Money', items: ['finance', 'deposits'] },
   { label: 'Platform', items: ['categories', 'staff', 'system', 'audit', 'settings'] },
 ];
@@ -348,6 +369,7 @@ const ICONS: Record<ViewKey, React.ReactNode> = (() => {
     technicians: I(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5" /><path d="M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20c-.6-2.6-2.2-4.1-4.3-4.7" /></>),
     verification: I(<><path d="M12 2.5 20 6v5.5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3.5Z" /><path d="m8.7 11.7 2.3 2.3 4.3-4.5" /></>),
     tickets: I(<><path d="M21 11.5c0 4.1-4 7.5-9 7.5-1 0-2-.1-2.9-.4L3 20l1.5-3.6C3.5 15.1 3 13.4 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5Z" /></>),
+    customers: I(<><circle cx="9" cy="8" r="3.4" /><path d="M2.6 20c.8-3.4 3.4-5 6.4-5s5.6 1.6 6.4 5" /><path d="M17 9.5h4.5M19.25 7.25v4.5" /></>),
     deposits: I(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5h.01M18 14.5h.01" /></>),
     reviews: I(<path d="m12 3 2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9l-5.4 2.9 1.1-6.1L3.2 9.4l6.1-.8L12 3Z" />),
     categories: I(<><path d="M3 10.5V4.8C3 3.8 3.8 3 4.8 3h5.7c.5 0 .9.2 1.3.5l8.7 8.7c.7.7.7 1.8 0 2.6l-5.7 5.7c-.7.7-1.8.7-2.6 0l-8.7-8.7a1.8 1.8 0 0 1-.5-1.3Z" /><circle cx="7.5" cy="7.5" r="1.2" /></>),
@@ -469,6 +491,13 @@ const EMPTY_TECH = {
 /** bookings per page - the client could not work through 78 in one scroll */
 const PAGE_SIZE = 20;
 
+const FEED_LABEL: Record<string, string> = {
+  APPLICATION: 'new technician',
+  PAYMENT: 'payment',
+  COMPLAINT: 'complaint',
+  DEPOSIT: 'deposit',
+};
+
 const ACTIVE_STATUSES = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
 
 // ── page ─────────────────────────────────────────────────────────────────────
@@ -556,6 +585,12 @@ export default function AdminPage() {
   /** the application being rejected, and the reasons ticked so far */
   /** who is on the phone, once we recognise the number */
   const [caller, setCaller] = useState<CallerLookup | null>(null);
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [feedOpen, setFeedOpen] = useState(false);
+  /** everything in the feed older than this has already been seen */
+  const [feedSeen, setFeedSeen] = useState<string>('');
   /** true once the operator has actually placed the pin themselves */
   const [pinPlaced, setPinPlaced] = useState(false);
   const [auditQuery, setAuditQuery] = useState({ who: '', action: '', target: '', from: '', to: '' });
@@ -654,6 +689,15 @@ export default function AdminPage() {
       }
       if (has('reviews')) api<PendingReview[]>('/admin/reviews').then(setReviews).catch(() => {});
       if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
+      if (has('customers')) {
+        const q = customerQuery.trim();
+        api<CustomerRow[]>(`/admin/customers${q ? `?q=${encodeURIComponent(q)}` : ''}`)
+          .then(setCustomers)
+          .catch(() => {});
+      }
+      api<{ feed: FeedItem[] }>('/admin/notifications')
+        .then((r) => setFeed(r.feed))
+        .catch(() => {});
       if (has('audit')) {
         const qs = new URLSearchParams(
           Object.entries(auditQuery).filter(([, v]) => v) as [string, string][],
@@ -663,7 +707,7 @@ export default function AdminPage() {
           .catch(() => {});
       }
     },
-    [verifStatus, range, auditQuery],
+    [verifStatus, range, auditQuery, customerQuery],
   );
 
   useEffect(() => {
@@ -677,6 +721,7 @@ export default function AdminPage() {
       return;
     }
     setRole(r);
+    setFeedSeen(localStorage.getItem('tg_feed_seen') ?? '');
     load(r);
     const t = setInterval(() => load(r), 30000);
     return () => clearInterval(t);
@@ -1776,6 +1821,9 @@ export default function AdminPage() {
       .includes(q);
   });
 
+  /** feed entries the operator has not opened yet */
+  const unreadFeed = feed.filter((f) => f.at > feedSeen);
+
   const bookingPages = Math.max(1, Math.ceil(filteredBookings.length / PAGE_SIZE));
   const pagedBookings = filteredBookings.slice(
     bookingPage * PAGE_SIZE,
@@ -1811,7 +1859,51 @@ export default function AdminPage() {
 
   return (
     <main className="console">
-      <ConsoleBar subtitle="Staff console" />
+      <ConsoleBar
+        subtitle="Staff console"
+        unread={unreadFeed.length}
+        onBell={() => {
+          const next = !feedOpen;
+          setFeedOpen(next);
+          if (next && feed[0]) {
+            localStorage.setItem('tg_feed_seen', feed[0].at);
+            setFeedSeen(feed[0].at);
+          }
+        }}
+      />
+      {feedOpen && (
+        <div className="feed-veil" onClick={() => setFeedOpen(false)}>
+          <div className="feed" onClick={(e) => e.stopPropagation()}>
+            <div className="spread">
+              <h2 style={{ margin: 0 }}>What has happened</h2>
+              <button type="button" className="link-btn" onClick={() => setFeedOpen(false)}>
+                close
+              </button>
+            </div>
+            <p className="hint">New registrations, money in, complaints and deposits to check.</p>
+            {feed.length === 0 && <p className="hint">Nothing in the last seven days.</p>}
+            {feed.map((f) => (
+              <button
+                key={`${f.kind}-${f.at}-${f.title}`}
+                type="button"
+                className={`feed-row${f.at > feedSeen ? ' fresh' : ''}`}
+                onClick={() => {
+                  setView(f.view as ViewKey);
+                  setFeedOpen(false);
+                }}
+              >
+                <span className={`feed-kind ${f.kind.toLowerCase()}`}>
+                  {FEED_LABEL[f.kind]}
+                </span>
+                <span>
+                  {f.title}
+                  <small>{fmtDate(f.at)}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="container console-container">
         <h1 className="page-title">{titles ? `${titles.en} · ${titles.am}` : 'Staff console'}</h1>
@@ -3669,6 +3761,97 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </form>
+                </div>
+              )}
+
+              {view === 'customers' && can('customers') && (
+                <div className="panel">
+                  <div className="spread mb">
+                    <h2 style={{ margin: 0 }}>Customers ({customers.length})</h2>
+                    <input
+                      className="input"
+                      style={{ maxWidth: 280 }}
+                      placeholder="Search name or phone…"
+                      value={customerQuery}
+                      onChange={(e) => setCustomerQuery(e.target.value)}
+                    />
+                  </div>
+                  <p className="hint mb">
+                    Everyone who has booked, in the app or over the phone. Open one to see their
+                    whole history, or block a nuisance caller.
+                  </p>
+                  {customers.length === 0 && (
+                    <p className="hint">
+                      {customerQuery ? `Nobody matches “${customerQuery}”.` : 'No customers yet.'}
+                    </p>
+                  )}
+                  {customers.length > 0 && (
+                    <div className="table-scroll-y scroll-cap" style={{ overflowX: 'auto' }}>
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Customer</th>
+                            <th>Bookings</th>
+                            <th>Lifetime spend</th>
+                            <th>Last booking</th>
+                            <th>Since</th>
+                            <th aria-label="Actions" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customers.map((c) => (
+                            <tr key={c.id}>
+                              <td>
+                                {c.name ?? 'Unnamed'}
+                                {c.blocked && <span className="pill danger">blocked</span>}
+                                <div className="hint">{c.phone}</div>
+                              </td>
+                              <td>{c.bookings}</td>
+                              <td>{MONEY(c.lifetimeSpendEtb)} ETB</td>
+                              <td className="hint">
+                                {c.lastBooking
+                                  ? `${c.lastBooking.service} · ${c.lastBooking.status.toLowerCase()} · ${fmtDate(c.lastBooking.at)}`
+                                  : '-'}
+                              </td>
+                              <td className="hint">{fmtDate(c.customerSince)}</td>
+                              <td>
+                                <span className="row" style={{ gap: '0.35rem', justifyContent: 'flex-end' }}>
+                                  <button
+                                    className="btn btn-line btn-sm"
+                                    onClick={() => {
+                                      loadContext(c.id);
+                                      setView('tickets');
+                                    }}
+                                  >
+                                    History
+                                  </button>
+                                  <button
+                                    className={c.blocked ? 'btn btn-teal btn-sm' : 'btn btn-line btn-sm'}
+                                    onClick={() => {
+                                      if (c.blocked) {
+                                        act(`/admin/customers/${c.id}/unblock`);
+                                        return;
+                                      }
+                                      const note = window.prompt(
+                                        `Why is ${c.name ?? c.phone} being blocked? (kept on the audit log)`,
+                                      );
+                                      if (note === null) return;
+                                      act(
+                                        `/admin/customers/${c.id}/block`,
+                                        note.trim() ? { note: note.trim() } : undefined,
+                                      );
+                                    }}
+                                  >
+                                    {c.blocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 

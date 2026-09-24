@@ -1391,6 +1391,145 @@ export class AdminController {
   /** Everything a support agent needs on one screen: who they are, their repair
    *  history, what they paid, and every case opened on their account. */
   /**
+   * The customer register: everyone who has ever booked or been called in,
+   * searchable, with what they are worth and whether they are blocked.
+   */
+  @Get('customers')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
+  async customers(@Query('q') q?: string) {
+    const search = (q ?? '').trim();
+    const rows = await this.prisma.user.findMany({
+      where: {
+        role: 'CUSTOMER',
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' as const } },
+                { phone: { contains: search } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        disabledAt: true,
+        createdAt: true,
+        _count: { select: { bookings: true } },
+        bookings: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true, status: true, category: { select: { nameEn: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 400,
+    });
+
+    // what each of them has actually paid us over their lifetime
+    const paid = await this.prisma.payment.groupBy({
+      by: ['bookingId'],
+      where: { status: 'CONFIRMED' },
+      _sum: { amountEtb: true },
+    });
+    const byBooking = new Map(paid.map((p) => [p.bookingId, Number(p._sum.amountEtb ?? 0)]));
+    const bookings = await this.prisma.booking.findMany({
+      where: { customerId: { in: rows.map((r) => r.id) } },
+      select: { id: true, customerId: true },
+    });
+    const spendByCustomer = new Map<string, number>();
+    for (const b of bookings) {
+      const amount = byBooking.get(b.id);
+      if (amount) spendByCustomer.set(b.customerId, (spendByCustomer.get(b.customerId) ?? 0) + amount);
+    }
+
+    return rows.map((c) => {
+      const [last] = c.bookings;
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        blocked: !!c.disabledAt,
+        bookings: c._count.bookings,
+        lifetimeSpendEtb: spendByCustomer.get(c.id) ?? 0,
+        customerSince: c.createdAt,
+        lastBooking: last
+          ? { at: last.createdAt, service: last.category.nameEn, status: last.status }
+          : null,
+      };
+    });
+  }
+
+  /**
+   * What has happened since the operator last looked: new technician
+   * applications, money in, and customer complaints. Read-only - the console
+   * decides what counts as "new" from the timestamps.
+   */
+  @Get('notifications')
+  @Roles(...STAFF_ROLES)
+  async notificationFeed() {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [applications, payments, tickets, deposits] = await Promise.all([
+      this.prisma.providerProfile.findMany({
+        where: { verificationStatus: 'PENDING', createdAt: { gte: since } },
+        include: { user: { select: { name: true, phone: true } }, category: true },
+        orderBy: { createdAt: 'desc' },
+        take: 15,
+      }),
+      this.prisma.payment.findMany({
+        where: { status: 'CONFIRMED', confirmedAt: { gte: since } },
+        include: { booking: { include: { category: { select: { nameEn: true } } } } },
+        orderBy: { confirmedAt: 'desc' },
+        take: 15,
+      }),
+      this.prisma.supportTicket.findMany({
+        where: { status: { in: ['OPEN', 'RE_INSPECTION'] }, createdAt: { gte: since } },
+        include: { openedBy: { select: { name: true, phone: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 15,
+      }),
+      this.prisma.deposit.findMany({
+        where: { status: 'PENDING', createdAt: { gte: since } },
+        include: {
+          wallet: { include: { provider: { include: { user: { select: { name: true, phone: true } } } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 15,
+      }),
+    ]);
+
+    const feed = [
+      ...applications.map((p) => ({
+        kind: 'APPLICATION' as const,
+        at: p.createdAt,
+        title: `${p.user.name ?? p.user.phone} applied as a ${p.category.nameEn} technician`,
+        view: 'verification',
+      })),
+      ...payments.map((p) => ({
+        kind: 'PAYMENT' as const,
+        at: p.confirmedAt ?? new Date(),
+        title: `${p.amountEtb} ETB received for ${p.booking.category.nameEn} #${p.bookingId.slice(-6).toUpperCase()}`,
+        view: 'finance',
+      })),
+      ...tickets.map((t) => ({
+        kind: 'COMPLAINT' as const,
+        at: t.createdAt,
+        title: `${t.type.replace(/_/g, ' ').toLowerCase()} raised by ${t.openedBy.name ?? t.openedBy.phone}`,
+        view: 'tickets',
+      })),
+      ...deposits.map((d) => ({
+        kind: 'DEPOSIT' as const,
+        at: d.createdAt,
+        title: `${d.amountEtb} ETB deposit from ${d.wallet.provider.user.name ?? d.wallet.provider.user.phone} needs checking`,
+        view: 'deposits',
+      })),
+    ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
+    return { feed: feed.slice(0, 30) };
+  }
+
+  /**
    * Who is on the phone. The operator types the number they are being called
    * from; if we have seen it before this brings back the name, how many jobs
    * they have had and whether they are blocked, so nobody re-keys a regular.
