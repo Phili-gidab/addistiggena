@@ -423,6 +423,24 @@ class FinanceRangeQuery {
   to?: string;
 }
 
+/** Narrow the audit log - who did it, what they did, what it was done to. */
+class AuditQuery extends FinanceRangeQuery {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  who?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  action?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  target?: string;
+}
+
 class DepositQueueQuery {
   @IsOptional()
   @IsEnum(DepositStatus)
@@ -1568,12 +1586,81 @@ export class AdminController {
 
   @Get('audit')
   @Roles('ADMIN')
-  auditLog() {
+  auditLog(@Query() query: AuditQuery) {
     return this.prisma.auditLog.findMany({
+      where: this.auditWhere(query),
       include: { actor: { select: { name: true, username: true } } },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 300,
     });
+  }
+
+  /** The same rows as a CSV, so a period can be filed or handed over. */
+  @Get('audit/export')
+  @Roles('ADMIN')
+  async auditExport(@Res({ passthrough: true }) res: Response, @Query() query: AuditQuery) {
+    const rows = await this.prisma.auditLog.findMany({
+      where: this.auditWhere(query),
+      include: { actor: { select: { name: true, username: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const esc = (v: unknown) => {
+      const t = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+    };
+    const lines = [['when', 'who', 'role', 'action', 'target_type', 'target_id', 'reason', 'detail'].join(',')];
+    for (const a of rows) {
+      lines.push(
+        [
+          a.createdAt.toISOString(),
+          a.actor?.name ?? a.actor?.username ?? '',
+          a.actorRole,
+          a.action,
+          a.targetType,
+          a.targetId,
+          a.reason ?? '',
+          a.meta ? JSON.stringify(a.meta) : '',
+        ]
+          .map(esc)
+          .join(','),
+      );
+    }
+    res.setHeader('content-type', 'text/csv; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return lines.join('\n');
+  }
+
+  /** Shared by the log and its export so both narrow identically. */
+  private auditWhere(query: AuditQuery): Prisma.AuditLogWhereInput {
+    const from = query.from ? new Date(query.from) : null;
+    if (from) from.setHours(0, 0, 0, 0);
+    const to = query.to ? new Date(query.to) : null;
+    if (to) to.setHours(23, 59, 59, 999);
+
+    return {
+      ...(from || to
+        ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+        : {}),
+      ...(query.action ? { action: { contains: query.action, mode: 'insensitive' } } : {}),
+      ...(query.target
+        ? {
+            OR: [
+              { targetType: { contains: query.target, mode: 'insensitive' } },
+              { targetId: { contains: query.target, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(query.who
+        ? {
+            actor: {
+              OR: [
+                { name: { contains: query.who, mode: 'insensitive' } },
+                { username: { contains: query.who, mode: 'insensitive' } },
+              ],
+            },
+          }
+        : {}),
+    };
   }
 
   // -- Support refund cap (spec section 5) ------------------------------------

@@ -238,6 +238,7 @@ interface StaffAccount {
 
 interface AuditEntry {
   id: string;
+  meta?: Record<string, unknown> | null;
   action: string;
   targetType: string;
   targetId: string;
@@ -511,6 +512,7 @@ export default function AdminPage() {
     escalateAfterAttempts: '',
     arrivalTargetMinutes: '',
     minWalletBalanceEtb: '',
+    workingHours: '',
   });
   const [newCase, setNewCase] = useState({ bookingId: '', type: 'DISPUTE', note: '' });
   const [newBooking, setNewBooking] = useState({
@@ -540,6 +542,8 @@ export default function AdminPage() {
   /** what the officer has typed into the technician picker on the deposit form */
   const [techQuery, setTechQuery] = useState('');
   /** the application being rejected, and the reasons ticked so far */
+  const [auditQuery, setAuditQuery] = useState({ who: '', action: '', target: '', from: '', to: '' });
+  const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<{
     id: string;
     name: string;
@@ -634,9 +638,16 @@ export default function AdminPage() {
       }
       if (has('reviews')) api<PendingReview[]>('/admin/reviews').then(setReviews).catch(() => {});
       if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
-      if (has('audit')) api<AuditEntry[]>('/admin/audit').then(setAudit).catch(() => {});
+      if (has('audit')) {
+        const qs = new URLSearchParams(
+          Object.entries(auditQuery).filter(([, v]) => v) as [string, string][],
+        );
+        api<AuditEntry[]>(`/admin/audit${qs.toString() ? `?${qs}` : ''}`)
+          .then(setAudit)
+          .catch(() => {});
+      }
     },
-    [verifStatus, range],
+    [verifStatus, range, auditQuery],
   );
 
   useEffect(() => {
@@ -925,12 +936,14 @@ export default function AdminPage() {
     e.preventDefault();
     setError('');
     try {
-      const body: Record<string, number> = {};
+      // working hours is a string like 06:00-20:00; the rest are numbers
+      const body: Record<string, number | string> = {};
       if (rules.offerWindowMinutes) body.offerWindowMinutes = Number(rules.offerWindowMinutes);
       if (rules.escalateAfterAttempts) body.escalateAfterAttempts = Number(rules.escalateAfterAttempts);
       if (rules.arrivalTargetMinutes) body.arrivalTargetMinutes = Number(rules.arrivalTargetMinutes);
       if (rules.minWalletBalanceEtb)
         body.minWalletBalanceEtb = Number(rules.minWalletBalanceEtb);
+      if (rules.workingHours.trim()) body.workingHours = rules.workingHours.trim();
       await api('/admin/config/dispatch', { method: 'PUT', body: JSON.stringify(body) });
       setNotice('Dispatch rules updated - they apply to new jobs within a minute.');
       setRules({
@@ -938,8 +951,29 @@ export default function AdminPage() {
         escalateAfterAttempts: '',
         arrivalTargetMinutes: '',
         minWalletBalanceEtb: '',
+        workingHours: '',
       });
       api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /** Same shape as the finance export - fetch with auth, then save the blob. */
+  async function exportAudit() {
+    setError('');
+    try {
+      const qs = new URLSearchParams(
+        Object.entries(auditQuery).filter(([, v]) => v) as [string, string][],
+      );
+      const res = await authorizedFetch(`/admin/audit/export${qs.toString() ? `?${qs}` : ''}`);
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -1227,6 +1261,9 @@ export default function AdminPage() {
           <button type="button" className="link-btn" onClick={() => loadContext(t.booking.customer.id)}>
             {t.booking.customer.name ?? t.booking.customer.phone}
           </button>{' '}
+          · <a href={`tel:${t.booking.customer.phone}`} className="link-btn">
+            {t.booking.customer.phone}
+          </a>{' '}
           · {fmtDate(t.createdAt)}
           {t.booking.provider?.user
             ? ` · technician: ${t.booking.provider.user.name ?? t.booking.provider.user.phone}`
@@ -3109,10 +3146,13 @@ export default function AdminPage() {
               {view === 'system' && can('system') && (
                 <>
                   <div className="panel mb">
-                    <h2>Service health</h2>
+                    <h2>Service health · የአገልግሎት ሁኔታ</h2>
                     <p className="hint mb">
                       What is switched on right now. A service that is off is not broken - it is
                       waiting on credentials.
+                      <span className="am-cell">
+                        አሁን የሚሰሩት አገልግሎቶች። የጠፋ አገልግሎት አልተበላሸም - ፈቃድ እየተጠበቀ ነው።
+                      </span>
                     </p>
                     <div className="sys-grid">
                       {[
@@ -3149,6 +3189,11 @@ export default function AdminPage() {
                           <span className={x.on ? 'dot on' : 'dot off'} aria-hidden />
                           <span>
                             <b>{x.label}</b>
+                            {/* the on/off word in both languages - staff read one
+                                or the other, and this is the line that matters */}
+                            <span className={`pill ${x.on ? 'ok' : 'warn'}`}>
+                              {x.on ? 'On · በስራ ላይ' : 'Off · አልተጀመረም'}
+                            </span>
                             <small>{x.detail}</small>
                           </span>
                         </div>
@@ -3164,9 +3209,9 @@ export default function AdminPage() {
                       The minimum deposit balance is the commission credit a technician must still
                       hold to keep being offered work.
                     </p>
-                    <form onSubmit={saveRules} className="row" style={{ flexWrap: 'wrap', gap: '0.6rem' }}>
-                      <div className="field" style={{ maxWidth: 190 }}>
-                        <label>Offer window (minutes)</label>
+                    <form onSubmit={saveRules} className="form-grid" style={{ alignItems: 'end' }}>
+                      <div className="field" style={{ maxWidth: 200 }}>
+                        <label>Offer window (min)</label>
                         <input
                           className="input"
                           inputMode="numeric"
@@ -3190,7 +3235,7 @@ export default function AdminPage() {
                         />
                       </div>
                       <div className="field" style={{ maxWidth: 200 }}>
-                        <label>Arrival target (minutes)</label>
+                        <label>Arrival target (min)</label>
                         <input
                           className="input"
                           inputMode="numeric"
@@ -3199,6 +3244,15 @@ export default function AdminPage() {
                           onChange={(e) =>
                             setRules({ ...rules, arrivalTargetMinutes: e.target.value.replace(/\D/g, '') })
                           }
+                        />
+                      </div>
+                      <div className="field" style={{ maxWidth: 180 }}>
+                        <label>Working hours</label>
+                        <input
+                          className="input"
+                          placeholder={system?.dispatch.workingHours ?? '06:00-20:00'}
+                          value={rules.workingHours}
+                          onChange={(e) => setRules({ ...rules, workingHours: e.target.value })}
                         />
                       </div>
                       <div className="field" style={{ maxWidth: 210 }}>
@@ -3221,8 +3275,7 @@ export default function AdminPage() {
                       </button>
                     </form>
                     <p className="hint">
-                      Working hours {system?.dispatch.workingHours ?? '06:00-20:00'} · support refund
-                      cap {MONEY(system?.money.supportRefundCapEtb ?? 500)} ETB
+                      Support refund cap {MONEY(system?.money.supportRefundCapEtb ?? 500)} ETB
                     </p>
                   </div>
 
@@ -3476,10 +3529,81 @@ export default function AdminPage() {
 
               {view === 'audit' && can('audit') && (
                 <div className="panel">
-                  <h2>Audit log</h2>
-                  {audit.length === 0 && <p className="hint">No staff overrides recorded yet.</p>}
+                  <div className="spread mb">
+                    <h2 style={{ margin: 0 }}>Audit log ({audit.length})</h2>
+                    <button className="btn btn-primary btn-sm" onClick={exportAudit}>
+                      Export report
+                    </button>
+                  </div>
+                  <div className="form-grid mb">
+                    <div className="field">
+                      <label>Who</label>
+                      <input
+                        className="input"
+                        placeholder="name or username"
+                        value={auditQuery.who}
+                        onChange={(e) => setAuditQuery({ ...auditQuery, who: e.target.value })}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Action</label>
+                      <input
+                        className="input"
+                        placeholder="e.g. DEPOSIT_CONFIRM"
+                        value={auditQuery.action}
+                        onChange={(e) => setAuditQuery({ ...auditQuery, action: e.target.value })}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Target</label>
+                      <input
+                        className="input"
+                        placeholder="type or id"
+                        value={auditQuery.target}
+                        onChange={(e) => setAuditQuery({ ...auditQuery, target: e.target.value })}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>From</label>
+                      <input
+                        className="input"
+                        type="date"
+                        value={auditQuery.from}
+                        max={auditQuery.to || undefined}
+                        onChange={(e) => setAuditQuery({ ...auditQuery, from: e.target.value })}
+                      />
+                    </div>
+                    <div className="field">
+                      <label>To</label>
+                      <input
+                        className="input"
+                        type="date"
+                        value={auditQuery.to}
+                        min={auditQuery.from || undefined}
+                        onChange={(e) => setAuditQuery({ ...auditQuery, to: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  {Object.values(auditQuery).some(Boolean) && (
+                    <p className="hint mb">
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setAuditQuery({ who: '', action: '', target: '', from: '', to: '' })}
+                      >
+                        clear all filters
+                      </button>
+                    </p>
+                  )}
+                  {audit.length === 0 && (
+                    <p className="hint">
+                      {Object.values(auditQuery).some(Boolean)
+                        ? 'Nothing matches these filters.'
+                        : 'No staff overrides recorded yet.'}
+                    </p>
+                  )}
                   {audit.length > 0 && (
-                    <div style={{ overflowX: 'auto' }}>
+                    <div className="table-scroll-y scroll-cap" style={{ overflowX: 'auto' }}>
                       <table className="table">
                         <thead>
                           <tr>
@@ -3491,23 +3615,60 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {audit.slice(0, 40).map((a) => (
-                            <tr key={a.id}>
-                              <td className="hint">{fmtDate(a.createdAt)}</td>
-                              <td>
-                                {a.actor.name ?? a.actor.username}
-                                <div className="hint">{a.actorRole.replace(/_/g, ' ').toLowerCase()}</div>
-                              </td>
-                              <td>
-                                <code>{a.action}</code>
-                              </td>
-                              <td className="hint">
-                                {a.targetType} #{a.targetId.slice(-6)}
-                              </td>
-                              <td className="hint" style={{ maxWidth: 240 }}>
-                                {a.reason ?? '-'}
-                              </td>
-                            </tr>
+                          {audit.map((a) => (
+                            <Fragment key={a.id}>
+                              <tr
+                                className={`row-open${openAudit === a.id ? ' on' : ''}`}
+                                onClick={() => setOpenAudit(openAudit === a.id ? null : a.id)}
+                              >
+                                <td className="hint">{fmtDate(a.createdAt)}</td>
+                                <td>
+                                  {a.actor.name ?? a.actor.username}
+                                  <div className="hint">{a.actorRole.replace(/_/g, ' ').toLowerCase()}</div>
+                                </td>
+                                <td>
+                                  <code>{a.action}</code>
+                                </td>
+                                <td className="hint">
+                                  {a.targetType} #{a.targetId.slice(-6)}
+                                </td>
+                                <td className="hint" style={{ maxWidth: 240 }}>
+                                  {a.reason ?? '-'}
+                                </td>
+                              </tr>
+                              {openAudit === a.id && (
+                                <tr className="row-detail">
+                                  <td colSpan={5}>
+                                    <dl>
+                                      <dt>When</dt>
+                                      <dd>{new Date(a.createdAt).toLocaleString()}</dd>
+                                      <dt>Who</dt>
+                                      <dd>
+                                        {a.actor.name ?? '-'}{' '}
+                                        {a.actor.username ? `(${a.actor.username})` : ''} ·{' '}
+                                        {a.actorRole.replace(/_/g, ' ').toLowerCase()}
+                                      </dd>
+                                      <dt>Action</dt>
+                                      <dd>{a.action}</dd>
+                                      <dt>Target</dt>
+                                      <dd>
+                                        {a.targetType} {a.targetId}
+                                      </dd>
+                                      <dt>Reason</dt>
+                                      <dd>{a.reason ?? 'none given'}</dd>
+                                      <dt>Detail</dt>
+                                      <dd>
+                                        {a.meta
+                                          ? Object.entries(a.meta)
+                                              .map(([k, v]) => `${k}: ${String(v)}`)
+                                              .join(' · ')
+                                          : '-'}
+                                      </dd>
+                                    </dl>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
                           ))}
                         </tbody>
                       </table>
