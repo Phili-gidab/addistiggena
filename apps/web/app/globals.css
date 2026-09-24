@@ -2073,3 +2073,11 @@ body.scroll-locked .site-header { transform: none; }
 .feed-kind.payment { background: var(--ok-bg); color: var(--ok-fg); }
 .feed-kind.complaint { background: var(--err-bg); color: var(--err-fg); }
 .feed-kind.deposit { background: var(--warn-bg); color: var(--warn-fg); }
+/* the Amharic half of a console title sits quieter than the English */
+.console .page-title .title-am {
+  font-family: var(--font-am); font-weight: 600;
+  font-size: 0.5em; color: var(--blue); margin-left: 0.6rem; white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .console .page-title .title-am { display: block; margin: 0.25rem 0 0; font-size: 0.55em; }
+}

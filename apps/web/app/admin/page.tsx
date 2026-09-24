@@ -1928,7 +1928,10 @@ export default function AdminPage() {
       )}
 
       <div className="container console-container">
-        <h1 className="page-title">{titles ? `${titles.en} · ${titles.am}` : 'Staff console'}</h1>
+        <h1 className="page-title">
+          {titles ? titles.en : 'Staff console'}
+          {titles && <span className="title-am">{titles.am}</span>}
+        </h1>
         <p className="page-sub">{titles?.sub ?? ''}</p>
 
         {error && <div className="error-box">{error}</div>}
