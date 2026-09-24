@@ -72,8 +72,8 @@ interface WalletDetail {
 // mandatory - Fayda/Resident ID, Woreda recommendation letter, CoC practical
 // pass, Woreda/police clearance; optional - TVET/trade certificate, portfolio.
 const DOC_TYPES = [
-  { value: 'NATIONAL_ID', label: 'Fayda / Resident ID · መታወቂያ', required: true },
-  { value: 'WOREDA_RECOMMENDATION', label: 'Woreda recommendation letter · የወረዳ ደብዳቤ', required: true },
+  { value: 'NATIONAL_ID', label: 'Fayda or Addis Ababa digital ID · ፋይዳ ወይም የአዲስ አበባ ዲጂታል መታወቂያ', required: true },
+  { value: 'WOREDA_RECOMMENDATION', label: 'Woreda recommendation letter (optional) · የወረዳ ደብዳቤ', required: false },
   { value: 'COC_CERTIFICATE', label: 'CoC assessment pass · የCoC ማረጋገጫ', required: true },
   { value: 'POLICE_CLEARANCE', label: 'Police clearance · የፖሊስ ማረጋገጫ', required: true },
   { value: 'TRADE_CERTIFICATE', label: 'TVET / trade certificate (optional)', required: false },

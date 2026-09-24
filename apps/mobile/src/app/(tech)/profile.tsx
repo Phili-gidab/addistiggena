@@ -11,11 +11,16 @@ import { CredentialsCard } from '../../components/CredentialsCard';
 import { useAuth } from '../../store/auth';
 
 /** The paperwork the official onboarding protocol requires, in review order. */
+/** The three the verification desk must see (client, 2026-09-24). */
 const REQUIRED: { type: DocumentType; label: string; am: string; hint: string }[] = [
-  { type: 'NATIONAL_ID', label: 'Fayda / Resident ID', am: 'ፋይዳ ወይም የነዋሪነት መታወቂያ', hint: 'A clear photo of the front' },
-  { type: 'WOREDA_RECOMMENDATION', label: 'Woreda recommendation letter', am: 'የወረዳ የድጋፍ ደብዳቤ', hint: 'From your residential Woreda' },
-  { type: 'COC_CERTIFICATE', label: 'CoC certificate', am: 'የCoC ሰርተፍኬት', hint: 'Government skill assessment' },
+  { type: 'NATIONAL_ID', label: 'Fayda or Addis Ababa digital ID', am: 'ፋይዳ ወይም የአዲስ አበባ ዲጂታል መታወቂያ', hint: 'A clear photo of the front' },
   { type: 'POLICE_CLEARANCE', label: 'Police clearance', am: 'የፖሊስ ማረጋገጫ', hint: 'Recent criminal record check' },
+  { type: 'COC_CERTIFICATE', label: 'CoC certificate', am: 'የCoC ሰርተፍኬት', hint: 'Government skill assessment' },
+];
+
+/** accepted and filed, but they do not hold up a verification */
+const OPTIONAL: { type: DocumentType; label: string; am: string; hint: string }[] = [
+  { type: 'WOREDA_RECOMMENDATION', label: 'Woreda recommendation letter', am: 'የወረዳ የድጋፍ ደብዳቤ', hint: 'From your residential Woreda' },
 ];
 
 /** Technician profile: identity, verification state, rating, sign out. */
@@ -101,12 +106,12 @@ export default function TechProfile() {
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Documents · ሰነዶች</Text>
           <Hint style={{ marginTop: 6, lineHeight: 19 }}>
-            Upload each document once. Our verification team reviews them within 3-5 days, and you
-            can go online as soon as your profile is verified.
+            The first three are required. Upload each once - our verification team reviews them
+            within 3-5 days, and you can go online as soon as your profile is verified.
           </Hint>
           <ErrorBox>{error}</ErrorBox>
           <OkBox>{notice}</OkBox>
-          {REQUIRED.map((d) => {
+          {[...REQUIRED, ...OPTIONAL].map((d) => {
             const doc = profile?.documents?.find((x) => x.type === d.type);
             const tone =
               doc?.state === 'APPROVED' ? C.green : doc?.state === 'REJECTED' ? C.red : C.amber;
@@ -133,6 +138,7 @@ export default function TechProfile() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={st.docName} numberOfLines={1}>
                     {d.label}
+                    {OPTIONAL.some((o) => o.type === d.type) ? ' (optional)' : ''}
                   </Text>
                   <Am style={{ fontSize: 11 }} numberOfLines={1}>
                     {d.am}

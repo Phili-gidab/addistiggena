@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { CategoryBars, DailyBars } from '../../components/charts';
 import { ConsoleBar } from '../../components/ConsoleBar';
+import { DocPreview } from '../../components/DocPreview';
 import { StatusBadge } from '../../components/StatusBadge';
 import {
   api,
@@ -395,11 +396,32 @@ const TICKET_LABEL: Record<Ticket['type'], string> = {
   SAFETY: 'Safety flag',
 };
 
+/**
+ * The three the desk must see before anyone is verified (client, 2026-09-24).
+ * Called plainly "ID" here; the application form is where it says which IDs
+ * count. The Woreda letter is still accepted and filed, but no longer blocks
+ * a verification.
+ */
 const REQUIRED_DOCS = [
-  { type: 'NATIONAL_ID', label: 'Fayda ID' },
-  { type: 'WOREDA_RECOMMENDATION', label: 'Woreda letter' },
-  { type: 'COC_CERTIFICATE', label: 'CoC pass' },
+  { type: 'NATIONAL_ID', label: 'ID' },
   { type: 'POLICE_CLEARANCE', label: 'Police clearance' },
+  { type: 'COC_CERTIFICATE', label: 'CoC pass' },
+];
+
+/** accepted as supporting evidence, not required to verify */
+const OPTIONAL_DOCS = [
+  { type: 'WOREDA_RECOMMENDATION', label: 'Woreda letter' },
+  { type: 'TRADE_CERTIFICATE', label: 'Trade certificate' },
+  { type: 'PORTFOLIO', label: 'Portfolio' },
+];
+
+/** why an application was turned down - kept on record and texted to them */
+const REJECT_REASONS = [
+  'Incomplete police clearance',
+  'Expired ID',
+  'Expired CoC certificate',
+  'ID does not match the applicant',
+  'Document unreadable',
 ];
 
 /** A blank Technician Registration Form - every field the paper form has. */
@@ -517,6 +539,13 @@ export default function AdminPage() {
   const [arrearsOnly, setArrearsOnly] = useState(false);
   /** what the officer has typed into the technician picker on the deposit form */
   const [techQuery, setTechQuery] = useState('');
+  /** the application being rejected, and the reasons ticked so far */
+  const [rejecting, setRejecting] = useState<{
+    id: string;
+    name: string;
+    reasons: string[];
+    note: string;
+  } | null>(null);
   const [techFilter, setTechFilter] = useState('');
   const [techGrouped, setTechGrouped] = useState(true);
   const [newStaff, setNewStaff] = useState({
@@ -1055,6 +1084,23 @@ export default function AdminPage() {
     document.getElementById('record-deposit')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
+  const missingDocs = (p: PendingProvider) =>
+    REQUIRED_DOCS.filter((r) => !p.documents.some((d) => d.type === r.type)).map((r) => r.label);
+  const hasAllRequired = (p: PendingProvider) => missingDocs(p).length === 0;
+
+  /** 24 - record why, and let the applicant know */
+  async function submitRejection() {
+    if (!rejecting) return;
+    const note = [...rejecting.reasons, rejecting.note.trim()].filter(Boolean).join('; ');
+    if (!note) {
+      setError('Pick at least one reason - it is kept on record and sent to the applicant.');
+      return;
+    }
+    const target = rejecting.id;
+    setRejecting(null);
+    await act(`/admin/providers/${target}/reject`, { note });
+  }
+
   const tile = (v: string | number, k: string, hi = false, sub?: string) => (
     <div className={`tile${hi ? ' hi' : ''}`} key={k}>
       <div className="v">{v}</div>
@@ -1473,9 +1519,11 @@ export default function AdminPage() {
                     <td>
                       {p.documents.length === 0 && <span className="hint">none yet</span>}
                       {p.documents.map((d) => (
-                        <button key={d.id} type="button" className="doc-link" onClick={() => openDocument(d.objectKey)}>
-                          {d.type.replace(/_/g, ' ').toLowerCase()}
-                        </button>
+                        <DocPreview
+                          key={d.id}
+                          objectKey={d.objectKey}
+                          label={d.type.replace(/_/g, ' ').toLowerCase()}
+                        />
                       ))}
                       {/* wraps onto several lines - on one it runs past the cell
                           and over the next column */}
@@ -1560,18 +1608,30 @@ export default function AdminPage() {
                     <td>
                       <span className="row" style={{ justifyContent: 'flex-end' }}>
                         {p.verificationStatus !== 'VERIFIED' && (
-                          <button className="btn btn-teal btn-sm" onClick={() => act(`/admin/providers/${p.id}/verify`)}>
+                          <button
+                            className="btn btn-teal btn-sm"
+                            disabled={!hasAllRequired(p)}
+                            title={
+                              hasAllRequired(p)
+                                ? 'Approve this technician'
+                                : `Still missing: ${missingDocs(p).join(', ')}`
+                            }
+                            onClick={() => act(`/admin/providers/${p.id}/verify`)}
+                          >
                             Verify ✓
                           </button>
                         )}
                         {p.verificationStatus === 'PENDING' && (
                           <button
                             className="btn btn-line btn-sm"
-                            onClick={() => {
-                              const note = window.prompt('Reason for rejection · ውድቅ የሆነበት ምክንያት');
-                              if (note === null) return;
-                              act(`/admin/providers/${p.id}/reject`, note.trim() ? { note: note.trim() } : undefined);
-                            }}
+                            onClick={() =>
+                              setRejecting({
+                                id: p.id,
+                                name: p.user.name ?? p.user.phone,
+                                reasons: [],
+                                note: '',
+                              })
+                            }
                           >
                             Reject
                           </button>
@@ -1654,6 +1714,52 @@ export default function AdminPage() {
 
         {error && <div className="error-box">{error}</div>}
         {notice && <div className="ok-box">{notice}</div>}
+        {rejecting && (
+          <div className="modal-veil" onClick={() => setRejecting(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h2>Reject {rejecting.name}</h2>
+              <p className="hint mb">
+                The reason is kept on the application and texted to the applicant, so they know
+                what to fix before re-applying.
+              </p>
+              {REJECT_REASONS.map((reason) => (
+                <label key={reason} className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={rejecting.reasons.includes(reason)}
+                    onChange={(e) =>
+                      setRejecting({
+                        ...rejecting,
+                        reasons: e.target.checked
+                          ? [...rejecting.reasons, reason]
+                          : rejecting.reasons.filter((r) => r !== reason),
+                      })
+                    }
+                  />
+                  <span>{reason}</span>
+                </label>
+              ))}
+              <div className="field" style={{ marginTop: '0.8rem' }}>
+                <label>Anything else (optional)</label>
+                <input
+                  className="input"
+                  placeholder="in your own words"
+                  value={rejecting.note}
+                  onChange={(e) => setRejecting({ ...rejecting, note: e.target.value })}
+                />
+              </div>
+              <div className="form-actions">
+                <button className="btn btn-dark btn-sm" onClick={submitRejection}>
+                  Reject and notify
+                </button>
+                <button className="btn btn-line btn-sm" onClick={() => setRejecting(null)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {connection === 'lost' && (
           <div className="warn-box">
             Lost contact with the server - showing the last data we loaded.{' '}
