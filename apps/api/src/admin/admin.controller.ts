@@ -1390,6 +1390,83 @@ export class AdminController {
 
   /** Everything a support agent needs on one screen: who they are, their repair
    *  history, what they paid, and every case opened on their account. */
+  /**
+   * Who is on the phone. The operator types the number they are being called
+   * from; if we have seen it before this brings back the name, how many jobs
+   * they have had and whether they are blocked, so nobody re-keys a regular.
+   */
+  @Get('customers/lookup')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT', 'SUBCITY_COORDINATOR')
+  async lookupCaller(@Query('phone') raw?: string) {
+    const digits = (raw ?? '').replace(/\D/g, '');
+    if (digits.length < 9) return { found: false };
+    const phone = normalizePhone(raw!);
+    const customer = await this.prisma.user.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        disabledAt: true,
+        createdAt: true,
+        _count: { select: { bookings: true } },
+        bookings: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true, category: { select: { nameEn: true } }, status: true },
+        },
+      },
+    });
+    if (!customer) return { found: false };
+    const [last] = customer.bookings;
+    return {
+      found: true,
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      blocked: !!customer.disabledAt,
+      bookings: customer._count.bookings,
+      customerSince: customer.createdAt,
+      lastBooking: last
+        ? { at: last.createdAt, service: last.category.nameEn, status: last.status }
+        : null,
+    };
+  }
+
+  /** Stop a nuisance or scam caller booking again. Reversible, and logged. */
+  @Post('customers/:id/block')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
+  async blockCustomer(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: VerdictDto,
+  ) {
+    const customer = await this.prisma.user.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (customer.role !== 'CUSTOMER') {
+      throw new BadRequestException('Only customer accounts can be blocked here');
+    }
+    this.audit.log(actor, 'CUSTOMER_BLOCK', 'User', id, dto.note);
+    return this.prisma.user.update({
+      where: { id },
+      data: { disabledAt: new Date() },
+      select: { id: true, name: true, phone: true, disabledAt: true },
+    });
+  }
+
+  @Post('customers/:id/unblock')
+  @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
+  async unblockCustomer(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    const customer = await this.prisma.user.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException('Customer not found');
+    this.audit.log(actor, 'CUSTOMER_UNBLOCK', 'User', id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { disabledAt: null },
+      select: { id: true, name: true, phone: true, disabledAt: true },
+    });
+  }
+
   @Get('customers/:id/context')
   @Roles('ADMIN', 'OPS_MANAGER', 'SUPPORT_AGENT')
   async customerContext(@Param('id') id: string) {

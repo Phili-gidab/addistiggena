@@ -236,6 +236,18 @@ interface StaffAccount {
   createdAt: string;
 }
 
+/** GET /admin/customers/lookup - the caller behind a phone number */
+interface CallerLookup {
+  found: boolean;
+  id?: string;
+  name?: string | null;
+  phone?: string;
+  blocked?: boolean;
+  bookings?: number;
+  customerSince?: string;
+  lastBooking?: { at: string; service: string; status: string } | null;
+}
+
 interface AuditEntry {
   id: string;
   meta?: Record<string, unknown> | null;
@@ -542,6 +554,10 @@ export default function AdminPage() {
   /** what the officer has typed into the technician picker on the deposit form */
   const [techQuery, setTechQuery] = useState('');
   /** the application being rejected, and the reasons ticked so far */
+  /** who is on the phone, once we recognise the number */
+  const [caller, setCaller] = useState<CallerLookup | null>(null);
+  /** true once the operator has actually placed the pin themselves */
+  const [pinPlaced, setPinPlaced] = useState(false);
   const [auditQuery, setAuditQuery] = useState({ who: '', action: '', target: '', from: '', to: '' });
   const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<{
@@ -1133,6 +1149,51 @@ export default function AdminPage() {
     const target = rejecting.id;
     setRejecting(null);
     await act(`/admin/providers/${target}/reject`, { note });
+  }
+
+  /** Neighbourhoods that match what the operator typed, with the sub-city
+   *  centre to jump to. Straight from the coverage list we already keep. */
+  const landmarkMatches = (() => {
+    const q = newBooking.landmark.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const out: { label: string; subCity: string; lat: number; lng: number }[] = [];
+    for (const sc of SUB_CITIES) {
+      if (sc.name.toLowerCase().includes(q) || sc.nameAm.includes(q)) {
+        out.push({ label: sc.name, subCity: sc.name, lat: sc.lat, lng: sc.lng });
+      }
+      for (const n of sc.neighborhoods) {
+        if (n.toLowerCase().includes(q)) {
+          out.push({ label: n, subCity: sc.name, lat: sc.lat, lng: sc.lng });
+        }
+      }
+    }
+    return out.slice(0, 6);
+  })();
+
+  const jumpTo = (m: { label: string; lat: number; lng: number }) => {
+    setPin({ lat: m.lat, lng: m.lng });
+    setPinPlaced(true);
+    setNewBooking((b) => ({ ...b, landmark: m.label }));
+  };
+
+  /** 11 - recognise a number we have seen before */
+  async function lookupCaller(phone: string) {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 9) {
+      setCaller(null);
+      return;
+    }
+    try {
+      const found = await api<CallerLookup>(
+        `/admin/customers/lookup?phone=${encodeURIComponent(phone)}`,
+      );
+      setCaller(found.found ? found : null);
+      if (found.found && found.name && !newBooking.customerName) {
+        setNewBooking((b) => ({ ...b, customerName: found.name ?? '' }));
+      }
+    } catch {
+      setCaller(null);
+    }
   }
 
   const tile = (v: string | number, k: string, hi = false, sub?: string) => (
@@ -1731,6 +1792,12 @@ export default function AdminPage() {
       label: `#${b.id.slice(-6).toUpperCase()} ${b.category.nameEn}`,
       sub: `${b.status} · ${b.customer?.name ?? b.customer?.phone ?? ''}`,
     }));
+  /** technicians already assigned to a live job - shown differently on the map */
+  const busyTechIds = new Set(
+    bookings
+      .filter((b) => ACTIVE_STATUSES.includes(b.status) && b.provider?.id)
+      .map((b) => b.provider!.id),
+  );
   const mapTechs = technicians
     .filter((t) => t.isAvailable && t.verificationStatus === 'VERIFIED' && t.lat != null && t.lng != null)
     .map((t) => ({
@@ -1738,7 +1805,8 @@ export default function AdminPage() {
       lat: t.lat!,
       lng: t.lng!,
       label: t.name ?? t.phone,
-      sub: `${t.category.nameEn} · online`,
+      sub: `${t.category.nameEn} · ${busyTechIds.has(t.id) ? 'on a job' : 'free'}`,
+      busy: busyTechIds.has(t.id),
     }));
 
   return (
@@ -1851,22 +1919,74 @@ export default function AdminPage() {
               {view === 'dashboard' && dashboardView}
 
               {view === 'map' && can('map') && (
-                <>
-                  <div className="panel mb">
+                <div className="dispatch-split">
+                  <div className="panel">
                     <h2>Create booking (phone order)</h2>
                     <p className="hint mb">
                       For a customer who calls instead of using the app. An unknown number becomes a
                       customer account, and the closest verified technician is offered the job the
-                      moment you save. Drag the pin on the map below first if the caller is not near
-                      Meskel Square.
+                      moment you save. Type where they are into Landmark and the map jumps there -
+                      or drag the pin yourself.
                     </p>
+                    {caller?.found && (
+                      <div className={`caller-card${caller.blocked ? ' blocked' : ''}`}>
+                        <div>
+                          <b>
+                            {caller.name || 'Known caller'}
+                            {caller.blocked && <span className="pill danger">blocked</span>}
+                          </b>
+                          <small>
+                            {caller.bookings} previous booking{caller.bookings === 1 ? '' : 's'}
+                            {caller.lastBooking
+                              ? ` · last ${caller.lastBooking.service}, ${caller.lastBooking.status.toLowerCase()}, ${fmtDate(caller.lastBooking.at)}`
+                              : ''}
+                          </small>
+                        </div>
+                        <span className="row" style={{ gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-line btn-sm"
+                            onClick={() => {
+                              loadContext(caller.id!);
+                              setView('tickets');
+                            }}
+                          >
+                            History
+                          </button>
+                          <button
+                            type="button"
+                            className={caller.blocked ? 'btn btn-teal btn-sm' : 'btn btn-line btn-sm'}
+                            onClick={async () => {
+                              if (caller.blocked) {
+                                await act(`/admin/customers/${caller.id}/unblock`);
+                              } else {
+                                const note = window.prompt(
+                                  'Why is this caller being blocked? (kept on the audit log)',
+                                );
+                                if (note === null) return;
+                                await act(
+                                  `/admin/customers/${caller.id}/block`,
+                                  note.trim() ? { note: note.trim() } : undefined,
+                                );
+                              }
+                              lookupCaller(newBooking.phone);
+                            }}
+                          >
+                            {caller.blocked ? 'Unblock' : 'Block caller'}
+                          </button>
+                        </span>
+                      </div>
+                    )}
                     <form onSubmit={createBookingForCaller}>
                       <div className="form-grid">
                         <div className="field">
                           <label>Caller phone</label>
                           <input className="input" placeholder="09…" inputMode="tel"
                             value={newBooking.phone}
-                            onChange={(e) => setNewBooking({ ...newBooking, phone: e.target.value })} />
+                            onChange={(e) => {
+                              setNewBooking({ ...newBooking, phone: e.target.value });
+                              lookupCaller(e.target.value);
+                            }} />
                         </div>
                         <div className="field">
                           <label>Caller name</label>
@@ -1886,9 +2006,23 @@ export default function AdminPage() {
                         </div>
                         <div className="field span-2">
                           <label>Landmark</label>
-                          <input className="input" placeholder="e.g. behind Edna Mall"
+                          <input className="input" placeholder="e.g. Bole Medhanialem"
                             value={newBooking.landmark}
                             onChange={(e) => setNewBooking({ ...newBooking, landmark: e.target.value })} />
+                          {landmarkMatches.length > 0 && (
+                            <span className="suggest">
+                              {landmarkMatches.map((m) => (
+                                <button
+                                  key={`${m.subCity}-${m.label}`}
+                                  type="button"
+                                  onClick={() => jumpTo(m)}
+                                >
+                                  {m.label}
+                                  <small>{m.subCity}</small>
+                                </button>
+                              ))}
+                            </span>
+                          )}
                         </div>
                         <div className="field span-full">
                           <label>What is broken?</label>
@@ -1899,28 +2033,39 @@ export default function AdminPage() {
                       </div>
                       <div className="form-actions">
                         <button className="btn btn-dark btn-sm"
-                          disabled={newBooking.phone.trim().length < 9 || !newBooking.categoryId}>
+                          disabled={
+                            newBooking.phone.trim().length < 9 ||
+                            !newBooking.categoryId ||
+                            !!caller?.blocked
+                          }
+                          title={caller?.blocked ? 'This caller is blocked' : undefined}>
                           + Create booking
                         </button>
-                        <span className="hint">
-                          pin {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
+                        <span className={pinPlaced ? 'hint' : 'pin-warn'}>
+                          {pinPlaced
+                            ? `pin set · ${pin.lat.toFixed(4)}, ${pin.lng.toFixed(4)}`
+                            : 'pin not set - this job will go to Meskel Square'}
                         </span>
                         <button type="button" className="link-btn"
-                          onClick={() => setPin({ lat: 9.0108, lng: 38.7613 })}>
+                          onClick={() => {
+                            setPin({ lat: 9.0108, lng: 38.7613 });
+                            setPinPlaced(false);
+                          }}>
                           reset pin
                         </button>
                       </div>
                     </form>
                   </div>
 
-                <div className="panel">
-                  <h2>
-                    Live dispatch map · {mapJobs.length} active job{mapJobs.length === 1 ? '' : 's'},{' '}
-                    {mapTechs.length} technician{mapTechs.length === 1 ? '' : 's'} online
-                  </h2>
-                  <DispatchMap jobs={mapJobs} techs={mapTechs} />
+                  <div className="panel">
+                    <h2>
+                      Live dispatch map · {mapJobs.length} active job
+                      {mapJobs.length === 1 ? '' : 's'}, {mapTechs.length} technician
+                      {mapTechs.length === 1 ? '' : 's'} online
+                    </h2>
+                    <DispatchMap jobs={mapJobs} techs={mapTechs} />
                   </div>
-                </>
+                </div>
               )}
 
               {view === 'bookings' && (

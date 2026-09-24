@@ -8,6 +8,10 @@
 export interface SubCity {
   name: string;
   nameAm: string;
+  /** approximate centre - moves the dispatch map to the right part of town,
+   *  the operator then drags the pin to the exact spot */
+  lat: number;
+  lng: number;
   neighborhoods: string[];
 }
 
@@ -15,6 +19,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Bole',
     nameAm: 'ቦሌ',
+    lat: 8.995,
+    lng: 38.79,
     neighborhoods: [
       'Bole Medhanialem',
       'Bole Atlas',
@@ -32,6 +38,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Yeka',
     nameAm: 'የካ',
+    lat: 9.05,
+    lng: 38.8,
     neighborhoods: [
       'Yeka Abado',
       'Yeka Michael',
@@ -57,6 +65,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Kirkos',
     nameAm: 'ቂርቆስ',
+    lat: 9.01,
+    lng: 38.76,
     neighborhoods: [
       'Meskel Square area',
       'Kazanchis',
@@ -72,6 +82,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Lideta',
     nameAm: 'ልደታ',
+    lat: 9.02,
+    lng: 38.73,
     neighborhoods: [
       'Lideta',
       'Abnet',
@@ -85,6 +97,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Arada',
     nameAm: 'አራዳ',
+    lat: 9.04,
+    lng: 38.75,
     neighborhoods: [
       'Piassa',
       'Arat Kilo',
@@ -98,6 +112,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Addis Ketema',
     nameAm: 'አዲስ ከተማ',
+    lat: 9.04,
+    lng: 38.73,
     neighborhoods: [
       'Mercato',
       'Sebategna',
@@ -110,6 +126,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Gullele',
     nameAm: 'ጉለሌ',
+    lat: 9.06,
+    lng: 38.73,
     neighborhoods: [
       'Shiro Meda',
       'Entoto',
@@ -122,11 +140,15 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Kolfe Keranio',
     nameAm: 'ኮልፌ ቀራንዮ',
+    lat: 9.02,
+    lng: 38.69,
     neighborhoods: ['Kolfe', 'Ayer Tena', 'Bethel', 'Tor Hailoch', 'Kara', 'Keranio', 'Repi'],
   },
   {
     name: 'Nifas Silk-Lafto',
     nameAm: 'ንፋስ ስልክ-ላፍቶ',
+    lat: 8.98,
+    lng: 38.72,
     neighborhoods: [
       'Jemo 1 condominium',
       'Jemo 2 condominium',
@@ -142,6 +164,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Lemi Kura',
     nameAm: 'ለሚ ኩራ',
+    lat: 9.02,
+    lng: 38.85,
     neighborhoods: [
       'Bole Arabsa',
       'Yeka Abado condominiums',
@@ -154,6 +178,8 @@ export const SUB_CITIES: SubCity[] = [
   {
     name: 'Akaky Kaliti',
     nameAm: 'አቃቂ ቃሊቲ',
+    lat: 8.88,
+    lng: 38.79,
     neighborhoods: [
       'Akaky',
       'Kaliti',

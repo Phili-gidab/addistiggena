@@ -227,6 +227,15 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async create(customerId: string, dto: CreateBookingDto) {
+    // a blocked caller is blocked everywhere - app, website and the phone desk
+    const customer = await this.prisma.user.findUnique({
+      where: { id: customerId },
+      select: { disabledAt: true },
+    });
+    if (customer?.disabledAt) {
+      throw new ForbiddenException('This account has been blocked - contact support');
+    }
+
     const category = await this.prisma.serviceCategory.findUnique({
       where: { id: dto.categoryId },
     });

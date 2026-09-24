@@ -88,6 +88,12 @@ export class AuthService {
       this.prisma.user.upsert({ where: { phone }, update: {}, create: { phone } }),
     ]);
 
+    // a blocked account must not get in by code either - the code is consumed
+    // above first, so a blocked number cannot keep replaying one
+    if (user.disabledAt) {
+      throw new UnauthorizedException('This account has been blocked - contact support');
+    }
+
     return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }
 

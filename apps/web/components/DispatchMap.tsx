@@ -21,12 +21,15 @@ const jobIcon = (status: string) =>
     iconAnchor: [15, 30],
   });
 
-const techIcon = L.divIcon({
-  className: '',
-  html: '<div class="tech-dot"></div>',
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
-});
+/** Idle technicians and technicians already on a job read differently - a
+ *  single colour for everyone told the dispatcher nothing. */
+const techIcon = (busy?: boolean) =>
+  L.divIcon({
+    className: '',
+    html: `<div class="tech-dot${busy ? ' busy' : ''}"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
 
 export interface MapJob {
   id: string;
@@ -43,6 +46,8 @@ export interface MapTech {
   lng: number;
   label: string;
   sub: string;
+  /** currently the assigned technician on an active job */
+  busy?: boolean;
 }
 
 export default function DispatchMap({ jobs, techs }: { jobs: MapJob[]; techs: MapTech[] }) {
@@ -60,7 +65,7 @@ export default function DispatchMap({ jobs, techs }: { jobs: MapJob[]; techs: Ma
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {techs.map((t) => (
-          <Marker key={`t-${t.id}`} position={[t.lat, t.lng]} icon={techIcon}>
+          <Marker key={`t-${t.id}`} position={[t.lat, t.lng]} icon={techIcon(t.busy)}>
             <Popup>
               <strong>{t.label}</strong>
               <br />
@@ -82,7 +87,8 @@ export default function DispatchMap({ jobs, techs }: { jobs: MapJob[]; techs: Ma
         <span style={{ color: '#d9912c' }}>●</span> awaiting dispatch{' '}
         <span style={{ color: '#0072ce' }}>●</span> accepted / en route{' '}
         <span style={{ color: '#0b1e3f' }}>●</span> on site{' '}
-        <span style={{ color: 'var(--teal)' }}>●</span> online technician
+        <span style={{ color: 'var(--teal)' }}>●</span> technician free{' '}
+        <span style={{ color: '#7a4ecb' }}>●</span> technician on a job
       </p>
     </div>
   );

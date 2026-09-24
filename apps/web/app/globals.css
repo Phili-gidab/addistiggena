@@ -2004,3 +2004,36 @@ body.scroll-locked .site-header { transform: none; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .sys-card .pill { margin: 0.25rem 0 0.15rem; }
 .hint .am-cell { display: block; font-family: var(--font-am); font-size: 0.82rem; margin-top: 0.3rem; }
+
+/* ── dispatch: caller details beside the map, not above it ─────────────── */
+.dispatch-split { display: grid; gap: 1.1rem; align-items: start; }
+@media (min-width: 1100px) {
+  .dispatch-split { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); }
+  .dispatch-split > .panel:last-child { position: sticky; top: 74px; }
+}
+
+/* a number we recognise */
+.caller-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+  flex-wrap: wrap; margin-bottom: 0.9rem; padding: 0.7rem 0.9rem;
+  border: 1px solid var(--blue); border-radius: 12px; background: var(--blue-tint);
+}
+.caller-card.blocked { border-color: var(--err-fg); background: var(--err-bg); }
+.caller-card b { display: flex; align-items: center; gap: 0.45rem; font-size: 0.92rem; color: var(--navy); }
+.caller-card small { display: block; margin-top: 0.15rem; font-size: 0.78rem; color: var(--muted); }
+
+/* neighbourhood suggestions under the landmark box */
+.suggest { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.suggest button {
+  display: inline-flex; align-items: baseline; gap: 0.35rem;
+  padding: 0.28rem 0.6rem; border-radius: 999px;
+  border: 1px solid var(--line); background: #fff;
+  font-size: 0.78rem; font-weight: 600; color: var(--navy); cursor: pointer;
+}
+.suggest button:hover { border-color: var(--blue); background: var(--blue-tint); }
+.suggest button small { color: var(--muted); font-weight: 500; font-size: 0.68rem; }
+
+/* the pin has not been placed yet - say so rather than silently using a default */
+.pin-warn { font-size: 0.82rem; font-weight: 600; color: var(--warn-fg); }
+/* a technician already on a live job reads apart from a free one */
+.tech-dot.busy { background: #7a4ecb; box-shadow: 0 0 0 2px rgba(122, 78, 203, 0.3); }
