@@ -7,9 +7,10 @@ export function StatusBadge({ status }: { status: string }) {
     IN_PROGRESS: 'b-progress',
     COMPLETED: 'b-done',
     PAID: 'b-paid',
-    REJECTED: 'b-dead',
-    EXPIRED: 'b-dead',
-    CANCELLED: 'b-dead',
+    // the client could not tell these apart - each outcome now reads distinctly
+    REJECTED: 'b-rejected',
+    EXPIRED: 'b-expired',
+    CANCELLED: 'b-cancelled',
   };
   return <span className={`badge ${map[status] ?? 'b-dead'}`}>{status.replace('_', ' ')}</span>;
 }

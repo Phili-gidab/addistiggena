@@ -1879,3 +1879,55 @@ body.scroll-locked .site-header { transform: none; }
 .price-jump a:hover { border-color: var(--blue); background: var(--blue-tint); }
 /* land a jumped-to category below the fixed header, not under it */
 .page .panel[id] { scroll-margin-top: 90px; }
+
+/* ── client review, batch 1 ─────────────────────────────────────────────── */
+
+/* Expired / Cancelled / Rejected all shared one grey and were indistinguishable */
+.b-expired { background: #fff1e0; color: #9a5b18; }
+.b-cancelled { background: #f2f2f2; color: #7a7a7a; }
+.b-rejected { background: var(--err-bg); color: var(--err-fg); }
+
+/* a dropped background refresh is not an error the operator caused */
+.warn-box {
+  background: var(--warn-bg); color: var(--warn-fg);
+  border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem;
+  font-size: 0.9rem; font-weight: 600;
+}
+.warn-box .link-btn { color: inherit; }
+
+/* short label, full explanation on hover */
+.explain {
+  border-bottom: 1px dashed var(--muted); cursor: help; font-weight: 600; color: var(--navy);
+}
+
+/* KPI tiles that open the view behind the number */
+.tile.as-link {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.tile.as-link:hover {
+  border-color: var(--blue); transform: translateY(-2px);
+  box-shadow: 0 12px 26px -20px rgba(7, 20, 41, 0.55);
+}
+
+/* quick actions read as plain boxed text - make them obviously clickable and
+   all the same size */
+.qa-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.55rem; }
+.qa-row .btn {
+  width: 100%; justify-content: space-between; gap: 0.5rem;
+  padding: 0.7rem 0.95rem; font-size: 0.86rem;
+}
+.qa-row .btn::after { content: '→'; opacity: 0.55; font-weight: 700; }
+.qa-row .btn:hover { border-color: var(--blue); color: var(--blue-deep); background: var(--blue-tint); }
+@media (max-width: 640px) { .qa-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* password fields with a reveal control */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap .input { width: 100%; padding-right: 2.4rem; }
+.pw-wrap .peek {
+  position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%);
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 7px; color: var(--muted); cursor: pointer;
+}
+.pw-wrap .peek:hover { color: var(--navy); background: var(--surface); }
+.field-help { font-size: 0.75rem; color: var(--muted); line-height: 1.45; margin-top: 0.15rem; }

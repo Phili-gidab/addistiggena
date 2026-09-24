@@ -344,6 +344,17 @@ const ICONS: Record<ViewKey, React.ReactNode> = (() => {
   };
 })();
 
+/** One line on what each role may do - shown under the role picker, because
+ *  "Ops Manager" alone does not tell an administrator what they are granting. */
+const ROLE_BLURB: Record<string, string> = {
+  ADMIN: 'Everything: dispatch, vetting, support, money, staff and the audit log.',
+  OPS_MANAGER: 'Dispatch and bookings: assign jobs, manage technicians and reviews. No money, no staff.',
+  VERIFICATION_OFFICER: 'Vets technician applications and their documents. Nothing else.',
+  SUPPORT_AGENT: 'Customer cases: tickets, booking history and refunds up to the cap.',
+  FINANCE_OFFICER: 'Money only: deposits, commission balances and the finance export.',
+  SUBCITY_COORDINATOR: 'Bookings and technicians inside their own sub-city only.',
+};
+
 const ROLE_TITLES: Record<StaffRole, { en: string; am: string; sub: string }> = {
   ADMIN: {
     en: 'Super Admin',
@@ -431,6 +442,9 @@ export default function AdminPage() {
   const [role, setRole] = useState<StaffRole | null>(null);
   const [view, setView] = useState<ViewKey>('dashboard');
   const [error, setError] = useState('');
+  /** background refreshes must not shout: a dropped poll shows a quiet,
+   *  self-clearing notice instead of a red error that never goes away */
+  const [connection, setConnection] = useState<'ok' | 'lost'>('ok');
   const [notice, setNotice] = useState('');
 
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -483,6 +497,8 @@ export default function AdminPage() {
   const [newTech, setNewTech] = useState(EMPTY_TECH);
   /** the console form starts folded to the four fields staff use most */
   const [fullForm, setFullForm] = useState(false);
+  /** which password fields are currently revealed, by field name */
+  const [shownPw, setShownPw] = useState<Record<string, boolean>>({});
   const [newStaff, setNewStaff] = useState({
     name: '',
     phone: '',
@@ -517,7 +533,12 @@ export default function AdminPage() {
   const load = useCallback(
     (r: StaffRole) => {
       const has = (v: ViewKey) => MENU[r].includes(v);
-      api<Overview>('/admin/overview').then(setOverview).catch(() => {});
+      api<Overview>('/admin/overview')
+        .then((o) => {
+          setOverview(o);
+          setConnection('ok');
+        })
+        .catch(() => setConnection('lost'));
       if (has('bookings') || has('map')) {
         api<OpsBooking[]>('/admin/bookings').then(setBookings).catch(() => {});
       }
@@ -536,8 +557,11 @@ export default function AdminPage() {
       }
       if (has('verification')) {
         api<PendingProvider[]>(`/admin/providers?status=${verifStatus}`)
-          .then(setVerifRows)
-          .catch((e) => setError((e as Error).message));
+          .then((rows) => {
+            setVerifRows(rows);
+            setConnection('ok');
+          })
+          .catch(() => setConnection('lost'));
       }
       if (has('tickets')) {
         api<Ticket[]>('/admin/tickets').then(setTickets).catch(() => {});
@@ -932,6 +956,51 @@ export default function AdminPage() {
     </div>
   );
 
+  /** a KPI tile that opens the view behind the number */
+  const tileLink = (v: string | number, k: string, to: ViewKey) => (
+    <button type="button" className="tile as-link" key={k} onClick={() => setView(to)}>
+      <div className="v">{v}</div>
+      <div className="k">{k}</div>
+    </button>
+  );
+
+  /** password input with an eye to reveal it - staff mistype silently otherwise */
+  const passwordField = (
+    name: string,
+    value: string,
+    onChange: (v: string) => void,
+    placeholder: string,
+  ) => (
+    <span className="pw-wrap">
+      <input
+        className="input"
+        type={shownPw[name] ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        className="peek"
+        aria-label={shownPw[name] ? 'Hide password' : 'Show password'}
+        title={shownPw[name] ? 'Hide password' : 'Show password'}
+        onClick={() => setShownPw((p) => ({ ...p, [name]: !p[name] }))}
+      >
+        {shownPw[name] ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2" />
+            <path d="M9.9 4.6A9.7 9.7 0 0 1 12 4.4c5 0 9 4.4 9 7.6a9.6 9.6 0 0 1-2.3 3.7M6.2 6.6C3.9 8.1 3 10.6 3 12c0 3.2 4 7.6 9 7.6 1.3 0 2.5-.3 3.6-.8" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 12c0-3.2 4-7.6 9-7.6s9 4.4 9 7.6-4 7.6-9 7.6-9-4.4-9-7.6Z" />
+            <circle cx="12" cy="12" r="2.8" />
+          </svg>
+        )}
+      </button>
+    </span>
+  );
+
   const assignRow = (b: OpsBooking, flavor: 'escalated' | 'stalled') => (
     <div key={b.id} className="booking-row" style={{ cursor: 'default', flexWrap: 'wrap' }}>
       <span>
@@ -977,8 +1046,13 @@ export default function AdminPage() {
       <h2>Dispatch exceptions ({(ops?.escalated.length ?? 0) + (ops?.stalled.length ?? 0)})</h2>
       {ops && ops.escalated.length === 0 && ops.stalled.length === 0 && (
         <p className="hint">
-          No stuck jobs. Escalations land here after 3 declined or expired offers; en-route jobs
-          appear when the technician stops sending GPS pings for 15 minutes.
+          No stuck jobs.{' '}
+          <span
+            className="explain"
+            title="Escalations land here after a declined or expired offer; en-route jobs appear when the technician stops sending GPS pings for 15 minutes."
+          >
+            What lands here?
+          </span>
         </p>
       )}
       {ops?.escalated.map((b) => assignRow(b, 'escalated'))}
@@ -1070,9 +1144,9 @@ export default function AdminPage() {
     <>
       {role === 'ADMIN' && analytics && (
         <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-          {tile(analytics.totals.bookings, 'bookings, all time', true)}
-          {tile(`${analytics.totals.grossRevenueEtb} ETB`, 'gross revenue')}
-          {tile(`${analytics.totals.commissionEtb} ETB`, 'platform commission')}
+          {tile(MONEY(analytics.totals.bookings), 'bookings, all time')}
+          {tile(`${MONEY(Number(analytics.totals.grossRevenueEtb))} ETB`, 'gross revenue')}
+          {tile(`${MONEY(Number(analytics.totals.commissionEtb))} ETB`, 'platform commission')}
           {tile(overview?.ops.activeJobs ?? '…', 'jobs live now')}
           {tile(overview?.support.openTickets ?? '…', 'open tickets')}
           {tile(overview?.verification.pendingApplications ?? '…', 'pending vetting')}
@@ -1080,7 +1154,7 @@ export default function AdminPage() {
       )}
       {role === 'OPS_MANAGER' && (
         <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-          {tile(overview?.ops.activeJobs ?? '…', 'active jobs', true)}
+          {tile(overview?.ops.activeJobs ?? '…', 'active jobs')}
           {tile(overview?.ops.awaitingDispatch ?? '…', 'awaiting dispatch')}
           {tile(stuckCount, 'stuck / stalled')}
           {tile(overview?.ops.techniciansOnline ?? '…', 'technicians online')}
@@ -1092,7 +1166,7 @@ export default function AdminPage() {
       )}
       {role === 'SUPPORT_AGENT' && (
         <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-          {tile(overview?.support.openTickets ?? '…', 'open tickets', true)}
+          {tile(overview?.support.openTickets ?? '…', 'open tickets')}
           {tile(overview?.support.activeClaims ?? '…', 'guarantee claims active')}
           {tile(overview?.support.resolvedToday ?? '…', 'resolved today')}
           {tile(
@@ -1105,7 +1179,7 @@ export default function AdminPage() {
       )}
       {role === 'VERIFICATION_OFFICER' && (
         <div className="tiles" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-          {tile(overview?.verification.pendingApplications ?? '…', 'pending applications', true)}
+          {tile(overview?.verification.pendingApplications ?? '…', 'pending applications')}
           {tile(overview?.verification.approvedThisWeek ?? '…', 'approved this week')}
           {tile(overview?.verification.flaggedForReview ?? '…', 'suspended / flagged')}
         </div>
@@ -1168,7 +1242,7 @@ export default function AdminPage() {
             <DailyBars data={analytics.daily} />
           </div>
           <div className="panel">
-            <h2>Category demand · የአገልግሎት ፍላጎት</h2>
+            <h2>Service Demand · የአገልግሎት ፍላጎት</h2>
             <CategoryBars data={analytics.byCategory} />
           </div>
         </>
@@ -1467,6 +1541,14 @@ export default function AdminPage() {
 
         {error && <div className="error-box">{error}</div>}
         {notice && <div className="ok-box">{notice}</div>}
+        {connection === 'lost' && (
+          <div className="warn-box">
+            Lost contact with the server - showing the last data we loaded.{' '}
+            <button type="button" className="link-btn" onClick={reload}>
+              retry now
+            </button>
+          </div>
+        )}
 
         {role && (
           <div className="admin-shell">
@@ -1940,7 +2022,7 @@ export default function AdminPage() {
                       <div className="form-actions">
                         <button className="btn btn-dark btn-sm"
                           disabled={newCase.bookingId.trim().length < 6 || newCase.note.trim().length < 5}>
-                          + Open case
+                          Open case
                         </button>
                       </div>
                     </form>
@@ -2634,9 +2716,9 @@ export default function AdminPage() {
                     <h2>Platform at a glance</h2>
                     <div className="tiles" style={{ marginTop: '0.6rem' }}>
                       {tile(system?.scale.customers ?? '…', 'customers')}
-                      {tile(system?.scale.technicians ?? '…', 'technicians')}
-                      {tile(system?.scale.bookings ?? '…', 'bookings all time')}
-                      {tile(system?.scale.staff ?? '…', 'staff accounts')}
+                      {tileLink(system?.scale.technicians ?? '…', 'technicians', 'technicians')}
+                      {tileLink(system?.scale.bookings ?? '…', 'bookings all time', 'bookings')}
+                      {tileLink(system?.scale.staff ?? '…', 'staff accounts', 'staff')}
                     </div>
                   </div>
                 </>
@@ -2743,16 +2825,11 @@ export default function AdminPage() {
                               ))}
                             </select>
                           )}
-                          <input
-                            className="input"
-                            style={{ maxWidth: 190 }}
-                            type="password"
-                            placeholder="new password (optional)"
-                            value={editStaff.password}
-                            onChange={(e) =>
-                              setEditStaff({ ...editStaff, password: e.target.value })
-                            }
-                          />
+                          <span style={{ maxWidth: 190, flex: '1 1 190px' }}>
+                            {passwordField(`edit-${editStaff.id}`, editStaff.password,
+                              (v) => setEditStaff({ ...editStaff, password: v }),
+                              'new password (optional)')}
+                          </span>
                           <button
                             className="btn btn-dark btn-sm"
                             disabled={
@@ -2791,9 +2868,8 @@ export default function AdminPage() {
                       </div>
                       <div className="field">
                         <label>Password</label>
-                        <input className="input" type="password" placeholder="8 characters or more"
-                          value={newStaff.password}
-                          onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} />
+                        {passwordField('new-staff', newStaff.password,
+                          (v) => setNewStaff({ ...newStaff, password: v }), '8 characters or more')}
                       </div>
                       <div className="field span-2">
                         <label>Role</label>
@@ -2806,6 +2882,9 @@ export default function AdminPage() {
                           <option value="SUBCITY_COORDINATOR">Sub-city Coordinator</option>
                           <option value="ADMIN">Super Admin</option>
                         </select>
+                        {ROLE_BLURB[newStaff.role] && (
+                          <span className="field-help">{ROLE_BLURB[newStaff.role]}</span>
+                        )}
                       </div>
                       {newStaff.role === 'SUBCITY_COORDINATOR' && (
                         <div className="field">

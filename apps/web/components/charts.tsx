@@ -19,11 +19,29 @@ const dayLabel = (iso: string) =>
  * Mark spec: thin bars, rounded data-end anchored to the baseline, 2px surface
  * gaps, recessive grid, hover tooltip, selective direct labels (peak + latest).
  */
+/**
+ * A readable axis: round the top up to a whole multiple of 1, 2, 5 or 10 so the
+ * gridlines land on numbers people expect (0, 2, 4, 6, 8) rather than fractions
+ * of whatever the tallest bar happens to be.
+ */
+function niceScale(rawMax: number, divisions = 4) {
+  const rough = Math.max(rawMax, 1) / divisions;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+  const step =
+    [1, 2, 5, 10].map((m) => m * magnitude).find((candidate) => candidate >= rough) ??
+    10 * magnitude;
+  const top = Math.max(step, Math.ceil(rawMax / step) * step);
+  const ticks: number[] = [];
+  for (let v = 0; v <= top + step / 2; v += step) ticks.push(v);
+  return { top, ticks };
+}
+
 export function DailyBars({ data }: { data: DayPoint[] }) {
   const [tip, setTip] = useState<{ i: number; x: number; y: number } | null>(null);
   if (data.length === 0) return null;
 
   const max = Math.max(1, ...data.map((d) => d.count));
+  const { top: axisTop, ticks } = niceScale(max);
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
   const slot = plotW / data.length;
@@ -31,7 +49,7 @@ export function DailyBars({ data }: { data: DayPoint[] }) {
   const peakIdx = data.findIndex((d) => d.count === max);
 
   const bar = (d: DayPoint, i: number) => {
-    const h = (d.count / max) * plotH;
+    const h = (d.count / axisTop) * plotH;
     const x = PAD.left + i * slot + (slot - barW) / 2;
     const y = PAD.top + plotH - h;
     const r = Math.min(4, barW / 2, h);
@@ -54,13 +72,13 @@ export function DailyBars({ data }: { data: DayPoint[] }) {
     <div className="chart-wrap">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Bookings per day, last 14 days">
         {/* recessive grid: baseline + two guides */}
-        {[0, 0.5, 1].map((f) => {
-          const y = PAD.top + plotH - f * plotH;
+        {ticks.map((value) => {
+          const y = PAD.top + plotH - (value / axisTop) * plotH;
           return (
-            <g key={f}>
-              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="var(--line)" strokeWidth={f === 0 ? 1.5 : 1} strokeDasharray={f === 0 ? undefined : '3 4'} />
+            <g key={value}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="var(--line)" strokeWidth={value === 0 ? 1.5 : 1} strokeDasharray={value === 0 ? undefined : '3 4'} />
               <text x={PAD.left - 7} y={y + 3} textAnchor="end" fontSize="10" fill="var(--muted)">
-                {Math.round(f * max)}
+                {value}
               </text>
             </g>
           );
@@ -70,7 +88,7 @@ export function DailyBars({ data }: { data: DayPoint[] }) {
         {[peakIdx, data.length - 1]
           .filter((i, idx, arr) => i >= 0 && data[i].count > 0 && arr.indexOf(i) === idx)
           .map((i) => {
-            const h = (data[i].count / max) * plotH;
+            const h = (data[i].count / axisTop) * plotH;
             return (
               <text
                 key={`lbl-${i}`}
