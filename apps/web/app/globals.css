@@ -1187,9 +1187,12 @@ body.scroll-locked .site-header { transform: none; }
 }
 .admin-nav .badge {
   flex-shrink: 0;
+  /* .badge is shared with the status pills, and their leading dot made a nav
+     count read as a toggle switch rather than a number */
   background: var(--blue); color: #fff; font-size: 0.66rem; font-weight: 700;
   border-radius: 999px; padding: 0.08rem 0.45rem; line-height: 1.4;
 }
+.admin-nav .badge::before { display: none; }
 .admin-nav button.on .badge { background: #fff; color: var(--navy); }
 
 .side-foot { border-top: 1px solid var(--line); padding: 0.4rem 0.5rem; }
@@ -1214,7 +1217,8 @@ body.scroll-locked .site-header { transform: none; }
 .rail-narrow .admin-nav .nav-item { gap: 0; }
 .rail-narrow .admin-nav .nav-item .lbl { display: none; }
 .rail-narrow .admin-nav .badge {
-  position: absolute; top: 5px; right: 7px; min-width: 7px; height: 7px;
+  position: absolute; top: 5px; right: 7px;
+  width: 7px; min-width: 0; height: 7px;
   padding: 0; font-size: 0; line-height: 0; overflow: hidden;
 }
 .rail-narrow .side-foot button { justify-content: center; }
@@ -1289,7 +1293,7 @@ body.scroll-locked .site-header { transform: none; }
 }
 
 /* -- a search box that looks like one ------------------------------------- */
-.search { position: relative; display: block; max-width: 340px; margin-bottom: 1rem; }
+.search { position: relative; display: block; max-width: 390px; margin-bottom: 1rem; }
 .search svg {
   position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
   color: var(--muted-soft); pointer-events: none;
@@ -1361,9 +1365,11 @@ body.scroll-locked .site-header { transform: none; }
   .admin-main .table th, .admin-main .table td { padding: 0.5rem 0.5rem; }
   .admin-main .booking-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .admin-main .booking-row .row { justify-content: flex-start; }
-  .view-head { flex-wrap: wrap; align-items: flex-start; }
+  .view-head { flex-wrap: wrap; align-items: center; }
   .view-head .vh-title { font-size: 1.1rem; }
+  .view-head .vh-sub { display: none; }
   .view-head .vh-stamp { display: none; }
+  .view-head .vh-actions { margin-left: auto; }
   .qa-row .btn { font-size: 0.78rem; padding: 0.45rem 0.7rem; }
   .seg { display: flex; width: 100%; }
   .seg button { flex: 1 1 auto; padding: 0.38rem 0.5rem; }
