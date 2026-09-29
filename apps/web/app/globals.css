@@ -1111,50 +1111,190 @@ body.scroll-locked .site-header { transform: none; }
 .tl-item .s { color: var(--muted); font-size: 0.82rem; margin-top: 0.1rem; }
 .tl-item.todo { opacity: 0.45; }
 
-/* -- staff console shell: sidebar nav + content (roles/workflow spec section 6) -- */
-.admin-shell { display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+/* == staff console shell ===================================================
+   A rail that carries the operator's identity and every queue, and a working
+   column that owns its own sticky header. The rail collapses to icons so a
+   wide finance table can have the width back. */
+
+.admin-shell {
+  --rail: 244px;
+  display: grid; grid-template-columns: var(--rail) minmax(0, 1fr);
+  gap: 1.15rem; align-items: start;
+}
+.admin-shell.rail-narrow { --rail: 66px; }
+
 .admin-side {
-  position: sticky; top: 92px; min-width: 0;
-  background: #fff; border: 1px solid var(--line); border-radius: 14px;
-  padding: 0.85rem 0.6rem; box-shadow: 0 10px 30px -24px rgba(7, 20, 41, 0.35);
+  position: sticky; top: 74px; min-width: 0;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 92px);
+  background: #fff; border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 18px 44px -36px rgba(7, 20, 41, 0.75);
+  overflow: hidden;
 }
-.admin-side .role-tag {
-  font-family: var(--font-display); font-size: 0.66rem; font-weight: 700;
-  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
-  padding: 0.15rem 0.65rem 0.6rem;
+
+/* who is signed in, and what that role may do - this used to sit above the
+   working column and pushed every queue below the fold */
+.side-head { padding: 0.9rem 0.95rem 0.85rem; border-bottom: 1px solid var(--line); }
+.side-head .role-tag {
+  display: block; font-family: var(--font-display); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.17em; text-transform: uppercase; color: var(--blue);
+  margin-bottom: 0.3rem;
 }
-.admin-nav { display: flex; flex-direction: column; gap: 0.15rem; }
+.side-head .role-name {
+  display: block; font-family: var(--font-display); font-weight: 800;
+  font-size: 1rem; line-height: 1.2; color: var(--navy);
+}
+.side-head .role-am {
+  display: block; font-family: var(--font-am); font-weight: 600;
+  font-size: 0.8rem; color: var(--blue); margin-top: 0.1rem;
+}
+.side-head .role-sub {
+  display: block; margin-top: 0.45rem; font-size: 0.71rem; line-height: 1.45; color: var(--muted-soft);
+}
+
+.admin-nav {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.6rem 0.5rem;
+}
+.admin-nav::-webkit-scrollbar { width: 6px; }
+.admin-nav::-webkit-scrollbar-track { background: transparent; }
+.admin-nav::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; border: 0; }
 .admin-nav .nav-group { display: flex; flex-direction: column; gap: 2px; }
-.admin-nav .nav-group + .nav-group { margin-top: 0.7rem; padding-top: 0.65rem; border-top: 1px solid var(--line); }
+.admin-nav .nav-group + .nav-group { margin-top: 0.6rem; padding-top: 0.55rem; border-top: 1px solid var(--line); }
 .admin-nav .nav-group-label {
-  font-family: var(--font-display); font-size: 0.6rem; font-weight: 700;
-  letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
-  opacity: 0.75; padding: 0 0.65rem 0.25rem;
+  font-family: var(--font-display); font-size: 0.58rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-soft);
+  padding: 0 0.6rem 0.3rem;
 }
-.admin-nav .nav-item { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; }
-.admin-nav .nav-item .ic { display: inline-flex; opacity: 0.75; flex-shrink: 0; }
+.admin-nav .nav-item {
+  display: inline-flex; align-items: center; gap: 0.6rem; min-width: 0; overflow: hidden;
+}
+.admin-nav .nav-item .ic { display: inline-flex; opacity: 0.7; flex-shrink: 0; }
+.admin-nav .nav-item .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-nav button.on .nav-item .ic { opacity: 1; }
 .admin-nav button {
+  position: relative;
   display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
-  width: 100%; text-align: left; padding: 0.52rem 0.65rem; border-radius: 9px;
-  font-size: 0.88rem; font-weight: 500; color: var(--muted);
+  width: 100%; text-align: left; padding: 0.52rem 0.6rem; border-radius: 10px;
+  font-size: 0.87rem; font-weight: 500; color: var(--muted);
   transition: background 0.15s, color 0.15s;
 }
-.admin-nav button:hover { background: rgba(0, 114, 206, 0.07); color: var(--navy); }
-.admin-nav button.on { background: var(--navy); color: #fff; }
+.admin-nav button:hover { background: var(--surface); color: var(--navy); }
+.admin-nav button.on {
+  background: var(--navy); color: #fff; font-weight: 600;
+  box-shadow: 0 8px 18px -12px rgba(11, 30, 63, 0.9);
+}
 .admin-nav .badge {
+  flex-shrink: 0;
   background: var(--blue); color: #fff; font-size: 0.66rem; font-weight: 700;
   border-radius: 999px; padding: 0.08rem 0.45rem; line-height: 1.4;
 }
 .admin-nav button.on .badge { background: #fff; color: var(--navy); }
+
+.side-foot { border-top: 1px solid var(--line); padding: 0.4rem 0.5rem; }
+.side-foot button {
+  display: flex; align-items: center; gap: 0.55rem; width: 100%;
+  padding: 0.45rem 0.6rem; border-radius: 9px;
+  font-size: 0.76rem; font-weight: 600; color: var(--muted-soft);
+}
+.side-foot button:hover { background: var(--surface); color: var(--navy); }
+.side-foot svg { flex-shrink: 0; transition: transform 0.25s var(--ease); }
+
+/* collapsed rail: icons only, a count becomes a dot, the name moves to the
+   tooltip */
+.rail-narrow .side-head { padding: 0.75rem 0.5rem; text-align: center; }
+.rail-narrow .side-head .role-name,
+.rail-narrow .side-head .role-am,
+.rail-narrow .side-head .role-sub { display: none; }
+.rail-narrow .side-head .role-tag { margin: 0; font-size: 0.62rem; letter-spacing: 0.06em; }
+.rail-narrow .admin-nav { padding: 0.5rem 0.35rem; }
+.rail-narrow .admin-nav .nav-group-label { display: none; }
+.rail-narrow .admin-nav button { justify-content: center; padding: 0.6rem 0; }
+.rail-narrow .admin-nav .nav-item { gap: 0; }
+.rail-narrow .admin-nav .nav-item .lbl { display: none; }
+.rail-narrow .admin-nav .badge {
+  position: absolute; top: 5px; right: 7px; min-width: 7px; height: 7px;
+  padding: 0; font-size: 0; line-height: 0; overflow: hidden;
+}
+.rail-narrow .side-foot button { justify-content: center; }
+.rail-narrow .side-foot .lbl { display: none; }
+.rail-narrow .side-foot svg { transform: rotate(180deg); }
+
 .admin-main { min-width: 0; }
+
+/* -- the working column's own header -------------------------------------- */
+/* One heading per screen. It used to be three: the role title, a breadcrumb
+   repeating the menu item, then a panel heading repeating it again. */
 .view-head {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 0.9rem; gap: 0.8rem;
+  position: sticky; top: 58px; z-index: 40;
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 1rem; margin-bottom: 1rem;
+  padding: 0.5rem 0 0.7rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
-.view-head .crumb {
-  font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; color: var(--navy);
+.view-head .vh-left { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.view-head .vh-title {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.28rem;
+  line-height: 1.2; color: var(--navy);
 }
+.view-head .vh-count {
+  font-family: var(--font-body); font-size: 0.74rem; font-weight: 700;
+  background: var(--blue-tint); color: var(--blue-deep);
+  border-radius: 999px; padding: 0.1rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.view-head .vh-sub {
+  font-size: 0.79rem; color: var(--muted-soft); margin-top: 0.15rem; line-height: 1.4;
+}
+.view-head .vh-actions { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.view-head .vh-stamp {
+  font-size: 0.72rem; color: var(--muted-soft); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* the rail's handle on a narrow screen - hidden while the rail is docked */
+.nav-toggle {
+  display: none; place-items: center; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid var(--line); background: #fff; color: var(--navy);
+}
+.nav-toggle:hover { border-color: var(--blue); color: var(--blue); }
+.side-veil { display: none; }
+
+/* -- a filter is a choice between states, not four call-to-action cards ---- */
+.seg {
+  display: inline-flex; flex-wrap: wrap; gap: 2px; margin-bottom: 1rem;
+  padding: 3px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.seg button {
+  padding: 0.38rem 0.95rem; border-radius: 999px;
+  font-family: var(--font-display); font-size: 0.8rem; font-weight: 600;
+  color: var(--muted); text-transform: capitalize; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.seg button:hover { color: var(--navy); }
+/* how many rows sit behind each choice, so the operator does not have to
+   click through empty ones */
+.seg button .n {
+  margin-left: 0.4rem; font-size: 0.72rem; font-weight: 700; opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.seg button.on .n { opacity: 1; color: var(--blue-deep); }
+.seg button.on {
+  background: #fff; color: var(--navy);
+  box-shadow: 0 2px 6px -2px rgba(11, 30, 63, 0.35);
+}
+
+/* -- a search box that looks like one ------------------------------------- */
+.search { position: relative; display: block; max-width: 340px; margin-bottom: 1rem; }
+.search svg {
+  position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+  color: var(--muted-soft); pointer-events: none;
+}
+.search .input { width: 100%; padding-left: 2.3rem; }
 .cat-create { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .qa-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.3rem 0 1.1rem; }
 .ticket-form { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.6rem; max-width: 460px; }
@@ -1172,15 +1312,46 @@ body.scroll-locked .site-header { transform: none; }
 .booking-photo { margin-top: 0.9rem; }
 .booking-photo img { cursor: zoom-in; }
 .booking-photo .hint { display: block; margin-top: 0.35rem; }
-@media (max-width: 920px) {
-  .admin-shell { grid-template-columns: 1fr; gap: 0.9rem; }
-  .admin-side { position: static; padding: 0.55rem; }
-  .admin-side .role-tag { display: none; }
-  .admin-nav { flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 0.15rem; }
-  .admin-nav .nav-group { flex-direction: row; gap: 0.25rem; }
-  .admin-nav .nav-group + .nav-group { margin: 0 0 0 0.25rem; padding: 0; border: 0; }
-  .admin-nav .nav-group-label { display: none; }
-  .admin-nav button { white-space: nowrap; padding: 0.45rem 0.6rem; font-size: 0.82rem; }
+/* Under 1040px the rail stops being free width and becomes a drawer: it slides
+   over the queue from the left, dims what is behind it, and closes on a tap,
+   an Escape, or on picking a screen. The old behaviour - a horizontally
+   scrolling strip of 15 buttons with the group labels stripped out - hid half
+   the menu off the right edge with nothing to say it was there. */
+@media (max-width: 1040px) {
+  .admin-shell, .admin-shell.rail-narrow { --rail: 0px; grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .admin-side, .admin-shell.rail-narrow .admin-side {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 260;
+    width: min(278px, 82vw); max-height: none;
+    border-radius: 0 18px 18px 0; border-left: 0;
+    box-shadow: 24px 0 60px -30px rgba(7, 20, 41, 0.75);
+    transform: translateX(-102%);
+    transition: transform 0.28s var(--ease);
+  }
+  .admin-side.open { transform: none; }
+  /* a drawer is always full width, whatever the docked rail was set to */
+  .rail-narrow .side-head .role-name,
+  .rail-narrow .side-head .role-am,
+  .rail-narrow .side-head .role-sub { display: block; }
+  .rail-narrow .side-head { padding: 0.9rem 0.95rem 0.85rem; text-align: left; }
+  .rail-narrow .admin-nav { padding: 0.6rem 0.5rem; }
+  .rail-narrow .admin-nav .nav-group-label { display: block; }
+  .rail-narrow .admin-nav button { justify-content: space-between; padding: 0.52rem 0.6rem; }
+  .rail-narrow .admin-nav .nav-item { gap: 0.6rem; }
+  .rail-narrow .admin-nav .nav-item .lbl { display: block; }
+  .rail-narrow .admin-nav .badge {
+    position: static; min-width: 0; height: auto;
+    padding: 0.08rem 0.45rem; font-size: 0.66rem; line-height: 1.4;
+  }
+  .side-foot { display: none; }
+  .side-veil {
+    display: block; position: fixed; inset: 0; z-index: 255;
+    background: rgba(7, 20, 41, 0.42);
+    -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px);
+  }
+  .nav-toggle { display: grid; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-side { transition: none; }
 }
 @media (max-width: 640px) {
   .admin-main .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
@@ -1190,8 +1361,12 @@ body.scroll-locked .site-header { transform: none; }
   .admin-main .table th, .admin-main .table td { padding: 0.5rem 0.5rem; }
   .admin-main .booking-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .admin-main .booking-row .row { justify-content: flex-start; }
-  .view-head { flex-wrap: wrap; }
+  .view-head { flex-wrap: wrap; align-items: flex-start; }
+  .view-head .vh-title { font-size: 1.1rem; }
+  .view-head .vh-stamp { display: none; }
   .qa-row .btn { font-size: 0.78rem; padding: 0.45rem 0.7rem; }
+  .seg { display: flex; width: 100%; }
+  .seg button { flex: 1 1 auto; padding: 0.38rem 0.5rem; }
   .cat-create .input { min-width: 0 !important; flex: 1 1 45%; }
 }
 
@@ -1703,7 +1878,9 @@ body.scroll-locked .site-header { transform: none; }
    owns its own chrome: a slim top bar, a wider working area than the public
    site, and a sidebar that stays put while long queues scroll. */
 
-.console { min-height: 100vh; background: var(--bg); padding-bottom: 3rem; }
+/* the console reads as an application, not a document: a light plate behind
+   white panels so every card, rail and table has an edge */
+.console { min-height: 100vh; background: var(--surface); padding-bottom: 3rem; }
 
 .console-bar {
   position: sticky; top: 0; z-index: 120;
@@ -1744,7 +1921,6 @@ body.scroll-locked .site-header { transform: none; }
 .console-container { max-width: 1440px; padding-top: 1.6rem; }
 .console .page-title { font-size: clamp(1.5rem, 3vw, 2rem); }
 .console .page-sub { margin-bottom: 1.4rem; }
-.console .admin-side { top: 74px; }
 
 /* ── KPI tiles ───────────────────────────────────────────────────────────── */
 /* 150px minimums left a lone tile stranded on a second row; these fit six
@@ -1794,7 +1970,7 @@ body.scroll-locked .site-header { transform: none; }
   .console-bar { height: 52px; }
   .console-bar-end .who { display: none; }
   .console-container { padding-top: 1.1rem; }
-  .console .admin-side { position: static; }
+  .view-head { top: 52px; }
   .list-scroll { max-height: none; }
 }
 
@@ -2085,3 +2261,58 @@ body.scroll-locked .site-header { transform: none; }
 @media (max-width: 640px) {
   .console .page-title .title-am { display: block; margin: 0.25rem 0 0; font-size: 0.55em; }
 }
+
+/* == console surfaces and tables ===========================================
+   The console sits on a light plate now, so panels need an edge rather than a
+   drop shadow, and a data table needs density: the old 0.85rem row padding
+   put eight bookings on a 900px screen. */
+
+.console .panel {
+  border-radius: 14px;
+  padding: clamp(1rem, 2vw, 1.35rem);
+  box-shadow: 0 1px 2px rgba(11, 30, 63, 0.04);
+}
+.console .panel h2 {
+  font-size: 0.98rem; letter-spacing: -0.01em;
+  padding-bottom: 0.7rem; margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.console .tile { border-radius: 14px; }
+
+/* a table scrolls sideways inside its own frame, and its head stays put */
+/* A scrollport clips anything that escapes it, and the verification queue
+   pops a document preview up out of its cell - so the height cap is opt-in,
+   and only a table with no popovers takes it. */
+.table-wrap { overflow: auto; }
+.table-wrap.capped { max-height: 68vh; }
+.table-wrap .table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--card);
+  box-shadow: inset 0 -2px 0 var(--line);
+  border-bottom: 0;
+}
+.console .table { font-size: 0.875rem; }
+.console .table th { padding: 0.6rem 0.75rem; font-size: 0.68rem; }
+.console .table td { padding: 0.62rem 0.75rem; }
+.console .table tbody tr:last-child td { border-bottom: 0; }
+.console .table tr:hover td { background: var(--surface); }
+.console .table .hint { font-size: 0.76rem; line-height: 1.35; }
+/* money and counts line up digit for digit */
+.console .table td.num, .console .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.console .table td.ref { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* an absent value should read as absent, not as content */
+.console .table .none { color: var(--muted-soft); opacity: 0.6; }
+
+/* a row that opens says so */
+.table th.chev, .table td.chev { width: 28px; padding-left: 0; padding-right: 0; text-align: center; }
+.table td.chev svg { color: var(--muted-soft); transition: transform 0.2s var(--ease); }
+.table tr.row-open:hover td.chev svg { color: var(--blue); }
+.table tr.row-open.on td.chev svg { color: var(--blue); transform: rotate(90deg); }
+
+/* nothing here yet: say so once, with room around it */
+.empty {
+  display: grid; place-items: center; gap: 0.3rem;
+  padding: 2.2rem 1rem; text-align: center;
+  color: var(--muted-soft); font-size: 0.86rem;
+}
+.empty b { font-family: var(--font-display); font-size: 0.95rem; color: var(--navy); font-weight: 700; }

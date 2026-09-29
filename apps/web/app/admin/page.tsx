@@ -371,6 +371,30 @@ const VIEW_LABEL: Record<ViewKey, string> = {
   settings: 'Settings',
 };
 
+/**
+ * One line under each screen title, saying what the screen is actually for.
+ * The console has fifteen of them and a word like "Deposits" does not tell a
+ * new finance officer whether they are recording money in or chasing money
+ * owed. Kept short enough to sit on one line beside the actions.
+ */
+const VIEW_SUB: Record<ViewKey, string> = {
+  dashboard: 'Today at a glance: live jobs, money in, and anything waiting on a decision.',
+  map: 'Where every live job and free technician is right now. Phone orders start here.',
+  bookings: 'Every job ever booked. Open a row for the full history, payment and rating.',
+  technicians: 'The directory: who is verified, who is free, and who owes commission.',
+  finance: 'Revenue, commission earned and the ledger for the window you choose.',
+  system: 'Dispatch rules, service health and the switches that change how the platform behaves.',
+  verification: 'Applications waiting on a decision. Check the documents against the form first.',
+  tickets: 'Disputes, guarantee claims and safety flags raised against a job.',
+  deposits: 'Top-ups to confirm against the bank statement, and what each technician holds.',
+  customers: 'Customer lookup: booking history, contact details and blocks.',
+  reviews: 'Ratings waiting on moderation before they reach a technician profile.',
+  categories: 'The trades we offer and the published rate for each one.',
+  staff: 'Console accounts, and what each role is allowed to reach.',
+  audit: 'Every action a staff member took, with the reason they gave for it.',
+  settings: 'Commission rate, and the refund cap support may approve without asking.',
+};
+
 /** Sidebar grouping - overview, day-to-day queues, platform configuration. */
 const NAV_GROUPS: { label: string; items: ViewKey[] }[] = [
   { label: 'Overview', items: ['dashboard', 'map'] },
@@ -523,6 +547,21 @@ const FEED_LABEL: Record<string, string> = {
 
 const ACTIVE_STATUSES = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
 
+/**
+ * Bookings were searchable but not filterable, so the only way to see the
+ * eleven live jobs among 82 rows was to know that typing a status into the
+ * search box happened to work. These are the buckets the desk asks for by
+ * name: what is running now, what was paid, and what fell through.
+ */
+const BOOKING_BUCKETS: { key: string; label: string; match: (status: string) => boolean }[] = [
+  { key: 'all', label: 'All', match: () => true },
+  { key: 'live', label: 'Live', match: (st) => ACTIVE_STATUSES.includes(st) },
+  { key: 'paid', label: 'Paid', match: (st) => st === 'PAID' },
+  { key: 'completed', label: 'Completed', match: (st) => st === 'COMPLETED' },
+  { key: 'expired', label: 'Expired', match: (st) => st === 'EXPIRED' },
+  { key: 'closed', label: 'Cancelled', match: (st) => st === 'CANCELLED' || st === 'REJECTED' },
+];
+
 // ── page ─────────────────────────────────────────────────────────────────────
 
 /** ETB amounts read better without decimals in an operations table. */
@@ -532,6 +571,12 @@ export default function AdminPage() {
   const router = useRouter();
   const [role, setRole] = useState<StaffRole | null>(null);
   const [view, setView] = useState<ViewKey>('dashboard');
+  /** the rail collapsed to icons - a wide finance table wants the width back */
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  /** on a narrow screen the rail is a drawer that slides over the queue */
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  /** clock time of the last successful poll, so a stale screen is obvious */
+  const [lastLoaded, setLastLoaded] = useState('');
   const [error, setError] = useState('');
   /** background refreshes must not shout: a dropped poll shows a quiet,
    *  self-clearing notice instead of a red error that never goes away */
@@ -560,6 +605,8 @@ export default function AdminPage() {
   const [capInput, setCapInput] = useState('');
   const [assignPick, setAssignPick] = useState<Record<string, string>>({});
   const [bookingFilter, setBookingFilter] = useState('');
+  /** which slice of the booking list is on screen - see BOOKING_BUCKETS */
+  const [bookingBucket, setBookingBucket] = useState('all');
   const [ticketForm, setTicketForm] = useState<{
     id: string;
     mode: 'resolve' | 'reject';
@@ -666,6 +713,9 @@ export default function AdminPage() {
         .then((o) => {
           setOverview(o);
           setConnection('ok');
+          setLastLoaded(
+            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          );
         })
         .catch(() => setConnection('lost'));
       if (has('bookings') || has('map')) {
@@ -750,10 +800,30 @@ export default function AdminPage() {
     }
     setRole(r);
     setFeedSeen(localStorage.getItem('tg_feed_seen') ?? '');
+    setNavCollapsed(localStorage.getItem('tg_admin_rail') === 'narrow');
     load(r);
     const t = setInterval(() => load(r), 30000);
     return () => clearInterval(t);
   }, [load, router]);
+
+  /** the rail's width is a per-operator preference, so it survives a reload */
+  const setRail = useCallback((narrow: boolean) => {
+    setNavCollapsed(narrow);
+    try {
+      localStorage.setItem('tg_admin_rail', narrow ? 'narrow' : 'wide');
+    } catch {
+      /* private mode - the preference just will not stick */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
   const reload = useCallback(() => {
     const r = getUser()?.role;
@@ -1596,15 +1666,19 @@ export default function AdminPage() {
   function verificationTable(rows: PendingProvider[] | null, compact = false) {
     return (
       <div className="panel" key="verif">
-        <h2>
-          Verification queue{rows ? ` (${rows.length})` : ''}
-        </h2>
+        {/* on the dashboard this table is one panel among many and still needs
+            its own heading; on its own screen the header above already says
+            what it is and how many are in it */}
+        {compact && <h2>Verification queue{rows ? ` (${rows.length})` : ''}</h2>}
         {!compact && (
-          <div className="qa-row">
+          <div className="seg" role="tablist" aria-label="Application status">
             {['PENDING', 'VERIFIED', 'REJECTED', 'SUSPENDED'].map((st) => (
               <button
                 key={st}
-                className={`btn btn-sm ${verifStatus === st ? 'btn-dark' : 'btn-line'}`}
+                type="button"
+                role="tab"
+                aria-selected={verifStatus === st}
+                className={verifStatus === st ? 'on' : ''}
                 onClick={() => setVerifStatus(st)}
               >
                 {st.toLowerCase()}
@@ -1612,9 +1686,14 @@ export default function AdminPage() {
             ))}
           </div>
         )}
-        {rows?.length === 0 && <p className="hint">Nothing in this list.</p>}
+        {rows?.length === 0 && (
+          <div className="empty">
+            <b>Nothing to review</b>
+            No {verifStatus.toLowerCase()} applications right now.
+          </div>
+        )}
         {!!rows?.length && (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
@@ -1850,7 +1929,8 @@ export default function AdminPage() {
     );
   }
 
-  const filteredBookings = bookings.filter((b) => {
+  /** the text search runs first so each bucket's count reflects what was typed */
+  const searchedBookings = bookings.filter((b) => {
     const q = bookingFilter.trim().toLowerCase();
     if (!q) return true;
     return [
@@ -1867,6 +1947,12 @@ export default function AdminPage() {
       .toLowerCase()
       .includes(q);
   });
+  const bucketCounts: Record<string, number> = Object.fromEntries(
+    BOOKING_BUCKETS.map((s) => [s.key, searchedBookings.filter((b) => s.match(b.status)).length]),
+  );
+  const activeBucket =
+    BOOKING_BUCKETS.find((s) => s.key === bookingBucket) ?? BOOKING_BUCKETS[0];
+  const filteredBookings = searchedBookings.filter((b) => activeBucket.match(b.status));
 
   /** feed entries the operator has not opened yet */
   const unreadFeed = feed.filter((f) => f.at > feedSeen);
@@ -1903,6 +1989,31 @@ export default function AdminPage() {
       sub: `${t.category.nameEn} · ${busyTechIds.has(t.id) ? 'on a job' : 'free'}`,
       busy: busyTechIds.has(t.id),
     }));
+
+  /** the count that belongs beside the screen title, where a count means
+   *  something. Saves repeating "Bookings (82)" inside the panel below. */
+  const viewCount: number | null =
+    view === 'bookings'
+      ? filteredBookings.length
+      : view === 'technicians'
+        ? techRows.length
+        : view === 'verification'
+          ? verifRows?.length ?? null
+          : view === 'tickets'
+            ? tickets.length
+            : view === 'deposits'
+              ? deposits.length
+              : view === 'customers'
+                ? customers.length
+                : view === 'reviews'
+                  ? reviews.length
+                  : view === 'categories'
+                    ? cats.length
+                    : view === 'staff'
+                      ? staff.length
+                      : view === 'audit'
+                        ? audit.length
+                        : null;
 
   return (
     <main className="console">
@@ -1953,12 +2064,6 @@ export default function AdminPage() {
       )}
 
       <div className="container console-container">
-        <h1 className="page-title">
-          {titles ? titles.en : 'Staff console'}
-          {titles && <span className="title-am">{titles.am}</span>}
-        </h1>
-        <p className="page-sub">{titles?.sub ?? ''}</p>
-
         {error && <div className="error-box">{error}</div>}
         {notice && <div className="ok-box">{notice}</div>}
         {rejecting && (
@@ -2017,46 +2122,126 @@ export default function AdminPage() {
         )}
 
         {role && (
-          <div className="admin-shell">
-            <aside className="admin-side">
-              <div className="role-tag">{role.replace(/_/g, ' ')}</div>
-              <nav className="admin-nav">
+          <div className={`admin-shell${navCollapsed ? ' rail-narrow' : ''}`}>
+            {drawerOpen && (
+              <div className="side-veil" onClick={() => setDrawerOpen(false)} aria-hidden />
+            )}
+            <aside className={`admin-side${drawerOpen ? ' open' : ''}`}>
+              {/* who is signed in and what the role covers - this used to be a
+                  page title above the working column, which cost a queue its
+                  first three rows on every screen */}
+              <div className="side-head">
+                <span className="role-tag">{role.replace(/_/g, ' ')}</span>
+                <b className="role-name">{titles?.en ?? 'Staff console'}</b>
+                {titles?.am && <span className="role-am">{titles.am}</span>}
+                {titles?.sub && <span className="role-sub">{titles.sub}</span>}
+              </div>
+              <nav className="admin-nav" aria-label="Console sections">
                 {NAV_GROUPS.map((g) => {
                   const items = g.items.filter((v) => MENU[role].includes(v));
                   if (items.length === 0) return null;
                   return (
                     <div className="nav-group" key={g.label}>
                       <span className="nav-group-label">{g.label}</span>
-                      {items.map((v) => (
-                        <button
-                          key={v}
-                          className={view === v ? 'on' : ''}
-                          onClick={() => {
-                            setView(v);
-                            if (v === 'tickets') setTicketHistory(null);
-                          }}
-                        >
-                          <span className="nav-item">
-                            <span className="ic">{ICONS[v]}</span>
-                            {VIEW_LABEL[v]}
-                          </span>
-                          {badge(v) != null && <span className="badge">{badge(v)}</span>}
-                        </button>
-                      ))}
+                      {items.map((v) => {
+                        const count = badge(v);
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            className={view === v ? 'on' : ''}
+                            aria-current={view === v ? 'page' : undefined}
+                            /* collapsed to icons, the name lives in the tooltip */
+                            title={
+                              navCollapsed
+                                ? count != null
+                                  ? `${VIEW_LABEL[v]} (${count} waiting)`
+                                  : VIEW_LABEL[v]
+                                : undefined
+                            }
+                            onClick={() => {
+                              setView(v);
+                              setDrawerOpen(false);
+                              if (v === 'tickets') setTicketHistory(null);
+                            }}
+                          >
+                            <span className="nav-item">
+                              <span className="ic">{ICONS[v]}</span>
+                              <span className="lbl">{VIEW_LABEL[v]}</span>
+                            </span>
+                            {count != null && (
+                              <span className="badge" aria-label={`${count} waiting`}>
+                                {count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   );
                 })}
               </nav>
+              <div className="side-foot">
+                <button
+                  type="button"
+                  onClick={() => setRail(!navCollapsed)}
+                  aria-label={navCollapsed ? 'Expand the menu' : 'Collapse the menu'}
+                  title={navCollapsed ? 'Expand the menu' : 'Collapse the menu'}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M15 5 8 12l7 7" />
+                  </svg>
+                  <span className="lbl">Collapse menu</span>
+                </button>
+              </div>
             </aside>
 
             <section className="admin-main">
               <div className="view-head">
-                <span className="crumb">
-                  {VIEW_LABEL[view]}
-                </span>
-                <button className="btn btn-line btn-sm" onClick={reload}>
-                  ↻ Refresh
-                </button>
+                <div className="vh-left">
+                  <button
+                    type="button"
+                    className="nav-toggle"
+                    aria-label="Open the menu"
+                    onClick={() => setDrawerOpen(true)}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden
+                    >
+                      <path d="M4 7h16M4 12h16M4 17h16" />
+                    </svg>
+                  </button>
+                  <div>
+                    <h1 className="vh-title">
+                      {VIEW_LABEL[view]}
+                      {viewCount != null && <span className="vh-count">{viewCount}</span>}
+                    </h1>
+                    <p className="vh-sub">{VIEW_SUB[view]}</p>
+                  </div>
+                </div>
+                <div className="vh-actions">
+                  {lastLoaded && <span className="vh-stamp">updated {lastLoaded}</span>}
+                  <button className="btn btn-line btn-sm" onClick={reload}>
+                    ↻ Refresh
+                  </button>
+                </div>
               </div>
               {view === 'dashboard' && dashboardView}
 
@@ -2212,26 +2397,59 @@ export default function AdminPage() {
 
               {view === 'bookings' && (
                 <div className="panel">
-                  <h2>Bookings ({filteredBookings.length})</h2>
-                  <input
-                    className="input mb"
-                    style={{ maxWidth: 340 }}
-                    placeholder="Search ref, customer, phone, technician…"
-                    value={bookingFilter}
-                    onChange={(e) => {
-                      setBookingFilter(e.target.value);
-                      setBookingPage(0);
-                    }}
-                  />
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="seg" role="tablist" aria-label="Booking status">
+                    {BOOKING_BUCKETS.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeBucket.key === s.key}
+                        className={activeBucket.key === s.key ? 'on' : ''}
+                        onClick={() => {
+                          setBookingBucket(s.key);
+                          setBookingPage(0);
+                        }}
+                      >
+                        {s.label}
+                        <span className="n">{bucketCounts[s.key]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="search">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.5-3.5" />
+                    </svg>
+                    <input
+                      className="input"
+                      placeholder="Search ref, customer, phone, technician"
+                      aria-label="Search bookings"
+                      value={bookingFilter}
+                      onChange={(e) => {
+                        setBookingFilter(e.target.value);
+                        setBookingPage(0);
+                      }}
+                    />
+                  </label>
+                  <div className="table-wrap capped">
                     <table className="table">
                       <thead>
                         <tr>
+                          <th className="chev" />
                           <th>Ref</th>
                           <th>Service</th>
                           <th>Customer</th>
                           <th>Technician</th>
-                          <th>Amount</th>
+                          <th className="num">Amount</th>
                           <th>Status</th>
                         </tr>
                       </thead>
@@ -2242,22 +2460,41 @@ export default function AdminPage() {
                               className={`row-open${openBooking === b.id ? ' on' : ''}`}
                               onClick={() => setOpenBooking(openBooking === b.id ? null : b.id)}
                             >
-                              <td className="hint">
+                              {/* a row that opens should look like one */}
+                              <td className="chev" aria-hidden>
+                                <svg
+                                  width="13"
+                                  height="13"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="m9 5 7 7-7 7" />
+                                </svg>
+                              </td>
+                              <td className="hint ref">
                                 #{b.id.slice(-6).toUpperCase()}
                                 {b.disputedAt && <span title="open ticket"> ⚑</span>}
                               </td>
                               <td>{b.category.nameEn}</td>
                               <td>
-                                {b.customer?.name ?? '-'}
+                                {b.customer?.name ?? <span className="none">no name</span>}
                                 <div className="hint">{b.customer?.phone}</div>
                               </td>
-                              <td>{b.provider?.user?.name ?? '-'}</td>
                               <td>
+                                {b.provider?.user?.name ?? (
+                                  <span className="none">not assigned</span>
+                                )}
+                              </td>
+                              <td className="num">
                                 {b.payment
                                   ? `${MONEY(Number(b.payment.amountEtb))} ETB`
                                   : b.finalPriceEtb
                                     ? `${MONEY(Number(b.finalPriceEtb))} ETB`
-                                    : '-'}
+                                    : <span className="none">-</span>}
                               </td>
                               <td>
                                 <StatusBadge status={b.status} />
@@ -2265,7 +2502,7 @@ export default function AdminPage() {
                             </tr>
                             {openBooking === b.id && (
                               <tr className="row-detail">
-                                <td colSpan={6}>
+                                <td colSpan={7}>
                                   <dl>
                                     <dt>Booked</dt>
                                     <dd>{fmtDate(b.createdAt)}</dd>
@@ -2768,7 +3005,7 @@ export default function AdminPage() {
                       </div>
 
                       <h3 className="sub-h">Booking history</h3>
-                      <div style={{ overflowX: 'auto' }}>
+                      <div className="table-wrap">
                         <table className="table">
                           <thead>
                             <tr>
@@ -3175,7 +3412,7 @@ export default function AdminPage() {
                     <input className="input" name="subs" style={{ minWidth: 220, flex: 1 }} placeholder="Sub-services, comma-separated" />
                     <button className="btn btn-dark btn-sm">+ Add category</button>
                   </form>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="table-wrap">
                     <table className="table">
                       <thead>
                         <tr>
@@ -3380,7 +3617,7 @@ export default function AdminPage() {
                       {system ? Math.round(system.money.commissionRate * 100) : 14}% commission from
                       their deposit balance when the job settles.
                     </p>
-                    <div style={{ overflowX: 'auto' }}>
+                    <div className="table-wrap">
                       <table className="table">
                         <thead>
                           <tr>
