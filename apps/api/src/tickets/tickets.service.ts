@@ -22,7 +22,9 @@ const TICKET_INCLUDE = {
       status: true,
       completedAt: true,
       category: { select: { nameEn: true, nameAm: true } },
-      customer: { select: { id: true, name: true, phone: true, telegramChatId: true } },
+      customer: {
+        select: { id: true, name: true, phone: true, telegramChatId: true, language: true },
+      },
       provider: { select: { user: { select: { id: true, name: true, phone: true } } } },
     },
   },
@@ -44,7 +46,9 @@ export class TicketsService {
   }
 
   async refundCapEtb(): Promise<number> {
-    const row = await this.prisma.appConfig.findUnique({ where: { key: 'support_refund_cap_etb' } });
+    const row = await this.prisma.appConfig.findUnique({
+      where: { key: 'support_refund_cap_etb' },
+    });
     const n = row ? Number(row.value) : NaN;
     return Number.isFinite(n) ? n : DEFAULT_REFUND_CAP_ETB;
   }
@@ -145,11 +149,8 @@ export class TicketsService {
       data: { status: 'RE_INSPECTION', resolutionNote: note ?? ticket.resolutionNote },
       include: TICKET_INCLUDE,
     });
-    const jobRef = ticket.bookingId.slice(-6);
-    this.notifications.notify(
-      updated.booking.customer,
-      `Addis Tiggena: የድጋሚ ምርመራ ተይዟል · a re-inspection has been scheduled for job #${jobRef}. Our team will contact you.`,
-    );
+    const jobRef = ticket.bookingId.slice(-6).toUpperCase();
+    this.notifications.send(updated.booking.customer, 'reInspection', { ref: jobRef });
     this.audit.log(actor, 'TICKET_REINSPECT', 'SupportTicket', id, note);
     return updated;
   }
@@ -192,14 +193,15 @@ export class TicketsService {
         data: { disputedAt: null },
       });
     }
-    const jobRef = ticket.bookingId.slice(-6);
-    const refundNote =
-      refundEtb && outcome === 'RESOLVED' ? ` Recorded refund: ETB ${refundEtb}.` : '';
-    this.notifications.notify(
+    const jobRef = ticket.bookingId.slice(-6).toUpperCase();
+    const refundNote = refundEtb && outcome === 'RESOLVED' ? ` ተመላሽ: ${refundEtb} ETB` : '';
+    // staff notes are free text - a long one would run to several paid
+    // parts, so only a line's worth goes out and the rest stays in the case
+    const reason = `${resolutionNote.trim().slice(0, 40)}${refundNote}`.trim();
+    this.notifications.send(
       updated.booking.customer,
-      outcome === 'RESOLVED'
-        ? `Addis Tiggena: ጉዳይዎ ተፈትቷል · your report on job #${jobRef} is resolved. ${resolutionNote}${refundNote}`
-        : `Addis Tiggena: job #${jobRef} - ${resolutionNote}`,
+      outcome === 'RESOLVED' ? 'ticketResolved' : 'ticketRejected',
+      { ref: jobRef, reason },
     );
     this.audit.log(actor, `TICKET_${outcome}`, 'SupportTicket', id, resolutionNote, {
       refundEtb: refundEtb ?? null,

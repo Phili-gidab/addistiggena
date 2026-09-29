@@ -204,6 +204,26 @@ interface CustomerContext {
   }[];
 }
 
+/** The full list of messages the platform can send, straight from the API. */
+interface MessageRegister {
+  totals: {
+    messages: number;
+    alwaysSms: number;
+    smsIfNoApp: number;
+    appOnly: number;
+    maxPartsPerJourney: number;
+  };
+  messages: {
+    key: string;
+    when: string;
+    audience: 'CUSTOMER' | 'TECHNICIAN';
+    channel: 'SMS_ALWAYS' | 'SMS_IF_NO_APP' | 'APP_ONLY';
+    sample: string;
+    characters: number;
+    segments: number;
+  }[];
+}
+
 interface SystemInfo {
   services: {
     sms: string;
@@ -550,6 +570,8 @@ export default function AdminPage() {
   const [pin, setPin] = useState({ lat: 9.0108, lng: 38.7613 });
   const [finance, setFinance] = useState<Finance | null>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [register, setRegister] = useState<MessageRegister | null>(null);
+  const [registerLang, setRegisterLang] = useState<'am' | 'en'>('am');
   const [context, setContext] = useState<CustomerContext | null>(null);
   const [rules, setRules] = useState({
     offerWindowMinutes: '',
@@ -658,7 +680,10 @@ export default function AdminPage() {
           .then(setFinance)
           .catch(() => {});
       }
-      if (r === 'ADMIN') api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
+      if (r === 'ADMIN') {
+        api<SystemInfo>('/admin/system').then(setSystem).catch(() => {});
+        api<MessageRegister>('/admin/config/messages').then(setRegister).catch(() => {});
+      }
       if (r === 'ADMIN' || r === 'OPS_MANAGER') {
         api<Analytics>('/admin/analytics').then(setAnalytics).catch(() => {});
         api<{ escalated: OpsBooking[]; stalled: OpsBooking[] }>('/admin/ops/queue')
@@ -3528,6 +3553,111 @@ export default function AdminPage() {
                         The API key and sender name live on the server and are not editable here.
                       </span>
                     </div>
+                  </div>
+
+                  <div className="panel mb">
+                    <h2>Message register · የመልእክት መዝገብ</h2>
+                    <p className="hint mb">
+                      Every message the platform can send, and when. Messages go out in Amharic by
+                      default; an account that asks for English gets the English wording. A message
+                      marked app only is never texted, and one marked fallback is texted only when
+                      the person has no app to receive it.
+                    </p>
+                    <div className="form-actions mb">
+                      {(['am', 'en'] as const).map((l) => (
+                        <button
+                          key={l}
+                          className={
+                            registerLang === l ? 'btn btn-dark btn-sm' : 'btn btn-line btn-sm'
+                          }
+                          onClick={() => {
+                            setRegisterLang(l);
+                            api<MessageRegister>(`/admin/config/messages?lang=${l}`)
+                              .then(setRegister)
+                              .catch(() => {});
+                          }}
+                        >
+                          {l === 'am' ? 'አማርኛ' : 'English'}
+                        </button>
+                      ))}
+                      <span className="hint">
+                        Which wording a person gets depends on the language set on their account.
+                      </span>
+                    </div>
+                    {register && (
+                      <div className="tiles">
+                        {[
+                          { k: 'Messages in total', v: register.totals.messages },
+                          { k: 'Always texted', v: register.totals.alwaysSms },
+                          { k: 'Texted only as fallback', v: register.totals.smsIfNoApp },
+                          { k: 'Never texted', v: register.totals.appOnly },
+                        ].map((t) => (
+                          <div className="tile" key={t.k}>
+                            <div className="v">{t.v}</div>
+                            <div className="k">{t.k}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="table-scroll">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>When it is sent</th>
+                            <th>To</th>
+                            <th>Channel</th>
+                            <th>What it says</th>
+                            <th className="num">Parts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(register?.messages ?? []).map((m) => (
+                            <tr key={m.key}>
+                              <td>{m.when}</td>
+                              <td>{m.audience === 'CUSTOMER' ? 'Customer' : 'Technician'}</td>
+                              <td>
+                                <span
+                                  className={`pill ${
+                                    m.channel === 'SMS_ALWAYS'
+                                      ? 'warn'
+                                      : m.channel === 'SMS_IF_NO_APP'
+                                        ? ''
+                                        : 'ok'
+                                  }`}
+                                >
+                                  {m.channel === 'SMS_ALWAYS'
+                                    ? 'SMS always'
+                                    : m.channel === 'SMS_IF_NO_APP'
+                                      ? 'App, SMS fallback'
+                                      : 'App only'}
+                                </span>
+                              </td>
+                              <td className="msg-sample">{m.sample}</td>
+                              <td className="num">
+                                {m.channel === 'APP_ONLY' ? (
+                                  <span className="hint">free</span>
+                                ) : (
+                                  m.segments
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                          {!register && (
+                            <tr>
+                              <td colSpan={5} className="hint">
+                                Loading the register...
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="hint">
+                      One part is 70 characters when a message contains Amharic, 160 when it is
+                      plain English. A whole job, from the offer to the receipt, costs at most{' '}
+                      <b>{register?.totals.maxPartsPerJourney ?? '-'} parts</b> and fewer when both
+                      people have the app.
+                    </p>
                   </div>
 
                   <div className="panel mb">

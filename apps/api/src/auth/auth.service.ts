@@ -13,6 +13,7 @@ import { compare } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from './sms.service';
 import { ET_PHONE_REGEX, normalizePhone } from './auth.dto';
+import { MESSAGES } from '../notifications/messages';
 
 export interface JwtPayload {
   sub: string;
@@ -53,7 +54,13 @@ export class AuthService {
     await this.prisma.otpCode.create({
       data: { phone, codeHash: this.hash(code), expiresAt: new Date(Date.now() + ttl * 1000) },
     });
-    await this.sms.send(phone, `Addis Tiggena: የማረጋገጫ ኮድዎ / your verification code is ${code}`);
+    // The code has to arrive whether or not the app is installed, and the
+    // person may have no account yet - Amharic unless they asked for English.
+    const account = await this.prisma.user.findUnique({
+      where: { phone },
+      select: { language: true },
+    });
+    await this.sms.send(phone, MESSAGES.otp[account?.language === 'EN' ? 'en' : 'am']({ code }));
     // Dev convenience only: with the console SMS driver there is no phone to receive the
     // code, so surface it in the response. Fail closed - requires an explicit
     // NODE_ENV=development, not merely "not production".
@@ -73,7 +80,8 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
     if (!otp) throw new UnauthorizedException('No valid code - request a new one');
-    if (otp.attempts >= 5) throw new UnauthorizedException('Too many attempts - request a new code');
+    if (otp.attempts >= 5)
+      throw new UnauthorizedException('Too many attempts - request a new code');
 
     if (otp.codeHash !== this.hash(code)) {
       await this.prisma.otpCode.update({
@@ -122,8 +130,7 @@ export class AuthService {
     // bcrypt-compare against a constant hash even when the user is missing,
     // so response timing doesn't reveal which usernames exist
     const hash =
-      user?.passwordHash ??
-      '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZUgkQfxwLXIYimlvbXBmpe/BwALvVy';
+      user?.passwordHash ?? '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZUgkQfxwLXIYimlvbXBmpe/BwALvVy';
     const ok = await compare(password, hash);
     if (!ok || !user?.passwordHash) {
       throw new UnauthorizedException('Wrong username or password');
@@ -131,7 +138,9 @@ export class AuthService {
     // checked after the password so a wrong guess cannot enumerate which
     // accounts exist and are disabled
     if (user.disabledAt) {
-      throw new UnauthorizedException('This account has been disabled - contact your administrator');
+      throw new UnauthorizedException(
+        'This account has been disabled - contact your administrator',
+      );
     }
     return { ...this.issueTokens(user.id, user.role), user: this.publicUser(user) };
   }

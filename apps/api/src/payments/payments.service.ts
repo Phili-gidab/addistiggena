@@ -9,12 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { PaymentGatewayType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import {
-  CbeBirrGateway,
-  ChapaGateway,
-  PaymentGatewayDriver,
-  TelebirrGateway,
-} from './gateways';
+import { CbeBirrGateway, ChapaGateway, PaymentGatewayDriver, TelebirrGateway } from './gateways';
 
 /** How long a COMPLETED job waits for customer sign-off before auto-confirming (§4.2 step 08). */
 export const AUTO_CONFIRM_MS = 30 * 60_000;
@@ -221,30 +216,29 @@ export class PaymentsService {
   }
 
   /** E-receipt mirrors to both parties (proposal §4.4 step 06). */
-  private async sendReceipts(
-    bookingId: string,
-    gross: Prisma.Decimal,
-    commission: Prisma.Decimal,
-  ) {
+  private async sendReceipts(bookingId: string, gross: Prisma.Decimal, commission: Prisma.Decimal) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
         category: true,
-        customer: { select: { phone: true, telegramChatId: true } },
-        provider: { include: { user: { select: { phone: true, telegramChatId: true } } } },
+        customer: { select: { phone: true, telegramChatId: true, language: true } },
+        provider: {
+          include: { user: { select: { phone: true, telegramChatId: true, language: true } } },
+        },
       },
     });
     if (!booking) return;
-    const jobRef = booking.id.slice(-6);
-    this.notifications.notify(
-      booking.customer,
-      `Addis Tiggena ደረሰኝ · receipt - job #${jobRef} (${booking.category.nameEn}) paid: ETB ${gross.toFixed(2)}. እናመሰግናለን!`,
-    );
+    const ref = booking.id.slice(-6).toUpperCase();
+    this.notifications.send(booking.customer, 'receipt', {
+      ref,
+      amount: gross.toFixed(2),
+    });
     if (booking.provider) {
-      this.notifications.notify(
-        booking.provider.user,
-        `Addis Tiggena: ክፍያ ተቀብለዋል · job #${jobRef} - you keep ETB ${gross.toFixed(2)} in cash. ETB ${commission.toFixed(2)} commission was taken from your deposit balance.`,
-      );
+      this.notifications.send(booking.provider.user, 'settlement', {
+        ref,
+        amount: gross.toFixed(2),
+        commission: commission.toFixed(2),
+      });
     }
   }
 }

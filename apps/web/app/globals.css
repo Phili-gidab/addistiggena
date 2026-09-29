@@ -1973,6 +1973,10 @@ body.scroll-locked .site-header { transform: none; }
 .tile.as-link.danger:hover { border-color: var(--err-fg); background: var(--err-bg); }
 .table td.owing { color: var(--err-fg); font-weight: 700; }
 
+/* ── message register: the wording is the point, so give it the room ─────── */
+.table th.num, .table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.msg-sample { max-width: 30rem; color: var(--navy); overflow-wrap: anywhere; }
+
 /* ── verification: see a document without leaving the queue ─────────────── */
 .doc-peek { position: relative; display: inline-block; }
 .doc-pop {

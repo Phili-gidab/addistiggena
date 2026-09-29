@@ -11,6 +11,7 @@ import { Booking, BookingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/jwt.strategy';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MessageKey, MessageVars } from '../notifications/messages';
 import { ProvidersService } from '../providers/providers.service';
 import { AUTO_CONFIRM_MS, PaymentsService } from '../payments/payments.service';
 import {
@@ -73,13 +74,13 @@ const TRANSITIONS: Record<
   complete: { from: ['IN_PROGRESS'], actor: 'provider', to: 'COMPLETED', stamp: 'completedAt' },
 };
 
-/** Status changes mirrored to the customer over SMS/Telegram (proposal §3: connectivity resilience). */
-const STATUS_MIRRORS: Partial<Record<string, (b: { id: string }) => string>> = {
-  accept: (b) => `Addis Tiggena: ባለሙያው ተቀብሏል · your technician accepted job #${b.id.slice(-6)}`,
-  enroute: (b) => `Addis Tiggena: ባለሙያው በመንገድ ላይ ነው · technician en route for job #${b.id.slice(-6)}`,
-  arrive: (b) => `Addis Tiggena: ባለሙያው ደርሷል · technician arrived for job #${b.id.slice(-6)}`,
-  complete: (b) =>
-    `Addis Tiggena: ስራው ተጠናቋል · job #${b.id.slice(-6)} completed - open the app to pay`,
+/** Status changes mirrored to the customer. Which of these is worth an SMS is
+ *  decided by the message catalogue, not here. */
+const STATUS_MIRRORS: Partial<Record<string, MessageKey>> = {
+  accept: 'jobAccepted',
+  enroute: 'jobEnRoute',
+  arrive: 'jobArrived',
+  complete: 'jobCompleted',
 };
 
 function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -132,12 +133,8 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         offerWindowMs:
           Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : DEFAULT_OFFER_WINDOW_MS,
         escalateAfter:
-          Number.isFinite(attempts) && attempts > 0
-            ? attempts
-            : DEFAULT_ESCALATE_AFTER_ATTEMPTS,
-        minBalanceEtb: Number.isFinite(minBalance)
-          ? minBalance
-          : DEFAULT_MIN_WALLET_BALANCE_ETB,
+          Number.isFinite(attempts) && attempts > 0 ? attempts : DEFAULT_ESCALATE_AFTER_ATTEMPTS,
+        minBalanceEtb: Number.isFinite(minBalance) ? minBalance : DEFAULT_MIN_WALLET_BALANCE_ETB,
         readAt: Date.now(),
       };
     } catch (err) {
@@ -281,7 +278,12 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       });
       this.notifyProvider(
         dto.providerId,
-        `Addis Tiggena: አዲስ ስራ · new ${category.nameEn} job #${created.id.slice(-6)} - respond within 5 minutes`,
+        'jobOffer',
+        {
+          ref: created.id.slice(-6).toUpperCase(),
+          category: category.nameEn,
+          categoryAm: category.nameAm,
+        },
         created.id,
       );
       return this.getPublic(created.id);
@@ -302,13 +304,21 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.booking.findUnique({ where: { id }, include: PUBLIC_INCLUDE });
   }
 
-  private notifyProvider(providerId: string, text: string, bookingId?: string) {
+  private notifyProvider(
+    providerId: string,
+    key: MessageKey,
+    vars: MessageVars = {},
+    bookingId?: string,
+  ) {
     this.prisma.providerProfile
       .findUnique({
         where: { id: providerId },
-        select: { user: { select: { phone: true, telegramChatId: true } } },
+        select: { user: { select: { phone: true, telegramChatId: true, language: true } } },
       })
-      .then((p) => p && this.notifications.notify(p.user, text, bookingId ? { bookingId } : undefined))
+      .then(
+        (p) =>
+          p && this.notifications.send(p.user, key, vars, bookingId ? { bookingId } : undefined),
+      )
       .catch(() => {});
   }
 
@@ -323,7 +333,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       where: { id: bookingId },
       include: {
         category: true,
-        customer: { select: { phone: true, telegramChatId: true } },
+        customer: { select: { phone: true, telegramChatId: true, language: true } },
         offers: { select: { providerId: true } },
       },
     });
@@ -348,10 +358,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         data: { providerId: null, offerExpiresAt: null, escalatedAt: new Date() },
       });
       if (count > 0) {
-        this.notifications.notify(
-          booking.customer,
-          `Addis Tiggena: job #${bookingId.slice(-6)} - our operations team is assigning a technician for you manually. We will notify you shortly.`,
-        );
+        this.notifications.send(booking.customer, 'escalated', {
+          ref: bookingId.slice(-6).toUpperCase(),
+        });
         this.logger.warn(
           `Booking ${bookingId} escalated to Ops after ${exclude.length} declined/expired offers`,
         );
@@ -373,10 +382,11 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         data: { status: 'EXPIRED', providerId: null, offerExpiresAt: null },
       });
       if (count > 0) {
-        this.notifications.notify(
-          booking.customer,
-          `Addis Tiggena: ይቅርታ · no ${booking.category.nameEn} technician is available right now for job #${bookingId.slice(-6)} - please try again shortly`,
-        );
+        this.notifications.send(booking.customer, 'noTechnician', {
+          ref: bookingId.slice(-6).toUpperCase(),
+          category: booking.category.nameEn,
+          categoryAm: booking.category.nameAm,
+        });
         this.logger.log(
           `Booking ${bookingId} expired: candidate pool exhausted (${exclude.length} offered)`,
         );
@@ -396,9 +406,15 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     await this.prisma.bookingOffer.create({
       data: { bookingId, providerId: next.id, expiresAt },
     });
-    this.notifications.notify(
+    this.notifications.send(
       { phone: next.phone, telegramChatId: next.telegramChatId },
-      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} ~${(next.distanceM / 1000).toFixed(1)}km away - respond within 5 minutes`,
+      'jobOffer',
+      {
+        ref: bookingId.slice(-6).toUpperCase(),
+        category: booking.category.nameEn,
+        categoryAm: booking.category.nameAm,
+        km: (next.distanceM / 1000).toFixed(1),
+      },
       { bookingId },
     );
     return this.getPublic(bookingId);
@@ -444,7 +460,12 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     return booking;
   }
 
-  async transition(id: string, action: keyof typeof TRANSITIONS, user: AuthUser, dto?: CompleteBookingDto) {
+  async transition(
+    id: string,
+    action: keyof typeof TRANSITIONS,
+    user: AuthUser,
+    dto?: CompleteBookingDto,
+  ) {
     const rule = TRANSITIONS[action];
     const booking = await this.getForParty(id, user);
 
@@ -513,10 +534,19 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    // fire-and-forget mirror to the customer for key transitions (SMS + Telegram)
+    // fire-and-forget mirror to the customer for key transitions
     const mirror = STATUS_MIRRORS[action];
     if (mirror && booking.customer) {
-      this.notifications.notifyUserId(booking.customer.id, mirror(booking)).catch(() => {});
+      this.notifications
+        .sendToUserId(
+          booking.customer.id,
+          mirror,
+          { ref: booking.id.slice(-6).toUpperCase() },
+          {
+            bookingId: booking.id,
+          },
+        )
+        .catch(() => {});
     }
     return this.getPublic(id);
   }
@@ -530,7 +560,10 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
   async assign(bookingId: string, providerId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { category: true, customer: { select: { phone: true, telegramChatId: true } } },
+      include: {
+        category: true,
+        customer: { select: { phone: true, telegramChatId: true, language: true } },
+      },
     });
     if (!booking) throw new NotFoundException('Booking not found');
     if (!['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED'].includes(booking.status)) {
@@ -538,7 +571,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     }
     const profile = await this.prisma.providerProfile.findUnique({
       where: { id: providerId },
-      include: { user: { select: { name: true, phone: true, telegramChatId: true } } },
+      include: {
+        user: { select: { name: true, phone: true, telegramChatId: true, language: true } },
+      },
     });
     if (!profile || profile.verificationStatus !== 'VERIFIED') {
       throw new BadRequestException('Technician must exist and be VERIFIED');
@@ -564,14 +599,13 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       }),
       this.prisma.bookingOffer.create({ data: { bookingId, providerId, expiresAt } }),
     ]);
-    this.notifications.notify(
-      profile.user,
-      `Addis Tiggena: አዲስ ስራ · new ${booking.category.nameEn} job #${bookingId.slice(-6)} assigned to you by dispatch - respond within 5 minutes`,
-    );
-    this.notifications.notify(
-      booking.customer,
-      `Addis Tiggena: job #${bookingId.slice(-6)} - a technician (${profile.user.name ?? 'assigned'}) has been selected for you.`,
-    );
+    this.notifications.send(profile.user, 'jobAssigned', {
+      ref: bookingId.slice(-6).toUpperCase(),
+      category: booking.category.nameEn,
+      categoryAm: booking.category.nameAm,
+    });
+    // the customer hears about it when the technician accepts - telling them
+    // twice was two messages for one fact
     return this.getPublic(bookingId);
   }
 
@@ -595,9 +629,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       updatedAt: p.locationUpdatedAt,
       distanceM,
       // straight-line estimate at Addis average speed; null once the technician is on site
-      etaMinutes: enRoute
-        ? Math.max(1, Math.round((distanceM / 1000 / AVG_SPEED_KMH) * 60))
-        : null,
+      etaMinutes: enRoute ? Math.max(1, Math.round((distanceM / 1000 / AVG_SPEED_KMH) * 60)) : null,
       booking: { lat: booking.lat, lng: booking.lng },
     };
   }
@@ -655,20 +687,17 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       return res;
     });
     if (count > 0 && booking.provider?.user) {
-      this.notifications.notify(
+      this.notifications.send(
         { phone: booking.provider.user.phone, telegramChatId: null },
-        `Addis Tiggena: job #${id.slice(-6)} was cancelled by the customer${late ? ' after you set out - a call-out fee may apply, contact support' : ''}.`,
+        late ? 'jobCancelledLate' : 'jobCancelled',
+        { ref: id.slice(-6).toUpperCase() },
       );
     }
     if (count === 0) {
       throw new BadRequestException('Booking state changed - it can no longer be cancelled');
     }
-    if (booking.provider) {
-      this.notifications.notify(
-        { phone: booking.provider.user.phone },
-        `Addis Tiggena: ስራው ተሰርዟል · job #${booking.id.slice(-6)} was cancelled by the customer`,
-      );
-    }
+    // the technician was told above, in the same breath as the late-cancel
+    // rule - saying it twice was two SMS for one fact
     return this.getPublic(id);
   }
 }

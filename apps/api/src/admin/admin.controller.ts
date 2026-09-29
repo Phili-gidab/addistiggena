@@ -48,6 +48,7 @@ import { CurrentUser, JwtAuthGuard, Roles, RolesGuard, STAFF_ROLES } from '../au
 import { AuthUser } from '../auth/jwt.strategy';
 import { BookingsService } from '../bookings/bookings.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MessageKey, messageRegister } from '../notifications/messages';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Everything the console shows about a staff account - never the password. */
@@ -623,14 +624,15 @@ export class AdminController {
       }),
     ]);
 
-    const messages: Record<VerificationStatus, string> = {
-      VERIFIED:
-        'Addis Tiggena: ተረጋግጠዋል · your technician profile is verified - go online to receive jobs!',
-      REJECTED: `Addis Tiggena: ማመልከቻዎ ውድቅ ሆኗል · your application was rejected${note ? ` - ${note}` : ''}. You can re-apply with corrected documents.`,
-      SUSPENDED: `Addis Tiggena: መለያዎ ታግዷል · your account is suspended${note ? ` - ${note}` : ''}.`,
-      PENDING: 'Addis Tiggena: your application is back in review.',
+    const verdict: Record<VerificationStatus, MessageKey> = {
+      VERIFIED: 'providerVerified',
+      REJECTED: 'providerRejected',
+      SUSPENDED: 'providerSuspended',
+      PENDING: 'backInReview',
     };
-    this.notifications.notifyUserId(profile.user.id, messages[status]).catch(() => {});
+    this.notifications
+      .sendToUserId(profile.user.id, verdict[status], { reason: note?.trim().slice(0, 40) })
+      .catch(() => {});
     return updated;
   }
 
@@ -818,10 +820,10 @@ export class AdminController {
     });
     if (!settled) throw new BadRequestException('Deposit already handled');
 
-    this.notifications.notify(
-      settled.provider.user,
-      `Addis Tiggena: ${deposit.amountEtb} ETB deposit confirmed. Balance ${settled.balanceEtb} ETB.`,
-    );
+    this.notifications.send(settled.provider.user, 'depositConfirmed', {
+      amount: String(deposit.amountEtb),
+      balance: String(settled.balanceEtb),
+    });
     return this.prisma.deposit.findUnique({ where: { id } });
   }
 
@@ -1204,6 +1206,7 @@ export class AdminController {
       },
     });
     if (dto.lat !== undefined && dto.lng !== undefined) {
+      // prettier-ignore
       await this.prisma.$executeRaw`UPDATE "ProviderProfile" SET "location" = ST_SetSRID(ST_MakePoint(${dto.lng}, ${dto.lat}), 4326)::geography WHERE "id" = ${profile.id}`;
     }
     await this.prisma.wallet.create({ data: { providerId: profile.id } });
@@ -1213,11 +1216,16 @@ export class AdminController {
       category: category.nameEn,
       verified: !!dto.verified,
     });
-    this.notifications.notify(
-      { phone, telegramChatId: null },
-      `Addis Tiggena: እንኳን ደህና መጡ · your technician account is ready. Sign in with this phone number at ${process.env.WEB_PUBLIC_URL ?? 'addistiggena.com'} or in the app.`,
-    );
-    return { id: profile.id, userId: user.id, name: user.name, phone, verificationStatus: profile.verificationStatus };
+    this.notifications.send({ phone, telegramChatId: null }, 'providerWelcome', {
+      site: process.env.WEB_PUBLIC_URL ?? 'addistiggena.com',
+    });
+    return {
+      id: profile.id,
+      userId: user.id,
+      name: user.name,
+      phone,
+      verificationStatus: profile.verificationStatus,
+    };
   }
 
   // -- Finance workspace (spec section 2: Finance Officer) --------------------
@@ -1242,45 +1250,50 @@ export class AdminController {
 
     const [collected, depositsPending, depositsToday, arrears, unpaidJobs, openRefunds, queue] =
       await Promise.all([
-      this.prisma.payment.aggregate({
-        where: { status: 'CONFIRMED', ...within('confirmedAt') },
-        _sum: { amountEtb: true, commissionEtb: true },
-        _count: { _all: true },
-      }),
-      this.prisma.deposit.aggregate({
-        where: { status: 'PENDING' },
-        _sum: { amountEtb: true },
-        _count: { _all: true },
-      }),
-      this.prisma.deposit.aggregate({
-        where: { status: 'CONFIRMED', ...within('settledAt') },
-        _sum: { amountEtb: true },
-        _count: { _all: true },
-      }),
-      // technicians who have run their commission balance into the red
-      this.prisma.wallet.aggregate({
-        where: { balanceEtb: { lt: 0 } },
-        _sum: { balanceEtb: true },
-        _count: { _all: true },
-      }),
-      // completed long ago but still unpaid - the classic exception to chase
-      this.prisma.booking.count({
-        where: { status: 'COMPLETED', completedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) } },
-      }),
-      this.prisma.supportTicket.count({
-        where: { status: { in: ['OPEN', 'RE_INSPECTION'] }, refundEtb: { not: null } },
-      }),
-      this.prisma.booking.findMany({
-        where: { OR: [{ status: 'PAID', ...within('paidAt') }, { status: 'COMPLETED' }] },
-        include: {
-          category: { select: { nameEn: true } },
-          payment: { select: { amountEtb: true, commissionEtb: true, gateway: true, status: true } },
-          provider: { select: { user: { select: { name: true } } } },
-        },
-        orderBy: { completedAt: 'desc' },
-        take: 60,
-      }),
-    ]);
+        this.prisma.payment.aggregate({
+          where: { status: 'CONFIRMED', ...within('confirmedAt') },
+          _sum: { amountEtb: true, commissionEtb: true },
+          _count: { _all: true },
+        }),
+        this.prisma.deposit.aggregate({
+          where: { status: 'PENDING' },
+          _sum: { amountEtb: true },
+          _count: { _all: true },
+        }),
+        this.prisma.deposit.aggregate({
+          where: { status: 'CONFIRMED', ...within('settledAt') },
+          _sum: { amountEtb: true },
+          _count: { _all: true },
+        }),
+        // technicians who have run their commission balance into the red
+        this.prisma.wallet.aggregate({
+          where: { balanceEtb: { lt: 0 } },
+          _sum: { balanceEtb: true },
+          _count: { _all: true },
+        }),
+        // completed long ago but still unpaid - the classic exception to chase
+        this.prisma.booking.count({
+          where: {
+            status: 'COMPLETED',
+            completedAt: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+          },
+        }),
+        this.prisma.supportTicket.count({
+          where: { status: { in: ['OPEN', 'RE_INSPECTION'] }, refundEtb: { not: null } },
+        }),
+        this.prisma.booking.findMany({
+          where: { OR: [{ status: 'PAID', ...within('paidAt') }, { status: 'COMPLETED' }] },
+          include: {
+            category: { select: { nameEn: true } },
+            payment: {
+              select: { amountEtb: true, commissionEtb: true, gateway: true, status: true },
+            },
+            provider: { select: { user: { select: { name: true } } } },
+          },
+          orderBy: { completedAt: 'desc' },
+          take: 60,
+        }),
+      ]);
 
     return {
       range: {
@@ -1448,7 +1461,8 @@ export class AdminController {
     const spendByCustomer = new Map<string, number>();
     for (const b of bookings) {
       const amount = byBooking.get(b.id);
-      if (amount) spendByCustomer.set(b.customerId, (spendByCustomer.get(b.customerId) ?? 0) + amount);
+      if (amount)
+        spendByCustomer.set(b.customerId, (spendByCustomer.get(b.customerId) ?? 0) + amount);
     }
 
     return rows.map((c) => {
@@ -1499,7 +1513,9 @@ export class AdminController {
       this.prisma.deposit.findMany({
         where: { status: 'PENDING', createdAt: { gte: since } },
         include: {
-          wallet: { include: { provider: { include: { user: { select: { name: true, phone: true } } } } } },
+          wallet: {
+            include: { provider: { include: { user: { select: { name: true, phone: true } } } } },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: 15,
@@ -1799,6 +1815,31 @@ export class AdminController {
     return { notifications: dto.notifications };
   }
 
+  /**
+   * The whole register of messages the platform can send: when each one goes
+   * out, to whom, over which channel, and what it costs in SMS parts. This
+   * exists because nobody could answer "when do we text people?" without
+   * reading the source.
+   */
+  @Get('config/messages')
+  @Roles('ADMIN', 'OPS_MANAGER')
+  async messages(@Query('lang') lang?: string) {
+    const rows = messageRegister(lang === 'en' ? 'en' : 'am');
+    const smsRows = rows.filter((r) => r.channel !== 'APP_ONLY');
+    return {
+      // an SMS_IF_NO_APP row only costs when the person has no app, so the
+      // worst case is every row billed and the best case is only SMS_ALWAYS
+      totals: {
+        messages: rows.length,
+        alwaysSms: rows.filter((r) => r.channel === 'SMS_ALWAYS').length,
+        smsIfNoApp: rows.filter((r) => r.channel === 'SMS_IF_NO_APP').length,
+        appOnly: rows.filter((r) => r.channel === 'APP_ONLY').length,
+        maxPartsPerJourney: smsRows.reduce((n, r) => n + r.segments, 0),
+      },
+      messages: rows,
+    };
+  }
+
   @Put('config/dispatch')
   @Roles('ADMIN')
   async setDispatchRules(@CurrentUser() actor: AuthUser, @Body() dto: DispatchRulesDto) {
@@ -1853,7 +1894,9 @@ export class AdminController {
       const t = v === null || v === undefined ? '' : String(v);
       return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
     };
-    const lines = [['when', 'who', 'role', 'action', 'target_type', 'target_id', 'reason', 'detail'].join(',')];
+    const lines = [
+      ['when', 'who', 'role', 'action', 'target_type', 'target_id', 'reason', 'detail'].join(','),
+    ];
     for (const a of rows) {
       lines.push(
         [
@@ -1871,7 +1914,10 @@ export class AdminController {
       );
     }
     res.setHeader('content-type', 'text/csv; charset=utf-8');
-    res.setHeader('content-disposition', `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.setHeader(
+      'content-disposition',
+      `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`,
+    );
     return lines.join('\n');
   }
 
@@ -2068,7 +2114,10 @@ export class AdminController {
         nameAm: dto.nameAm,
         icon: dto.icon ?? 'toolbox',
         priceFloorEtb: dto.priceFloorEtb ?? 250,
-        subServices: (dto.subServices ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 30),
+        subServices: (dto.subServices ?? [])
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .slice(0, 30),
       },
     });
     this.audit.log(actor, 'CATEGORY_CREATE', 'ServiceCategory', cat.id, dto.nameEn);
@@ -2097,7 +2146,12 @@ export class AdminController {
         ...(dto.nameAm ? { nameAm: dto.nameAm } : {}),
         ...(dto.icon ? { icon: dto.icon } : {}),
         ...(dto.subServices
-          ? { subServices: dto.subServices.map((x) => x.trim()).filter(Boolean).slice(0, 30) }
+          ? {
+              subServices: dto.subServices
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .slice(0, 30),
+            }
           : {}),
       },
     });
@@ -2108,7 +2162,13 @@ export class AdminController {
   @Put('config/refund-cap')
   @Roles('ADMIN', 'OPS_MANAGER')
   async setRefundCap(@CurrentUser() actor: AuthUser, @Body() dto: RefundCapDto) {
-    this.audit.log(actor, 'REFUND_CAP_SET', 'AppConfig', 'support_refund_cap_etb', String(dto.capEtb));
+    this.audit.log(
+      actor,
+      'REFUND_CAP_SET',
+      'AppConfig',
+      'support_refund_cap_etb',
+      String(dto.capEtb),
+    );
     await this.prisma.appConfig.upsert({
       where: { key: 'support_refund_cap_etb' },
       update: { value: String(dto.capEtb) },
