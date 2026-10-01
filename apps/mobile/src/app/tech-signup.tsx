@@ -112,8 +112,14 @@ export default function TechSignup() {
           declarationName: declarationName.trim() || undefined,
         }),
       });
-      // the account is a PROVIDER now - refresh the session so routing follows
-      await refreshUser();
+      // The account is a PROVIDER now, but only a refreshed session knows it,
+      // and the technician tabs turn away anyone who still reads as a customer.
+      // So the refresh has to land before we send them there.
+      const fresh = await refreshUser();
+      if (fresh?.role !== 'PROVIDER') {
+        setError('Registration saved. Sign in again to open your technician profile.');
+        return;
+      }
       router.replace('/(tech)/profile');
     } catch (e) {
       setError((e as Error).message);
