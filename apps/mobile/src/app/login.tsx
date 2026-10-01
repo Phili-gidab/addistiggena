@@ -11,7 +11,7 @@ type Stage = 'phone' | 'code' | 'name' | 'credentials' | 'password';
 
 /** Phone-OTP first (the consumer flow), with a username/password door for staff & demo. */
 export default function Login() {
-  const { requestOtp, verifyOtp, passwordLogin, updateName, setCredentials } = useAuth();
+  const { user, requestOtp, verifyOtp, passwordLogin, updateName, setCredentials } = useAuth();
   /** "I am a technician" on the welcome screen sets this. */
   const { role } = useLocalSearchParams<{ role?: string }>();
   const asTech = role === 'tech';
@@ -67,6 +67,19 @@ export default function Login() {
           </Hint>
 
           <ErrorBox>{error}</ErrorBox>
+
+          {/* Reaching this screen with a session still open is how people switch
+              account. Say whose session is open, so nobody signs in and then
+              wonders why the app still looks like somebody else's. */}
+          {user && (
+            <View style={st.switching}>
+              <Text style={st.switchingText}>
+                Signed in as {user.name ?? user.phone}
+                {user.role !== 'CUSTOMER' ? ` (${user.role.replace(/_/g, ' ').toLowerCase()})` : ''}.
+                Signing in below replaces that session.
+              </Text>
+            </View>
+          )}
 
           {stage === 'phone' && (
             <>
@@ -269,6 +282,14 @@ const st = StyleSheet.create({
     // letterSpacing also trails the last digit, so nudge the run back to centre
     paddingLeft: 10,
   },
+  switching: {
+    backgroundColor: '#e8f1fb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: S.lg,
+  },
+  switchingText: { fontFamily: F.bodyMedium, fontSize: 12.5, lineHeight: 18, color: C.navy },
   resendRow: { justifyContent: 'center', marginTop: S.md },
   resendText: { fontFamily: F.body, fontSize: 13, color: C.muted },
   resendLink: { fontFamily: F.bodySemi, fontSize: 13, color: C.blue },

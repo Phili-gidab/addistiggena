@@ -2,11 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   api,
   clearSession,
-  getToken,
   loadSession,
   normalizeEtPhone,
-  saveSession,
   setSessionLostHandler,
+  startSession,
+  storeUser,
   User,
 } from '../lib/api';
 
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ username: username.trim(), password }),
     });
-    await saveSession(res.accessToken, res.user, res.refreshToken);
+    await startSession(res.accessToken, res.refreshToken, res.user);
     setUser(res.user);
     return res.user;
   }, []);
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ phone: normalizeEtPhone(phone), code }),
     });
-    await saveSession(res.accessToken, res.user, res.refreshToken);
+    await startSession(res.accessToken, res.refreshToken, res.user);
     setUser(res.user);
     return res.user;
   }, []);
@@ -82,8 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const fresh = await api<User>('/users/me');
       setUser(fresh);
-      const token = getToken();
-      if (token) await saveSession(token, fresh);
+      await storeUser(fresh);
       return fresh;
     } catch {
       return null;

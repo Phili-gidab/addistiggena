@@ -1,8 +1,9 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, F } from '../../lib/theme';
+import { useAuth } from '../../store/auth';
 
 const icon =
   (glyph: keyof typeof MaterialCommunityIcons.glyphMap) =>
@@ -14,6 +15,14 @@ export default function CustomerTabs() {
   // Android runs edge-to-edge: without the bottom inset the system navigation
   // bar covers the tab bar entirely (seen on Samsung M10-class devices).
   const insets = useSafeAreaInsets();
+  const { user, ready } = useAuth();
+
+  // These tabs used to stay mounted whoever was signed in, so signing out or
+  // switching account left the previous person's screens on display.
+  if (!ready) return null;
+  if (!user) return <Redirect href="/welcome" />;
+  if (user.role === 'PROVIDER') return <Redirect href="/(tech)/jobs" />;
+
   return (
     <Tabs
       screenOptions={{

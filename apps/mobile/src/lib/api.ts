@@ -192,25 +192,39 @@ export async function loadSession(): Promise<User | null> {
   }
 }
 
-export async function saveSession(token: string, user: User, refresh?: string) {
+/**
+ * A completed sign-in. This replaces the whole session, refresh token included:
+ * keeping the previous account's refresh token left the app able to silently
+ * resurrect it, so signing in as someone else landed you back in the old
+ * account.
+ */
+export async function startSession(token: string, refresh: string, user: User) {
   accessToken = token;
+  refreshToken = refresh;
   currentUser = user;
-  if (refresh) refreshToken = refresh;
   await Promise.all([
     SecureStore.setItemAsync(K_TOKEN, token),
+    SecureStore.setItemAsync(K_REFRESH, refresh),
     SecureStore.setItemAsync(K_USER, JSON.stringify(user)),
-    refresh ? SecureStore.setItemAsync(K_REFRESH, refresh) : Promise.resolve(),
   ]);
+}
+
+/** Same account, fresher row (e.g. a customer who just became a technician). */
+export async function storeUser(user: User) {
+  currentUser = user;
+  await SecureStore.setItemAsync(K_USER, JSON.stringify(user));
 }
 
 export async function clearSession() {
   accessToken = null;
   refreshToken = null;
   currentUser = null;
+  // the in-memory session is already gone; a storage error must not leave the
+  // caller stranded mid-sign-out with no way back to the welcome screen
   await Promise.all([
-    SecureStore.deleteItemAsync(K_TOKEN),
-    SecureStore.deleteItemAsync(K_REFRESH),
-    SecureStore.deleteItemAsync(K_USER),
+    SecureStore.deleteItemAsync(K_TOKEN).catch(() => {}),
+    SecureStore.deleteItemAsync(K_REFRESH).catch(() => {}),
+    SecureStore.deleteItemAsync(K_USER).catch(() => {}),
   ]);
 }
 
@@ -252,16 +266,25 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+/**
+ * Signing in is not an authenticated call. The /auth/* endpoints answer 401 for
+ * "wrong password" and "incorrect code", so sending the signed-in account's
+ * bearer with them, or reading their 401 as this session expiring, made a bad
+ * password refresh the OLD session and report "your session expired" instead.
+ */
+const isAuthPath = (path: string) => path.startsWith('/auth/');
+
 export async function api<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+  const authenticate = !isAuthPath(path);
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       ...(init.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
-      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...(authenticate && accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
       ...(init.headers ?? {}),
     },
   });
-  if (res.status === 401 && accessToken) {
+  if (res.status === 401 && accessToken && authenticate) {
     if (!retried && (await tryRefresh())) return api<T>(path, init, true);
     await clearSession();
     onSessionLost?.();

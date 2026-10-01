@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, ErrorBox, Field, H1, Hint, OkBox, Row } from '../../components/ui';
@@ -14,6 +14,14 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // this screen outlives a sign-out, so the field has to follow whoever is
+  // signed in now rather than keep the previous account's name
+  useEffect(() => {
+    setName(user?.name ?? '');
+    setNotice('');
+    setError('');
+  }, [user?.id]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={st.wrap} keyboardShouldPersistTaps="handled">
@@ -26,7 +34,14 @@ export default function Profile() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.name}>{user?.name ?? 'Unnamed'}</Text>
-              <Hint>{user?.phone?.replace('+251', '0')}</Hint>
+              <Hint>
+                {user?.phone?.replace('+251', '0')}
+                {/* staff accounts also land here - name the role so it is never
+                    a guess which account the app is signed in to */}
+                {user && user.role !== 'CUSTOMER'
+                  ? ` · ${user.role.replace(/_/g, ' ').toLowerCase()}`
+                  : ''}
+              </Hint>
             </View>
           </Row>
         </Card>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { Am, Btn, Card, ErrorBox, Field, Hint, OkBox } from './ui';
 import { C, F, S } from '../lib/theme';
@@ -16,6 +16,15 @@ export function CredentialsCard() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // showing the last account's username here is how "I signed in as the
+  // customer but it still says admin" happened
+  useEffect(() => {
+    setUsername(user?.username ?? '');
+    setPassword('');
+    setError('');
+    setNotice('');
+  }, [user?.id]);
 
   return (
     <Card style={{ marginTop: S.md }}>
