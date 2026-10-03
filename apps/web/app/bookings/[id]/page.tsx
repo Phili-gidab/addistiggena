@@ -64,6 +64,7 @@ export default function BookingDetailPage() {
   const [stars, setStars] = useState(5);
   const [reviewText, setReviewText] = useState('');
   const [price, setPrice] = useState('');
+
   const [track, setTrack] = useState<TrackInfo | null>(null);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
@@ -202,6 +203,11 @@ export default function BookingDetailPage() {
   const isProvider = booking.provider?.user?.id === user.current?.id;
   const dead = ['CANCELLED', 'REJECTED', 'EXPIRED'].includes(booking.status);
   const flowIdx = FLOW.findIndex((f) => f.key === booking.status);
+
+  // The commission is taken from the final price, so it is mandatory and
+  // cannot sit below the trade's published list (client decision, Oct 2026).
+  const priceFloor = Number(booking.category.priceFloorEtb ?? 0);
+  const priceOk = !!price && !Number.isNaN(Number(price)) && Number(price) >= Math.max(priceFloor, 1);
 
   // 5-day guarantee window from completion; the claim button disables on expiry
   const guaranteeUntil = booking.completedAt
@@ -535,23 +541,34 @@ export default function BookingDetailPage() {
               )}
             </div>
             {booking.status === 'IN_PROGRESS' && (
-              <div className="row mt">
-                <input
-                  className="input"
-                  style={{ maxWidth: 180 }}
-                  placeholder="Final price (ETB)"
-                  inputMode="numeric"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
-                />
-                <button
-                  className="btn btn-teal"
-                  disabled={busy || !price}
-                  onClick={() => act(`/bookings/${booking.id}/complete`, { finalPriceEtb: Number(price) })}
-                >
-                  Complete job ✓
-                </button>
-              </div>
+              <>
+                <div className="row mt">
+                  <input
+                    className="input"
+                    style={{ maxWidth: 180 }}
+                    placeholder="Final price (ETB)"
+                    inputMode="numeric"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))}
+                  />
+                  <button
+                    className="btn btn-teal"
+                    disabled={busy || !priceOk}
+                    onClick={() => act(`/bookings/${booking.id}/complete`, { finalPriceEtb: Number(price) })}
+                  >
+                    Complete job ✓
+                  </button>
+                </div>
+                {/* the commission comes off this number, so the list it has to
+                    reach is shown rather than left to be guessed */}
+                {priceFloor > 0 && (
+                  <p className={price && !priceOk ? 'hint-bad' : 'hint'}>
+                    {price && !priceOk
+                      ? `${booking.category.nameEn} starts at ETB ${priceFloor} on the published list.`
+                      : `Published list: ${booking.category.nameEn} from ETB ${priceFloor}. Charge above it if the job needed more, never below.`}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

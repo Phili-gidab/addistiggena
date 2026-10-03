@@ -14,6 +14,12 @@ export class WalletController {
     return this.wallet.me(user.userId);
   }
 
+  /** The company's bank accounts and wallets, as shown on the top-up screen. */
+  @Get('accounts')
+  accounts() {
+    return this.wallet.depositAccounts();
+  }
+
   @Post('deposits')
   declareDeposit(@CurrentUser() user: AuthUser, @Body() dto: DeclareDepositDto) {
     return this.wallet.declareDeposit(user.userId, dto);

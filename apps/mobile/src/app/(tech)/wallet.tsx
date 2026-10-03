@@ -3,8 +3,15 @@ import { useFocusEffect } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Btn, Card, ErrorBox, Field, H1, Hint, OkBox, Row } from '../../components/ui';
-import { api, fmtDate, Wallet } from '../../lib/api';
+import { api, DepositAccount, fmtDate, Wallet } from '../../lib/api';
 import { C, F, R, S } from '../../lib/theme';
+
+const KIND_LABEL: Record<string, string> = {
+  BANK: 'Bank',
+  TELEBIRR: 'Telebirr',
+  CBE_BIRR: 'CBE Birr',
+  OTHER: 'Wallet',
+};
 
 const METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank' },
@@ -21,6 +28,7 @@ const METHODS = [
  */
 export default function WalletScreen() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [accounts, setAccounts] = useState<DepositAccount[] | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('BANK_TRANSFER');
   const [reference, setReference] = useState('');
@@ -31,7 +39,12 @@ export default function WalletScreen() {
 
   const load = useCallback(async () => {
     try {
-      setWallet(await api<Wallet>('/wallet/me'));
+      const [w, a] = await Promise.all([
+        api<Wallet>('/wallet/me'),
+        api<DepositAccount[]>('/wallet/accounts').catch(() => [] as DepositAccount[]),
+      ]);
+      setWallet(w);
+      setAccounts(a);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -73,9 +86,36 @@ export default function WalletScreen() {
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Top up · ገንዘብ አስገባ</Text>
           <Hint style={{ marginTop: 4, marginBottom: S.md }}>
-            Pay into the company account, then enter the bank reference here. Finance checks it
+            Pay into one of the accounts below, then enter the reference here. Finance checks it
             against the statement before your balance goes up.
           </Hint>
+          {/* "pay into the company account" meant nothing without the number.
+              Finance keeps this list from the console. */}
+          {accounts !== null && accounts.length === 0 && (
+            <View style={st.acctEmpty}>
+              <Text style={st.acctEmptyT}>
+                No payment accounts are published yet. Ask the office where to pay before you
+                transfer anything.
+              </Text>
+            </View>
+          )}
+          {!!accounts?.length && (
+            <View style={st.acctList}>
+              {accounts.map((a) => (
+                <View key={a.id} style={st.acct}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text style={st.acctLabel}>{a.label}</Text>
+                    <Text style={st.acctKind}>{KIND_LABEL[a.kind] ?? a.kind}</Text>
+                  </Row>
+                  <Text style={st.acctNumber} selectable>
+                    {a.number}
+                  </Text>
+                  {!!a.holderName && <Text style={st.acctSub}>{a.holderName}</Text>}
+                  {!!a.note && <Text style={st.acctSub}>{a.note}</Text>}
+                </View>
+              ))}
+            </View>
+          )}
           <Field
             label="Amount (ETB)"
             placeholder="e.g. 500"
@@ -193,6 +233,26 @@ export default function WalletScreen() {
 
 const st = StyleSheet.create({
   wrap: { padding: S.lg, paddingBottom: S.xxl },
+  acctList: { gap: 8, marginBottom: S.md },
+  acct: {
+    backgroundColor: C.blueSoft,
+    borderRadius: R.md,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 2,
+  },
+  acctLabel: { fontFamily: F.bodySemi, fontSize: 13, color: C.navy, flex: 1 },
+  acctKind: { fontFamily: F.bodySemi, fontSize: 10.5, color: C.blue, letterSpacing: 0.4 },
+  // the number is the thing they copy, so it gets the weight
+  acctNumber: { fontFamily: F.displayBold, fontSize: 17, color: C.navy, letterSpacing: 0.5 },
+  acctSub: { fontFamily: F.body, fontSize: 11.5, color: C.muted },
+  acctEmpty: {
+    backgroundColor: C.warnBg,
+    borderRadius: R.md,
+    padding: 12,
+    marginBottom: S.md,
+  },
+  acctEmptyT: { fontFamily: F.bodyMedium, fontSize: 12, lineHeight: 18, color: C.warnFg },
   balanceCard: {
     backgroundColor: C.navy,
     borderRadius: R.lg,

@@ -140,6 +140,17 @@ export interface ProviderProfile {
   documents?: ProviderDocument[];
 }
 
+/** A company bank account or wallet the technician can top up into. Display
+ *  only - nothing is collected through it. */
+export interface DepositAccount {
+  id: string;
+  kind: 'BANK' | 'TELEBIRR' | 'CBE_BIRR' | 'OTHER';
+  label: string;
+  holderName: string | null;
+  number: string;
+  note: string | null;
+}
+
 export interface Wallet {
   balanceEtb: string;
   transactions?: { id: string; amountEtb: string; type: string; note: string | null; createdAt: string }[];

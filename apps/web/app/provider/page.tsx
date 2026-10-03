@@ -55,6 +55,23 @@ interface Profile {
   documents: ProviderDoc[];
 }
 
+/** A company bank account or wallet, as published to technicians. */
+interface DepositAccount {
+  id: string;
+  kind: 'BANK' | 'TELEBIRR' | 'CBE_BIRR' | 'OTHER';
+  label: string;
+  holderName: string | null;
+  number: string;
+  note: string | null;
+}
+
+const ACCOUNT_KIND: Record<string, string> = {
+  BANK: 'Bank',
+  TELEBIRR: 'Telebirr',
+  CBE_BIRR: 'CBE Birr',
+  OTHER: 'Wallet',
+};
+
 interface WalletDetail {
   balanceEtb: string;
   transactions: { id: string; type: string; amountEtb: string; note: string | null; createdAt: string }[];
@@ -118,6 +135,7 @@ export default function ProviderPage() {
 
   // wallet + documents
   const [walletDetail, setWalletDetail] = useState<WalletDetail | null>(null);
+  const [accounts, setAccounts] = useState<DepositAccount[] | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMethod, setDepositMethod] = useState('BANK_TRANSFER');
   const [depositRef, setDepositRef] = useState('');
@@ -132,6 +150,7 @@ export default function ProviderPage() {
         setNoProfile(false);
         api<Booking[]>('/bookings/mine').then(setJobs).catch(() => {});
         api<WalletDetail>('/wallet/me').then(setWalletDetail).catch(() => {});
+        api<DepositAccount[]>('/wallet/accounts').then(setAccounts).catch(() => setAccounts([]));
       })
       .catch((e) => {
         // only a real 404 means "no profile yet" - on transient poll errors
@@ -615,9 +634,32 @@ export default function ProviderPage() {
               <p className="hint mb">
                 You collect the full price from the customer in cash. Our commission comes out of
                 this balance when a job completes, so keep it topped up - jobs stop being offered
-                to you once it runs out. Pay into the company account, then enter the bank
-                reference below.
+                to you once it runs out. Pay into one of the accounts below, then enter the
+                reference.
               </p>
+              {/* "the company account" meant nothing without the number - finance
+                  maintains this list from the console */}
+              {accounts !== null && accounts.length === 0 && (
+                <p className="note-warn mb">
+                  No payment accounts are published yet. Ask the office where to pay before you
+                  transfer anything.
+                </p>
+              )}
+              {!!accounts?.length && (
+                <div className="acct-list mb">
+                  {accounts.map((a) => (
+                    <div key={a.id} className="acct">
+                      <div className="acct-head">
+                        <b>{a.label}</b>
+                        <span className="pill">{ACCOUNT_KIND[a.kind] ?? a.kind}</span>
+                      </div>
+                      <div className="acct-number">{a.number}</div>
+                      {a.holderName && <small>{a.holderName}</small>}
+                      {a.note && <small>{a.note}</small>}
+                    </div>
+                  ))}
+                </div>
+              )}
               <form className="row mb" onSubmit={declareDeposit}>
                 <input
                   className="input"

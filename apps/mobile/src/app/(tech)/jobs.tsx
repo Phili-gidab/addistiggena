@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, CatIcon, Countdown, ErrorBox, H1, Hint, OkBox, Row, StatusPill } from '../../components/ui';
-import { api, Booking, fmtDate, ProviderProfile } from '../../lib/api';
+import { api, Booking, Category, fmtDate, ProviderProfile } from '../../lib/api';
 import { C, F, S } from '../../lib/theme';
 
 /**
@@ -233,7 +233,11 @@ export default function Jobs() {
                   <Btn title={na.label} small busy={busy === j.id + na.action} onPress={() => transition(j.id, na.action)} />
                 )}
                 {j.status === 'IN_PROGRESS' && (
-                  <CompleteButton busy={busy === j.id + 'complete'} onComplete={(price) => transition(j.id, 'complete', price ? { finalPriceEtb: price } : undefined)} />
+                  <CompleteButton
+                    busy={busy === j.id + 'complete'}
+                    category={j.category}
+                    onComplete={(price) => transition(j.id, 'complete', { finalPriceEtb: price })}
+                  />
                 )}
               </Row>
             </Card>
@@ -264,28 +268,50 @@ export default function Jobs() {
   );
 }
 
-/** Complete needs the agreed price - small inline two-tap flow. */
-function CompleteButton({ busy, onComplete }: { busy: boolean; onComplete: (price?: number) => void }) {
+/**
+ * Complete needs the agreed price - small inline two-tap flow.
+ *
+ * The amount is what the commission is taken from, so it is no longer
+ * skippable and no longer allowed below the trade's published list. The list
+ * is shown right here, because "the correct amount" has to be visible to be
+ * expected (client decision, Oct 2026).
+ */
+function CompleteButton({
+  busy,
+  category,
+  onComplete,
+}: {
+  busy: boolean;
+  category: Category;
+  onComplete: (price: number) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState('');
+  const floor = Number(category.priceFloorEtb ?? 0);
+  const entered = Number(price);
+  const valid = !!price && !Number.isNaN(entered) && entered >= Math.max(floor, 1);
+
   if (!open) return <Btn title="Complete · ጨርስ" kind="dark" small onPress={() => setOpen(true)} />;
   return (
-    <Row style={{ flex: 1, gap: 8 }}>
-      <View style={{ flex: 1 }}>
-        <Text style={st2.label}>Final price (ETB)</Text>
-        <View style={st2.priceWrap}>
-          <Text style={st2.etb}>ETB</Text>
-          <TextInputPrice value={price} onChange={setPrice} />
+    <View style={{ flex: 1 }}>
+      <Row style={{ flex: 1, gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={st2.label}>Final price (ETB) · የመጨረሻ ዋጋ</Text>
+          <View style={st2.priceWrap}>
+            <Text style={st2.etb}>ETB</Text>
+            <TextInputPrice value={price} onChange={setPrice} />
+          </View>
         </View>
-      </View>
-      <Btn
-        title="Confirm"
-        small
-        busy={busy}
-        disabled={!price || Number.isNaN(Number(price))}
-        onPress={() => onComplete(Number(price))}
-      />
-    </Row>
+        <Btn title="Confirm" small busy={busy} disabled={!valid} onPress={() => onComplete(entered)} />
+      </Row>
+      {floor > 0 && (
+        <Text style={price && !valid ? st2.priceBad : st2.priceHint}>
+          {price && !valid
+            ? `${category.nameEn} starts at ETB ${floor} on the published list.`
+            : `Published list: ${category.nameEn} from ETB ${floor}.`}
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -333,4 +359,6 @@ const st2 = StyleSheet.create({
   },
   etb: { fontFamily: F.bodySemi, fontSize: 12, color: C.muted, marginRight: 6 },
   priceInput: { flex: 1, fontFamily: F.bodySemi, fontSize: 15, color: C.ink, padding: 0 },
+  priceHint: { fontFamily: F.body, fontSize: 11.5, color: C.muted, marginTop: 6 },
+  priceBad: { fontFamily: F.bodySemi, fontSize: 11.5, color: C.red, marginTop: 6 },
 });

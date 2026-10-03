@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -47,10 +48,18 @@ export class CreateBookingDto {
 }
 
 export class CompleteBookingDto {
-  @IsOptional()
+  /**
+   * What the customer is actually charged, and the only number the commission
+   * is taken from. It used to be optional and allowed to be zero, so a job
+   * could be closed with no price at all and earn Amnen nothing (client
+   * decision, Oct 2026: "make it impossible to proceed unless the technician
+   * writes the correct amount"). The floor for the trade is checked server
+   * side as well - see BookingsService.transition.
+   */
   @IsNumber()
-  @Min(0)
-  finalPriceEtb?: number;
+  @Min(1, { message: 'finalPriceEtb: enter the amount the customer is paying' })
+  @Max(1_000_000)
+  finalPriceEtb: number;
 }
 
 export class CancelBookingDto {

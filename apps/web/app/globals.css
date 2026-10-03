@@ -959,6 +959,23 @@ body.scroll-locked .site-header { transform: none; }
 }
 
 .hint { font-size: 0.92rem; color: var(--muted); }
+/* a refusal next to the field that caused it, not a banner at the top */
+.hint-bad { font-size: 0.92rem; color: var(--err-fg); font-weight: 600; }
+
+/* ── where to pay: the number is what they copy, so it leads ─────────────── */
+.acct-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.7rem; }
+.acct { background: var(--blue-tint); border-radius: var(--radius); padding: 0.8rem 0.95rem; }
+.acct-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.acct-head b { color: var(--navy); font-size: 0.92rem; }
+.acct-number {
+  font-family: var(--font-display); font-weight: 800; font-size: 1.25rem;
+  color: var(--navy); letter-spacing: 0.5px; margin: 0.15rem 0; user-select: all;
+}
+.acct small { display: block; color: var(--muted); font-size: 0.8rem; }
+.note-warn {
+  background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-line);
+  border-radius: var(--radius); padding: 0.75rem 0.9rem; font-size: 0.9rem;
+}
 .hint code { background: var(--surface); padding: 0.15rem 0.5rem; border-radius: 6px; font-weight: 700; color: var(--navy); }
 
 .error-box {

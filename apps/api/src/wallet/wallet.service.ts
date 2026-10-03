@@ -33,6 +33,19 @@ export class WalletService {
   }
 
   /**
+   * Where to pay. "Pay into the company account" meant nothing without the
+   * account number, so finance keeps the real list here and the technician
+   * reads it on the top-up screen (client decision, Oct 2026).
+   */
+  depositAccounts() {
+    return this.prisma.depositAccount.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+      select: { id: true, kind: true, label: true, holderName: true, number: true, note: true },
+    });
+  }
+
+  /**
    * The technician has paid into the company account and is telling us so. No
    * money moves here - finance confirms it against the bank statement first,
    * otherwise anyone could credit themselves by filling in a form.

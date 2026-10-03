@@ -107,6 +107,13 @@ enum DepositStatus {
   REJECTED
 }
 
+enum DepositAccountKind {
+  BANK
+  TELEBIRR
+  CBE_BIRR
+  OTHER
+}
+
 enum DepositMethod {
   BANK_TRANSFER
   TELEBIRR
@@ -407,6 +414,29 @@ model WalletTransaction {
 /// A top-up the technician paid into the company account. Finance checks the
 /// bank reference against the statement, then confirms - only a confirmed
 /// deposit moves the wallet balance.
+/// Where a technician is told to pay their commission top-up: the company's
+/// bank accounts and mobile wallets. These are display-only - nothing is
+/// fetched or collected through them, the technician pays by their own means
+/// and declares the reference (client decision, Oct 2026). Finance maintains
+/// the list from the console so a new account never needs a deploy.
+model DepositAccount {
+  id        String            @id @default(cuid())
+  kind      DepositAccountKind @default(BANK)
+  /// what the technician sees, e.g. "Commercial Bank of Ethiopia"
+  label     String
+  /// the name the account is held in, shown so a transfer is addressed right
+  holderName String?
+  /// account, wallet or merchant number - the thing they copy
+  number    String
+  /// anything else they must do, e.g. "put your phone number as the reason"
+  note      String?
+  isActive  Boolean           @default(true)
+  sortOrder Int               @default(0)
+  updatedAt DateTime          @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
 model Deposit {
   id           String        @id @default(cuid())
   walletId     String

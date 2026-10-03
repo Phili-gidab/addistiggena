@@ -460,6 +460,30 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     return booking;
   }
 
+  /**
+   * The commission comes off this number, so a job closed with nothing in the
+   * box earned Amnen nothing. The amount is now required, and it has to reach
+   * the cheapest job in the trade's published price list - the technician can
+   * charge above the list (extra parts, a harder job) but not below it.
+   */
+  private async checkedFinalPrice(categoryId: string, entered?: number): Promise<number> {
+    if (entered === undefined || entered === null) {
+      throw new BadRequestException('Enter the final price before closing the job');
+    }
+    const category = await this.prisma.serviceCategory.findUnique({
+      where: { id: categoryId },
+      select: { nameEn: true, nameAm: true, priceFloorEtb: true },
+    });
+    const floor = category?.priceFloorEtb ? Number(category.priceFloorEtb) : 0;
+    if (entered < floor) {
+      throw new BadRequestException(
+        `The published price for ${category?.nameEn ?? 'this service'} starts at ETB ${floor}. ` +
+          `Enter the amount the customer is paying - ETB ${entered} is below the list.`,
+      );
+    }
+    return entered;
+  }
+
   async transition(
     id: string,
     action: keyof typeof TRANSITIONS,
@@ -499,8 +523,8 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     const now = new Date();
     const data: Record<string, unknown> = { status: rule.to };
     if (rule.stamp !== 'updatedAt') data[rule.stamp as string] = now;
-    if (action === 'complete' && dto?.finalPriceEtb !== undefined) {
-      data.finalPriceEtb = dto.finalPriceEtb;
+    if (action === 'complete') {
+      data.finalPriceEtb = await this.checkedFinalPrice(booking.categoryId, dto?.finalPriceEtb);
     }
     if (action === 'accept') data.offerExpiresAt = null;
 

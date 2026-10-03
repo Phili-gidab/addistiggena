@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -30,6 +31,7 @@ import {
 } from 'class-validator';
 import { Response } from 'express';
 import {
+  DepositAccountKind,
   DepositMethod,
   DepositStatus,
   DocumentType,
@@ -385,6 +387,43 @@ class CategoryCreateDto {
   subServices?: string[];
 }
 
+/**
+ * One of the company's bank accounts or wallets, as the technician reads it on
+ * the top-up screen. Display only - no money is collected through these.
+ */
+class DepositAccountDto {
+  @IsOptional()
+  @IsEnum(DepositAccountKind)
+  kind?: DepositAccountKind;
+
+  @IsString()
+  @Length(2, 80)
+  label: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 120)
+  holderName?: string;
+
+  @IsString()
+  @Length(2, 60)
+  number: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 200)
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  sortOrder?: number;
+}
+
 class RefundCapDto {
   @IsNumber()
   @Min(0)
@@ -706,6 +745,68 @@ export class AdminController {
   // out. Instead they top up a wallet and each settled job debits commission.
   // Only a CONFIRMED deposit moves a balance - finance matches the reference
   // against the bank statement first.
+
+  // ── Where technicians pay ──────────────────────────────────────────────────
+  // The top-up screen used to say "pay into the company account" and stop
+  // there. Finance keeps the real accounts here so adding one never needs a
+  // deploy (client decision, Oct 2026).
+
+  @Get('deposit-accounts')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  depositAccounts() {
+    return this.prisma.depositAccount.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
+  }
+
+  @Post('deposit-accounts')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async createDepositAccount(@CurrentUser() actor: AuthUser, @Body() dto: DepositAccountDto) {
+    const row = await this.prisma.depositAccount.create({
+      data: {
+        kind: dto.kind ?? 'BANK',
+        label: dto.label.trim(),
+        holderName: dto.holderName?.trim() || null,
+        number: dto.number.trim(),
+        note: dto.note?.trim() || null,
+        isActive: dto.isActive ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+    this.audit.log(actor, 'DEPOSIT_ACCOUNT_CREATE', 'DepositAccount', row.id, row.label);
+    return row;
+  }
+
+  @Put('deposit-accounts/:id')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async updateDepositAccount(
+    @CurrentUser() actor: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: DepositAccountDto,
+  ) {
+    const row = await this.prisma.depositAccount.update({
+      where: { id },
+      data: {
+        ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+        label: dto.label.trim(),
+        holderName: dto.holderName?.trim() || null,
+        number: dto.number.trim(),
+        note: dto.note?.trim() || null,
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+    });
+    this.audit.log(actor, 'DEPOSIT_ACCOUNT_UPDATE', 'DepositAccount', id, row.label);
+    return row;
+  }
+
+  @Delete('deposit-accounts/:id')
+  @Roles('ADMIN', 'FINANCE_OFFICER')
+  async deleteDepositAccount(@CurrentUser() actor: AuthUser, @Param('id') id: string) {
+    const row = await this.prisma.depositAccount.delete({ where: { id } });
+    this.audit.log(actor, 'DEPOSIT_ACCOUNT_DELETE', 'DepositAccount', id, row.label);
+    return { ok: true };
+  }
 
   @Get('deposits')
   @Roles('ADMIN', 'FINANCE_OFFICER')

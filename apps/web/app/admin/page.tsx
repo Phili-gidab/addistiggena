@@ -204,6 +204,37 @@ interface CustomerContext {
   }[];
 }
 
+/** A company bank account or wallet technicians top up into. Display only -
+ *  no money is collected through it (client decision, Oct 2026). */
+interface DepositAccount {
+  id: string;
+  kind: 'BANK' | 'TELEBIRR' | 'CBE_BIRR' | 'OTHER';
+  label: string;
+  holderName: string | null;
+  number: string;
+  note: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+const ACCOUNT_KIND: Record<string, string> = {
+  BANK: 'Bank',
+  TELEBIRR: 'Telebirr',
+  CBE_BIRR: 'CBE Birr',
+  OTHER: 'Wallet',
+};
+
+const BLANK_ACCOUNT = {
+  id: '',
+  kind: 'BANK' as DepositAccount['kind'],
+  label: '',
+  holderName: '',
+  number: '',
+  note: '',
+  isActive: true,
+  sortOrder: 0,
+};
+
 /** The full list of messages the platform can send, straight from the API. */
 interface MessageRegister {
   totals: {
@@ -683,6 +714,9 @@ export default function AdminPage() {
     role: 'SUPPORT_AGENT',
     subCity: '',
   });
+  const [accounts, setAccounts] = useState<DepositAccount[]>([]);
+  /** blank id = the "add an account" row */
+  const [accountForm, setAccountForm] = useState({ ...BLANK_ACCOUNT });
   const [newDeposit, setNewDeposit] = useState({
     providerId: '',
     amountEtb: '',
@@ -764,6 +798,7 @@ export default function AdminPage() {
       if (has('deposits')) {
         api<AdminDeposit[]>('/admin/deposits').then(setDeposits).catch(() => {});
         api<WalletBalances>('/admin/wallets').then(setBalances).catch(() => {});
+        api<DepositAccount[]>('/admin/deposit-accounts').then(setAccounts).catch(() => {});
       }
       if (has('reviews')) api<PendingReview[]>('/admin/reviews').then(setReviews).catch(() => {});
       if (has('staff')) api<StaffAccount[]>('/admin/staff').then(setStaff).catch(() => {});
@@ -946,6 +981,49 @@ export default function AdminPage() {
       setError((err as Error).message);
     } finally {
       setUploading(false);
+    }
+  }
+
+  /** Publish or amend one of the accounts technicians are told to pay into. */
+  async function saveAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      const body = JSON.stringify({
+        kind: accountForm.kind,
+        label: accountForm.label.trim(),
+        holderName: accountForm.holderName.trim() || undefined,
+        number: accountForm.number.trim(),
+        note: accountForm.note.trim() || undefined,
+        isActive: accountForm.isActive,
+        sortOrder: Number(accountForm.sortOrder) || 0,
+      });
+      await api(
+        accountForm.id ? `/admin/deposit-accounts/${accountForm.id}` : '/admin/deposit-accounts',
+        { method: accountForm.id ? 'PUT' : 'POST', body },
+      );
+      setNotice(
+        accountForm.id
+          ? `${accountForm.label} updated - technicians see it immediately.`
+          : `${accountForm.label} published to the technician app.`,
+      );
+      setAccountForm({ ...BLANK_ACCOUNT });
+      api<DepositAccount[]>('/admin/deposit-accounts').then(setAccounts).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function removeAccount(a: DepositAccount) {
+    if (!confirm(`Remove ${a.label} (${a.number})? Technicians will stop seeing it.`)) return;
+    setError('');
+    try {
+      await api(`/admin/deposit-accounts/${a.id}`, { method: 'DELETE' });
+      setNotice(`${a.label} removed.`);
+      if (accountForm.id === a.id) setAccountForm({ ...BLANK_ACCOUNT });
+      api<DepositAccount[]>('/admin/deposit-accounts').then(setAccounts).catch(() => {});
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
@@ -3104,6 +3182,194 @@ export default function AdminPage() {
 
               {view === 'deposits' && can('deposits') && (
                 <>
+                  {/* Where technicians pay. The top-up screen said "pay into the
+                      company account" and gave no number; this is that number,
+                      and it is editable here so a new account needs no deploy. */}
+                  <div className="panel mb" id="deposit-accounts">
+                    <h2>Where technicians pay · የክፍያ መረጃ</h2>
+                    <p className="hint mb">
+                      These appear on the technician top-up screen, in the app and on the web. They
+                      are for display only - nothing is collected through them. The technician pays
+                      by their own means and enters the reference, and you confirm it against the
+                      statement below.
+                    </p>
+                    {accounts.length === 0 && (
+                      <p className="note-warn mb">
+                        Nothing published yet, so technicians are being told to pay into an account
+                        with no number. Add at least one below.
+                      </p>
+                    )}
+                    {accounts.length > 0 && (
+                      <div className="table-scroll mb">
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Account</th>
+                              <th>Number</th>
+                              <th>Held by</th>
+                              <th>Shown to technicians</th>
+                              <th />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {accounts.map((a) => (
+                              <tr key={a.id}>
+                                <td>
+                                  <b>{a.label}</b>
+                                  <span className="pill" style={{ marginLeft: 8 }}>
+                                    {ACCOUNT_KIND[a.kind] ?? a.kind}
+                                  </span>
+                                  {a.note && <small className="am-cell">{a.note}</small>}
+                                </td>
+                                <td style={{ fontVariantNumeric: 'tabular-nums' }}>{a.number}</td>
+                                <td>{a.holderName ?? '-'}</td>
+                                <td>
+                                  <span className={`pill ${a.isActive ? 'ok' : 'warn'}`}>
+                                    {a.isActive ? 'Yes' : 'Hidden'}
+                                  </span>
+                                </td>
+                                <td className="num">
+                                  <button
+                                    className="btn btn-line btn-sm"
+                                    onClick={() =>
+                                      setAccountForm({
+                                        id: a.id,
+                                        kind: a.kind,
+                                        label: a.label,
+                                        holderName: a.holderName ?? '',
+                                        number: a.number,
+                                        note: a.note ?? '',
+                                        isActive: a.isActive,
+                                        sortOrder: a.sortOrder,
+                                      })
+                                    }
+                                  >
+                                    Edit
+                                  </button>{' '}
+                                  <button
+                                    className="btn btn-line btn-sm"
+                                    onClick={() => removeAccount(a)}
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <form onSubmit={saveAccount} className="form-grid">
+                      <div className="field">
+                        <label>Kind</label>
+                        <select
+                          className="input"
+                          value={accountForm.kind}
+                          onChange={(e) =>
+                            setAccountForm({
+                              ...accountForm,
+                              kind: e.target.value as DepositAccount['kind'],
+                            })
+                          }
+                        >
+                          <option value="BANK">Bank</option>
+                          <option value="TELEBIRR">Telebirr</option>
+                          <option value="CBE_BIRR">CBE Birr</option>
+                          <option value="OTHER">Other wallet</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Name shown</label>
+                        <input
+                          className="input"
+                          placeholder="Commercial Bank of Ethiopia"
+                          value={accountForm.label}
+                          onChange={(e) =>
+                            setAccountForm({ ...accountForm, label: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Account / wallet number</label>
+                        <input
+                          className="input"
+                          placeholder="1000123456789"
+                          value={accountForm.number}
+                          onChange={(e) =>
+                            setAccountForm({ ...accountForm, number: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Held in the name of</label>
+                        <input
+                          className="input"
+                          placeholder="Amnen Marketing & Promotion"
+                          value={accountForm.holderName}
+                          onChange={(e) =>
+                            setAccountForm({ ...accountForm, holderName: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="field span-2">
+                        <label>Instruction (optional)</label>
+                        <input
+                          className="input"
+                          placeholder="Put your phone number as the reason for transfer"
+                          value={accountForm.note}
+                          onChange={(e) => setAccountForm({ ...accountForm, note: e.target.value })}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Order</label>
+                        <input
+                          className="input"
+                          inputMode="numeric"
+                          value={accountForm.sortOrder}
+                          onChange={(e) =>
+                            setAccountForm({
+                              ...accountForm,
+                              sortOrder: Number(e.target.value.replace(/\D/g, '')) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Shown to technicians</label>
+                        <select
+                          className="input"
+                          value={accountForm.isActive ? 'yes' : 'no'}
+                          onChange={(e) =>
+                            setAccountForm({ ...accountForm, isActive: e.target.value === 'yes' })
+                          }
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">Hidden</option>
+                        </select>
+                      </div>
+                      <div className="form-actions span-2">
+                        <button
+                          className="btn btn-dark btn-sm"
+                          disabled={
+                            accountForm.label.trim().length < 2 ||
+                            accountForm.number.trim().length < 2
+                          }
+                        >
+                          {accountForm.id ? 'Save changes' : 'Publish account'}
+                        </button>
+                        {accountForm.id && (
+                          <button
+                            type="button"
+                            className="btn btn-line btn-sm"
+                            onClick={() => setAccountForm({ ...BLANK_ACCOUNT })}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+
                   <div className="panel mb" id="record-deposit">
                     <h2>Record a deposit</h2>
                     <p className="hint mb">
