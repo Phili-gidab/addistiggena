@@ -396,6 +396,18 @@ export default function BookingDetailPage() {
             📍 {booking.lat.toFixed(5)}, {booking.lng.toFixed(5)}
             {booking.landmarkNote && <> - “{booking.landmarkNote}”</>}
           </p>
+          {/* the technician needs the route, not the numbers - this hands the
+              pin to Google Maps for real turn-by-turn (client decision, Oct 2026) */}
+          {isProvider && (
+            <a
+              className="btn btn-line btn-sm"
+              href={`https://www.google.com/maps/dir/?api=1&destination=${booking.lat},${booking.lng}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Navigate to the customer →
+            </a>
+          )}
           {!booking.finalPriceEtb && booking.priceQuoteEtb && (
             <p className="hint" style={{ marginTop: '0.4rem' }}>
               Estimate: from ETB {booking.priceQuoteEtb} · ከ ETB {booking.priceQuoteEtb} ጀምሮ -

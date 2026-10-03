@@ -74,6 +74,17 @@ const TRANSITIONS: Record<
   complete: { from: ['IN_PROGRESS'], actor: 'provider', to: 'COMPLETED', stamp: 'completedAt' },
 };
 
+/** Once a technician has accepted, the two sides are introduced: name, phone
+ *  and live position. Before that the customer sees a job, not a person. */
+const CONNECTED_STATES: BookingStatus[] = [
+  'ACCEPTED',
+  'EN_ROUTE',
+  'ARRIVED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'PAID',
+];
+
 /** Status changes mirrored to the customer. Which of these is worth an SMS is
  *  decided by the message catalogue, not here. */
 const STATUS_MIRRORS: Partial<Record<string, MessageKey>> = {
@@ -433,7 +444,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
         take: 50,
       });
     }
-    return this.prisma.booking.findMany({
+    const rows = await this.prisma.booking.findMany({
       where: { customerId: user.userId },
       include: {
         category: true,
@@ -444,6 +455,29 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+    return rows.map((b) => this.maskUnconnected(b, user));
+  }
+
+  /**
+   * What the customer gets back. Who the technician is stays hidden until they
+   * accept: before that the booking may be sitting on a pending offer, and a
+   * customer holding the name and number could ring round it. Once connected,
+   * the name and phone are theirs to use - the client asked for exactly that
+   * ("access to his phone, but after we connect them, meaning after
+   * acceptance", Oct 2026).
+   */
+  private maskUnconnected<T extends { status: BookingStatus; customerId: string; provider?: unknown }>(
+    booking: T,
+    user: AuthUser,
+  ): T {
+    if (booking.customerId !== user.userId) return booking;
+    if (CONNECTED_STATES.includes(booking.status)) return booking;
+    return { ...booking, provider: null };
+  }
+
+  /** The customer-facing read of one booking. */
+  async getOne(id: string, user: AuthUser) {
+    return this.maskUnconnected(await this.getForParty(id, user), user);
   }
 
   async getForParty(id: string, user: AuthUser) {

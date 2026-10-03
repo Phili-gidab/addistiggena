@@ -26,7 +26,7 @@ export class BookingsController {
 
   @Get(':id')
   get(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.bookings.getForParty(id, user);
+    return this.bookings.getOne(id, user);
   }
 
   @Get(':id/track')

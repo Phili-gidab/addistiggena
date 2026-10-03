@@ -1,11 +1,22 @@
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Linking, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, CatIcon, Countdown, ErrorBox, H1, Hint, OkBox, Row, StatusPill } from '../../components/ui';
 import { api, Booking, Category, fmtDate, ProviderProfile } from '../../lib/api';
 import { C, F, S } from '../../lib/theme';
+
+/** Hand the customer's pin to whichever map app the phone has - that gives
+ *  real turn-by-turn without an embedded map or a Google key. */
+function navigateTo(lat: number, lng: number, label: string) {
+  const q = `${lat},${lng}`;
+  Linking.openURL(`google.navigation:q=${q}`).catch(() =>
+    Linking.openURL(`geo:${q}?q=${q}(${encodeURIComponent(label)})`).catch(() =>
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${q}`).catch(() => {}),
+    ),
+  );
+}
 
 /**
  * Technician job board: availability toggle (with a GPS ping so dispatch ranks
@@ -228,7 +239,21 @@ export default function Jobs() {
                 {j.landmarkNote ? `\nLandmark: ${j.landmarkNote}` : ''}
               </Hint>
               {j.description ? <Hint style={{ marginTop: 4 }}>“{j.description}”</Hint> : null}
-              <Row style={{ marginTop: 12, flexWrap: 'wrap' }}>
+              <Row style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+                <Btn
+                  title="Navigate · መንገድ"
+                  kind="line"
+                  small
+                  onPress={() => navigateTo(j.lat, j.lng, j.customer?.name ?? 'Customer')}
+                />
+                {!!j.customer?.phone && (
+                  <Btn
+                    title="Call · ደውል"
+                    kind="line"
+                    small
+                    onPress={() => Linking.openURL(`tel:${j.customer!.phone}`).catch(() => {})}
+                  />
+                )}
                 {na && (
                   <Btn title={na.label} small busy={busy === j.id + na.action} onPress={() => transition(j.id, na.action)} />
                 )}

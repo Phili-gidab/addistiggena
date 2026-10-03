@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Am, Btn, Card, CatIcon, Countdown, ErrorBox, Field, Hint, OkBox, Row, StatusPill } from '../../components/ui';
 import { api, authedImageSource, Booking, fmtDate, Ticket } from '../../lib/api';
@@ -8,7 +8,31 @@ import { STATUS_FLOW } from '../../lib/catalog';
 import { C, F, R, S } from '../../lib/theme';
 
 const ACTIVE = ['REQUESTED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
+/** Once accepted the two sides are introduced - name, phone and position. */
+const CONNECTED = ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'];
 const GUARANTEE_DAYS = 5;
+
+interface TrackInfo {
+  tracking?: boolean;
+  lat?: number;
+  lng?: number;
+  distanceM?: number;
+  etaMinutes: number | null;
+}
+
+/** Hand the position to whichever map app the phone has. An embedded live map
+ *  would need a native maps module and a Google key; the device's own map does
+ *  the job today and gives real turn-by-turn on top. */
+function openMap(lat: number, lng: number, label: string) {
+  const q = `${lat},${lng}`;
+  Linking.openURL(`geo:${q}?q=${q}(${encodeURIComponent(label)})`).catch(() =>
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`).catch(() => {}),
+  );
+}
+
+function call(phone: string) {
+  Linking.openURL(`tel:${phone}`).catch(() => {});
+}
 
 /** Customer booking detail: live timeline, dispatch countdown, cash payment,
  *  rating, and the "something's wrong" / guarantee-claim door to Support. */
@@ -16,7 +40,7 @@ export default function BookingDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [track, setTrack] = useState<{ etaMinutes: number | null } | null>(null);
+  const [track, setTrack] = useState<TrackInfo | null>(null);
   const [now, setNow] = useState(Date.now());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -31,8 +55,8 @@ export default function BookingDetail() {
     try {
       const b = await api<Booking>(`/bookings/${id}`);
       setBooking(b);
-      if (['EN_ROUTE', 'ARRIVED'].includes(b.status)) {
-        api<{ etaMinutes: number | null }>(`/bookings/${id}/track`).then(setTrack).catch(() => {});
+      if (CONNECTED.includes(b.status)) {
+        api<TrackInfo>(`/bookings/${id}/track`).then(setTrack).catch(() => {});
       }
       api<Ticket[]>('/tickets/mine').then((all) => setTickets(all.filter((t) => (t as Ticket & { booking?: { id: string } }).booking?.id === id || (t as Ticket & { bookingId?: string }).bookingId === id))).catch(() => {});
     } catch (e) {
@@ -115,7 +139,7 @@ export default function BookingDetail() {
                 Our dispatch team is assigning a technician manually - hang tight, this rarely takes
                 more than a few minutes.
               </Hint>
-            ) : booking.provider ? (
+            ) : booking.offerExpiresAt ? (
               <>
                 {offerSecs !== null && <Countdown seconds={offerSecs} />}
                 <Hint style={{ color: C.warnFg, marginTop: 8 }}>
@@ -129,22 +153,62 @@ export default function BookingDetail() {
           </Card>
         )}
 
-        {/* ETA while en-route */}
-        {['EN_ROUTE', 'ARRIVED'].includes(booking.status) && (
+        {/* Your technician: who they are, where they are, and how to reach
+            them. None of this exists before they accept - the client was
+            explicit that contact comes after we connect the two sides. */}
+        {CONNECTED.includes(booking.status) && booking.provider && (
           <Card style={{ marginTop: S.lg, backgroundColor: C.blueSoft, borderColor: '#cfe3f7' }}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={st.etaLabel}>
-                  {booking.provider?.user?.name ?? 'Your technician'}{' '}
-                  {booking.status === 'ARRIVED' ? 'has arrived' : 'is on the way'}
+                  {booking.provider.user?.name ?? 'Your technician'}
+                  {booking.status === 'ARRIVED'
+                    ? ' has arrived'
+                    : booking.status === 'EN_ROUTE'
+                      ? ' is on the way'
+                      : booking.status === 'IN_PROGRESS'
+                        ? ' is working'
+                        : ' accepted your job'}
                 </Text>
-                <Am>{booking.status === 'ARRIVED' ? 'ደርሷል' : 'በመንገድ ላይ ነው'}</Am>
+                <Am>
+                  {booking.status === 'ARRIVED'
+                    ? 'ደርሷል'
+                    : booking.status === 'EN_ROUTE'
+                      ? 'በመንገድ ላይ ነው'
+                      : 'ስራዎን ተቀብሏል'}
+                </Am>
+                {track?.tracking && track.distanceM != null && (
+                  <Hint style={{ marginTop: 4 }}>
+                    {track.distanceM < 1000
+                      ? `${Math.round(track.distanceM)} m away`
+                      : `${(track.distanceM / 1000).toFixed(1)} km away`}
+                  </Hint>
+                )}
               </View>
               {track?.etaMinutes != null && booking.status === 'EN_ROUTE' && (
                 <View style={st.etaBox}>
                   <Text style={st.etaV}>{track.etaMinutes}</Text>
                   <Text style={st.etaK}>min</Text>
                 </View>
+              )}
+            </Row>
+            <Row style={{ marginTop: 12, gap: 8 }}>
+              {!!booking.provider.user?.phone && (
+                <Btn
+                  title="Call · ደውል"
+                  small
+                  onPress={() => call(booking.provider!.user!.phone)}
+                />
+              )}
+              {track?.tracking && track.lat != null && track.lng != null && (
+                <Btn
+                  title="See on map · ካርታ"
+                  kind="line"
+                  small
+                  onPress={() =>
+                    openMap(track.lat!, track.lng!, booking.provider?.user?.name ?? 'Technician')
+                  }
+                />
               )}
             </Row>
           </Card>
