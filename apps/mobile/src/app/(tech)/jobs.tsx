@@ -36,7 +36,7 @@ export default function Jobs() {
     try {
       const [p, mine] = await Promise.all([
         api<ProviderProfile | null>('/providers/me').catch(() => null),
-        api<Booking[]>('/bookings/mine'),
+        api<Booking[]>('/bookings/mine?as=provider'),
       ]);
       setProfile(p);
       setJobs(mine);

@@ -15,13 +15,15 @@ export default function CustomerTabs() {
   // Android runs edge-to-edge: without the bottom inset the system navigation
   // bar covers the tab bar entirely (seen on Samsung M10-class devices).
   const insets = useSafeAreaInsets();
-  const { user, ready } = useAuth();
+  const { user, ready, mode } = useAuth();
 
   // These tabs used to stay mounted whoever was signed in, so signing out or
-  // switching account left the previous person's screens on display.
+  // switching account left the previous person's screens on display. A
+  // technician IS allowed in here - they book repairs like anyone else - so the
+  // gate is the mode they chose, not their role.
   if (!ready) return null;
   if (!user) return <Redirect href="/welcome" />;
-  if (user.role === 'PROVIDER') return <Redirect href="/(tech)/jobs" />;
+  if (mode === 'technician') return <Redirect href="/(tech)/jobs" />;
 
   return (
     <Tabs

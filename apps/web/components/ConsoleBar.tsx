@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { clearSession, getUser } from '../lib/api';
+import { clearSession, getUser, setMode } from '../lib/api';
 
 /**
  * Top bar for the staff console and the technician workspace. Those screens
@@ -50,6 +50,21 @@ export function ConsoleBar({
           {me?.name ?? me?.phone?.replace('+251', '0')}
           <small>{me?.role ? me.role.replace(/_/g, ' ').toLowerCase() : ''}</small>
         </span>
+        {/* A technician is also a customer sometimes, and registering set
+            their account role for good - without this they could never browse
+            or book a repair of their own again. */}
+        {me?.role === 'PROVIDER' && (
+          <button
+            className="btn btn-line btn-sm"
+            title="Book a technician for your own home"
+            onClick={() => {
+              setMode('customer');
+              router.push('/');
+            }}
+          >
+            Book a service
+          </button>
+        )}
         <button
           className="btn btn-line btn-sm"
           onClick={() => {

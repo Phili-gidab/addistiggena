@@ -259,6 +259,10 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       if (provider.categoryId !== dto.categoryId) {
         throw new BadRequestException('Technician does not offer this service');
       }
+      // a technician booking a repair cannot pick themselves
+      if (provider.userId === customerId) {
+        throw new BadRequestException('You cannot book your own services');
+      }
     }
 
     const created = await this.prisma.booking.create({
@@ -344,7 +348,9 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       where: { id: bookingId },
       include: {
         category: true,
-        customer: { select: { phone: true, telegramChatId: true, language: true } },
+        customer: {
+          select: { phone: true, telegramChatId: true, language: true, providerProfile: { select: { id: true } } },
+        },
         offers: { select: { providerId: true } },
       },
     });
@@ -358,12 +364,18 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
       offerExpiresAt: booking.offerExpiresAt,
     };
 
-    const exclude = booking.offers.map((o) => o.providerId);
+    // A technician may also be a customer. Dispatch must never hand them their
+    // own job: they are the closest technician to their own house, so without
+    // this they would be offered it first, every time.
+    const offered = booking.offers.map((o) => o.providerId);
+    const exclude = [...offered];
+    const ownProfileId = booking.customer?.providerProfile?.id;
+    if (ownProfileId && !exclude.includes(ownProfileId)) exclude.push(ownProfileId);
     const rules = await this.dispatchRules();
 
     // the offered technician declined or let the window lapse -> hold for
     // manual assignment by Ops instead of auto-offering the next one
-    if (exclude.length >= rules.escalateAfter && !booking.escalatedAt) {
+    if (offered.length >= rules.escalateAfter && !booking.escalatedAt) {
       const { count } = await this.prisma.booking.updateMany({
         where: claim,
         data: { providerId: null, offerExpiresAt: null, escalatedAt: new Date() },
@@ -373,7 +385,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
           ref: bookingId.slice(-6).toUpperCase(),
         });
         this.logger.warn(
-          `Booking ${bookingId} escalated to Ops after ${exclude.length} declined/expired offers`,
+          `Booking ${bookingId} escalated to Ops after ${offered.length} declined/expired offers`,
         );
       }
       return this.getPublic(bookingId);
@@ -399,7 +411,7 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
           categoryAm: booking.category.nameAm,
         });
         this.logger.log(
-          `Booking ${bookingId} expired: candidate pool exhausted (${exclude.length} offered)`,
+          `Booking ${bookingId} expired: candidate pool exhausted (${offered.length} offered)`,
         );
       }
       return this.getPublic(bookingId);
@@ -431,8 +443,14 @@ export class BookingsService implements OnModuleInit, OnModuleDestroy {
     return this.getPublic(bookingId);
   }
 
-  async mine(user: AuthUser) {
-    if (user.role === 'PROVIDER') {
+  /**
+   * Registering as a technician flips the account's role for good, and this
+   * used to decide on its own which list came back - so a technician who
+   * booked a repair for their own home could never see it. The caller now says
+   * which side it is asking about; without that it falls back to the role.
+   */
+  async mine(user: AuthUser, as?: 'customer' | 'provider') {
+    if (as !== 'customer' && (as === 'provider' || user.role === 'PROVIDER')) {
       const profile = await this.prisma.providerProfile.findUnique({
         where: { userId: user.userId },
       });

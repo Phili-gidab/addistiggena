@@ -166,6 +166,27 @@ export function clearSession() {
   localStorage.removeItem('tg_token');
   localStorage.removeItem('tg_refresh');
   localStorage.removeItem('tg_user');
+  localStorage.removeItem('tg_mode');
+  window.dispatchEvent(new Event('tg-auth'));
+}
+
+/**
+ * Which side of the site a technician is using. Registering as a technician
+ * sets the account's role to PROVIDER permanently, so the role cannot answer
+ * "is this person booking or working right now" - a technician who needs an
+ * electrician at home is a customer that evening. Everyone else is a customer
+ * and has nothing to switch.
+ */
+export type Mode = 'customer' | 'technician';
+
+export function getMode(): Mode {
+  if (typeof window === 'undefined') return 'customer';
+  if (getUser()?.role !== 'PROVIDER') return 'customer';
+  return localStorage.getItem('tg_mode') === 'customer' ? 'customer' : 'technician';
+}
+
+export function setMode(mode: Mode) {
+  localStorage.setItem('tg_mode', mode);
   window.dispatchEvent(new Event('tg-auth'));
 }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser, JwtAuthGuard } from '../auth/guards';
 import { AuthUser } from '../auth/jwt.strategy';
 import {
@@ -19,9 +19,10 @@ export class BookingsController {
     return this.bookings.create(user.userId, dto);
   }
 
+  /** `as=customer` asks for the repairs I booked, even if I am a technician. */
   @Get('mine')
-  mine(@CurrentUser() user: AuthUser) {
-    return this.bookings.mine(user);
+  mine(@CurrentUser() user: AuthUser, @Query('as') as?: string) {
+    return this.bookings.mine(user, as === 'customer' ? 'customer' : as === 'provider' ? 'provider' : undefined);
   }
 
   @Get(':id')

@@ -177,6 +177,28 @@ export class ApiError extends Error {
 const K_TOKEN = 'tg_token';
 const K_REFRESH = 'tg_refresh';
 const K_USER = 'tg_user';
+const K_MODE = 'tg_mode';
+
+/**
+ * Which side of the app someone is using. Registering as a technician sets the
+ * account's role to PROVIDER permanently, so the role cannot answer "is this
+ * person booking or working right now" - a technician who needs an electrician
+ * at home is a customer that evening. This is their last choice, remembered.
+ */
+export type Mode = 'customer' | 'technician';
+
+export async function loadMode(): Promise<Mode | null> {
+  try {
+    const v = await SecureStore.getItemAsync(K_MODE);
+    return v === 'customer' || v === 'technician' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveMode(mode: Mode): void {
+  SecureStore.setItemAsync(K_MODE, mode).catch(() => {});
+}
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;

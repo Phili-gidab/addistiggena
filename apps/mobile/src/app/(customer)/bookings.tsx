@@ -13,7 +13,7 @@ export default function Bookings() {
 
   const load = useCallback(async () => {
     try {
-      setItems(await api<Booking[]>('/bookings/mine'));
+      setItems(await api<Booking[]>('/bookings/mine?as=customer'));
     } catch {
       setItems((prev) => prev ?? []);
     }

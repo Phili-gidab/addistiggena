@@ -8,7 +8,7 @@ import { CredentialsCard } from '../../components/CredentialsCard';
 import { useAuth } from '../../store/auth';
 
 export default function Profile() {
-  const { user, updateName, signOut } = useAuth();
+  const { user, updateName, signOut, canSwitchMode, setMode } = useAuth();
   const [name, setName] = useState(user?.name ?? '');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -73,6 +73,28 @@ export default function Profile() {
         </Card>
 
         <CredentialsCard />
+
+        {/* A technician is also a customer sometimes. Registering sets the
+            account role to PROVIDER for good, so without this they could never
+            book a repair of their own again. */}
+        {canSwitchMode && (
+          <Card style={{ marginTop: S.md }}>
+            <Text style={st.h}>{'Technician mode · ባለሙያ'}</Text>
+            <Hint style={{ marginTop: 6, marginBottom: S.md, lineHeight: 19 }}>
+              {'You are booking as a customer. Switch back to see your job offers and earnings.'}
+            </Hint>
+            <Btn
+              title={'Go to my job board →'}
+              kind="line"
+              small
+              onPress={() => {
+                setMode('technician');
+                router.replace('/(tech)/jobs');
+              }}
+            />
+          </Card>
+        )}
+
 
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Support · ድጋፍ</Text>

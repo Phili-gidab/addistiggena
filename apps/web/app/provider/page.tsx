@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ConsoleBar } from '../../components/ConsoleBar';
 import { Stars } from '../../components/Stars';
 import { StatusBadge } from '../../components/StatusBadge';
-import { api, API_URL, ApiError, Booking, Category, fmtDate, getToken, getUser, isStaff } from '../../lib/api';
+import { api, API_URL, ApiError, Booking, Category, fmtDate, getToken, getUser, isStaff, setMode } from '../../lib/api';
 import { SUB_CITIES } from '../../lib/areas';
 
 interface ProviderDoc {
@@ -148,7 +148,10 @@ export default function ProviderPage() {
       .then((p) => {
         setProfile(p);
         setNoProfile(false);
-        api<Booking[]>('/bookings/mine').then(setJobs).catch(() => {});
+        // being here IS working, so the homepage should send them back here
+        // next time rather than to the customer side
+        setMode('technician');
+        api<Booking[]>('/bookings/mine?as=provider').then(setJobs).catch(() => {});
         api<WalletDetail>('/wallet/me').then(setWalletDetail).catch(() => {});
         api<DepositAccount[]>('/wallet/accounts').then(setAccounts).catch(() => setAccounts([]));
       })

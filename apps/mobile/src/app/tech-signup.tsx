@@ -35,7 +35,7 @@ const EDUCATION = [
  * closed until the verification desk marks them verified.
  */
 export default function TechSignup() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, setMode } = useAuth();
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -116,6 +116,8 @@ export default function TechSignup() {
       // and the technician tabs turn away anyone who still reads as a customer.
       // So the refresh has to land before we send them there.
       const fresh = await refreshUser();
+      // they just became a technician, so that is the side they are on now
+      setMode('technician');
       if (fresh?.role !== 'PROVIDER') {
         setError('Registration saved. Sign in again to open your technician profile.');
         return;

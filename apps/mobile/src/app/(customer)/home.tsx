@@ -84,7 +84,7 @@ export default function Home() {
     try {
       const [cats, mine] = await Promise.all([
         api<Category[]>('/catalog/categories'),
-        api<Booking[]>('/bookings/mine').catch(() => [] as Booking[]),
+        api<Booking[]>('/bookings/mine?as=customer').catch(() => [] as Booking[]),
       ]);
       setCategories(cats);
       setActive(

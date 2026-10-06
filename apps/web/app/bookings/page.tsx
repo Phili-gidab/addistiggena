@@ -16,7 +16,7 @@ export default function BookingsPage() {
       router.replace('/login?next=/bookings');
       return;
     }
-    api<Booking[]>('/bookings/mine')
+    api<Booking[]>('/bookings/mine?as=customer')
       .then(setBookings)
       .catch((e) => setError((e as Error).message));
   }, [router]);

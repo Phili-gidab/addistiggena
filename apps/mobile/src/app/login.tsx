@@ -11,7 +11,8 @@ type Stage = 'phone' | 'code' | 'name' | 'credentials' | 'password';
 
 /** Phone-OTP first (the consumer flow), with a username/password door for staff & demo. */
 export default function Login() {
-  const { user, requestOtp, verifyOtp, passwordLogin, updateName, setCredentials } = useAuth();
+  const { user, requestOtp, verifyOtp, passwordLogin, updateName, setCredentials, setMode } =
+    useAuth();
   /** "I am a technician" on the welcome screen sets this. */
   const { role } = useLocalSearchParams<{ role?: string }>();
   const asTech = role === 'tech';
@@ -34,11 +35,23 @@ export default function Login() {
     return () => clearInterval(t);
   }, [cooldown]);
 
+  /**
+   * The welcome screen already asked which they came for, so honour it. A
+   * technician who tapped "I need a repair" gets the customer side - they used
+   * to be dragged to the job board instead, because registering as a technician
+   * sets the account role for good and routing read that role alone.
+   */
   const go = (user: User) => {
-    if (user.role === 'PROVIDER') router.replace('/(tech)/jobs');
+    if (user.role === 'PROVIDER') {
+      const next = asTech ? 'technician' : 'customer';
+      setMode(next);
+      router.replace(next === 'technician' ? '/(tech)/jobs' : '/(customer)/home');
+      return;
+    }
+    setMode('customer');
     // came in through "I am a technician" but the account is still a plain
     // customer - send them through onboarding rather than the customer home
-    else if (asTech) router.replace('/tech-signup');
+    if (asTech) router.replace('/tech-signup');
     else router.replace('/(customer)/home');
   };
 

@@ -15,11 +15,14 @@ export default function TechTabs() {
   // Android runs edge-to-edge: without the bottom inset the system navigation
   // bar covers the tab bar entirely (seen on Samsung M10-class devices).
   const insets = useSafeAreaInsets();
-  const { user, ready } = useAuth();
+  const { user, ready, mode } = useAuth();
 
   if (!ready) return null;
   if (!user) return <Redirect href="/welcome" />;
-  if (user.role !== 'PROVIDER') return <Redirect href="/(customer)/home" />;
+  // only a technician has this side at all, and only while they are on it
+  if (user.role !== 'PROVIDER' || mode !== 'technician') {
+    return <Redirect href="/(customer)/home" />;
+  }
 
   return (
     <Tabs

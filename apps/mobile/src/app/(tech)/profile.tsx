@@ -25,7 +25,7 @@ const OPTIONAL: { type: DocumentType; label: string; am: string; hint: string }[
 
 /** Technician profile: identity, verification state, rating, sign out. */
 export default function TechProfile() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, canSwitchMode, setMode } = useAuth();
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
   const [busy, setBusy] = useState<DocumentType | null>(null);
   const [error, setError] = useState('');
@@ -102,6 +102,28 @@ export default function TechProfile() {
         )}
 
         <CredentialsCard />
+
+        {/* A technician is also a customer sometimes. Registering sets the
+            account role to PROVIDER for good, so without this they could never
+            book a repair of their own again. */}
+        {canSwitchMode && (
+          <Card style={{ marginTop: S.md }}>
+            <Text style={st.h}>{'Need a repair yourself? · አገልግሎት ይፈልጋሉ?'}</Text>
+            <Hint style={{ marginTop: 6, marginBottom: S.md, lineHeight: 19 }}>
+              {'Switch to the customer side to book a technician for your own home. Your job board stays exactly as it is.'}
+            </Hint>
+            <Btn
+              title={'Book a service →'}
+              kind="line"
+              small
+              onPress={() => {
+                setMode('customer');
+                router.replace('/(customer)/home');
+              }}
+            />
+          </Card>
+        )}
+
 
         <Card style={{ marginTop: S.md }}>
           <Text style={st.h}>Documents · ሰነዶች</Text>

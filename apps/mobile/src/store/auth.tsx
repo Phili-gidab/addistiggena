@@ -2,8 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   api,
   clearSession,
+  loadMode,
   loadSession,
+  Mode,
   normalizeEtPhone,
+  saveMode,
   setSessionLostHandler,
   startSession,
   storeUser,
@@ -13,6 +16,16 @@ import {
 interface AuthState {
   user: User | null;
   ready: boolean;
+  /**
+   * Which side of the app this person is using. Registering as a technician
+   * flips the account's role for good, so the role alone cannot answer it -
+   * a technician who needs a plumber at home is a customer that evening.
+   * Anyone who is not a technician is always in 'customer'.
+   */
+  mode: Mode;
+  /** True only for a technician, who is the only one with two sides. */
+  canSwitchMode: boolean;
+  setMode: (mode: Mode) => void;
   passwordLogin: (username: string, password: string) => Promise<User>;
   requestOtp: (phone: string) => Promise<{ devCode?: string }>;
   verifyOtp: (phone: string, code: string) => Promise<User>;
@@ -29,13 +42,25 @@ const Ctx = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const [modeState, setModeState] = useState<Mode>('customer');
 
   useEffect(() => {
     setSessionLostHandler(() => setUser(null));
-    loadSession().then((u) => {
+    Promise.all([loadSession(), loadMode()]).then(([u, m]) => {
       setUser(u);
+      // a technician lands on their own side unless they last chose otherwise
+      setModeState(u?.role === 'PROVIDER' ? (m ?? 'technician') : 'customer');
       setReady(true);
     });
+  }, []);
+
+  const canSwitchMode = user?.role === 'PROVIDER';
+  // someone who is not a technician has no second side to be on
+  const mode: Mode = canSwitchMode ? modeState : 'customer';
+
+  const setMode = useCallback((next: Mode) => {
+    setModeState(next);
+    saveMode(next);
   }, []);
 
   const passwordLogin = useCallback(async (username: string, password: string) => {
@@ -98,6 +123,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       ready,
+      mode,
+      canSwitchMode,
+      setMode,
       passwordLogin,
       requestOtp,
       verifyOtp,
@@ -109,6 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [
       user,
       ready,
+      mode,
+      canSwitchMode,
+      setMode,
       passwordLogin,
       requestOtp,
       verifyOtp,
